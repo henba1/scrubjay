@@ -60,10 +60,27 @@ bin/                      # the sync scripts
   `~/.claude/projects/<slug>/<session>/subagents/`). We only record *where* they are:
   `hosts/<host>/chats.index.json` stores each project's `slug`, `cwd`, and
   `transcripts_dir` — a pointer to the dir, not its contents.
-- **Finding a past chat** ("I talked about X somewhere — where?"): a `Stop` hook
-  (`hooks/log-session.sh`) appends one line per session to `logs/<host>.log`
-  (`time | host | cwd | "first prompt" | session=id`) and pushes it, so every machine's
-  history is greppable from any clone: `grep -i <keyword> logs/*.log`.
+
+## Find a past chat
+
+Lost track of *where* a conversation happened? Every Claude Code session is logged — a
+`Stop` hook (`hooks/log-session.sh`) writes one line to `logs/<host>.log` and pushes it,
+so all machines' histories aggregate in the repo and are searchable from any clone:
+
+```sh
+git pull                       # pick up sessions logged on other machines
+grep -i foolbox logs/*.log     # search every machine's history by keyword
+```
+
+Each hit tells you when, on which machine, in which directory, and your opening prompt:
+
+```
+logs/snellius.log:2026-06-23 22:56 | snellius | /gpfs/home2/jvrijn/code/VERONA | "add L2 attack to the foolbox example" | session=a65fb7ea-...
+```
+
+From there you have the **host** and **cwd** to resume in; the `session=<id>` maps to the
+full transcript on that host under `~/.claude/projects/<slug>/`. (The transcript itself
+never leaves its machine — the log is just the searchable pointer.)
 
 ## Host identity
 

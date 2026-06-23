@@ -29,6 +29,10 @@ digraph dotclaude {
           fillcolor="#fde68a", color="#d97706", fontcolor="#92400e"];
   }
 
+  FIND [shape=note, fontname="Helvetica", fillcolor="#dcfce7", color="#16a34a",
+        fontcolor="#166534", label="find a past chat\ngrep logs/*.log"];
+  GH  -> FIND [style=dashed, label="search every host's history"];
+
   GH  -> C1  [dir=both, label="git push / pull"];
   GH  -> C2  [dir=both, label="git clone / pull"];
   C1  -> CFG1 [label="claude-sync.sh\n(symlink + merge)"];
