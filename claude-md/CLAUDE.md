@@ -8,6 +8,10 @@
 - Never add a `Co-Authored-By: Claude` trailer to commits or PRs. Only my name in
   history. (Also enforced via `attribution` in settings.)
 - Branch before committing on `main`; commit/push only when I ask.
+- **Always use my GitHub SSH key for pushing and signing — never the auth token
+  (`GH_TOKEN`/PAT).** If a remote is `https://github.com/...`, switch it to SSH
+  (`git@github.com:...`) before pushing. Commit signing uses the SSH signing key, not
+  a token. The PAT is for read/API only.
 
 ## Working style
 - If you genuinely think a different approach is better than what I asked for, say so
