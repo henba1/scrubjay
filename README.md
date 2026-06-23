@@ -2,24 +2,24 @@
 
 ```mermaid
 flowchart LR
-    GH[("☁️ GitHub — henba1/dotclaude<br/>private · source of truth")]
+    GH[("📦 dotclaude — config repo<br/>├ hosts/ — per-machine env<br/>├ settings/ — shared base<br/>├ claude-md/ — rules · commands · agents<br/>├ templates/ — project snippets<br/>├ memory/ — portable facts<br/>└ bin/ — sync scripts")]
 
-    subgraph SNELLIUS["💻 snellius — this host"]
+    subgraph A["💻 this machine"]
         direction TB
-        C1["📁 clone<br/>~/code/dotclaude"]
+        C1["📁 local clone"]
         CFG1["⚙️ ~/.claude<br/>CLAUDE.md · commands · agents<br/>settings.json (merged)"]
         TX1["🔒 ~/.claude/projects/**<br/>chat + agent transcripts"]
     end
 
-    subgraph OTHER["💻 other machine — future"]
+    subgraph B["💻 another machine"]
         direction TB
-        C2["📁 clone"]
+        C2["📁 local clone"]
         CFG2["⚙️ ~/.claude"]
         TX2["🔒 projects/** transcripts"]
     end
 
-    GH <-->|"git push / pull<br/>SSH · signed"| C1
-    GH <-->|"git clone / pull · SSH"| C2
+    GH <-->|"git push / pull"| C1
+    GH <-->|"git clone / pull"| C2
     C1 -->|"claude-sync.sh<br/>symlink + merge"| CFG1
     C2 -->|"claude-sync.sh"| CFG2
     TX1 -.->|"claude-index-chats.sh<br/>metadata only"| C1
@@ -31,10 +31,10 @@ flowchart LR
     class TX1,TX2 priv
 ```
 
-> **Flow:** config lives in GitHub and flows **down** into each machine's `~/.claude`
+> **Flow:** config lives in the repo and flows **down** into each machine's `~/.claude`
 > via `claude-sync.sh`; each host's chat **index** flows **up** via
 > `claude-index-chats.sh`. 🔒 Transcripts are indexed by *location only* — they never
-> leave the host. Git ops use SSH (signed commits); the PAT is read/API only.
+> leave the host.
 
 Private repo that organizes my [Claude Code](https://claude.ai/code) configuration
 across machines. Top level is keyed by **machine**, so each machine's env stays
