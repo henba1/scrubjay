@@ -1,0 +1,26 @@
+[
+  {
+    "project": "rs",
+    "cwd": "/gpfs/home2/jvrijn/code/rs",
+    "slug": "-gpfs-home2-jvrijn-code-rs",
+    "sessions": 1,
+    "size": "17K",
+    "last": "2026-06-12"
+  },
+  {
+    "project": "VERONA_rs_rd",
+    "cwd": "/gpfs/home2/jvrijn/code/rs/verif/VERONA_rs_rd",
+    "slug": "-gpfs-home2-jvrijn-code-rs-verif-VERONA-rs-rd",
+    "sessions": 2,
+    "size": "2.7M",
+    "last": "2026-06-21"
+  },
+  {
+    "project": "VERONA",
+    "cwd": "/gpfs/home2/jvrijn/code/VERONA",
+    "slug": "-gpfs-home2-jvrijn-code-VERONA",
+    "sessions": 10,
+    "size": "5.6M",
+    "last": "2026-06-23"
+  }
+]

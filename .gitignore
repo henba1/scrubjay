@@ -1,0 +1,11 @@
+# Belt-and-suspenders: this repo must NEVER contain Claude secrets or transcripts.
+# (The repo lives outside ~/.claude, so these shouldn't appear here anyway.)
+*.credentials*
+.credentials.json
+.claude.json
+*.jsonl
+projects/
+
+# editor / OS noise
+*.swp
+.DS_Store
