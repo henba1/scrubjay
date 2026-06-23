@@ -33,6 +33,21 @@ bin/                      # the sync scripts
   (`~/.claude.json`), and chat transcripts (`~/.claude/projects/**/*.jsonl`). Chats are
   tracked as a metadata **index** only. `.gitignore` enforces this as a backstop.
 
+## Commands, agents & chat locations
+
+- **Slash commands** are plain Markdown in `claude-md/commands/<name>.md` (optional
+  YAML frontmatter: `description`, `argument-hint`, `allowed-tools`; body is the prompt,
+  `$ARGUMENTS` and `` !`cmd` `` are expanded). Synced as a symlinked dir, so `/<name>`
+  works on every machine. Example: `commands/explain-diff.md`.
+- **Subagents** are Markdown in `claude-md/agents/<name>.md` with YAML frontmatter
+  (`name`, `description`, `tools`, `model`) + a system-prompt body. These are *agent
+  definitions*, version-controlled and reusable. Example: `agents/test-runner.md`.
+- **Chat/agent transcripts are NOT stored here.** They live machine-locally under
+  `~/.claude/projects/<slug>/` (and agent runs under
+  `~/.claude/projects/<slug>/<session>/subagents/`). We only record *where* they are:
+  `hosts/<host>/chats.index.json` stores each project's `slug`, `cwd`, and
+  `transcripts_dir` — a pointer to the dir, not its contents.
+
 ## Host identity
 
 `hostname -s` is unreliable on HPC (transient login nodes like `int6`). The stable

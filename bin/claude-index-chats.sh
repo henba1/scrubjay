@@ -33,11 +33,13 @@ for d in "$PROJDIR"/*/; do
   size="$(du -sh "$d" 2>/dev/null | cut -f1)"
   last_epoch="$(find "$d" -maxdepth 1 -name '*.jsonl' -printf '%T@\n' | sort -nr | head -1)"
   last="$(date -d "@${last_epoch%.*}" +%Y-%m-%d 2>/dev/null || echo unknown)"
+  tdir="${d%/}"; tdir="${tdir/#$HOME/~}"   # link to where the transcripts live ($HOME tokenized)
   obj="$(jq -n \
     --arg slug "$slug" --arg cwd "$cwd" --argjson sessions "${#jsonls[@]}" \
-    --arg size "$size" --arg last "$last" \
+    --arg size "$size" --arg last "$last" --arg tdir "$tdir" \
     '{project: (if $cwd=="" then $slug else ($cwd|split("/")|last) end),
-      cwd: $cwd, slug: $slug, sessions: $sessions, size: $size, last: $last}')"
+      cwd: $cwd, slug: $slug, sessions: $sessions, size: $size, last: $last,
+      transcripts_dir: $tdir}')"
   jq --argjson o "$obj" '. += [$o]' "$tmp" > "$tmp.2" && mv "$tmp.2" "$tmp"
 done
 mv "$tmp" "$OUT"
