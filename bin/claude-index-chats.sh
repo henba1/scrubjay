@@ -1,22 +1,17 @@
 #!/usr/bin/env bash
-# Build hosts/<host>/chats.index.json: a registry of which Claude projects/chats
+# Build <data>/hosts/<host>/chats.index.json: a registry of which Claude projects/chats
 # live on this machine. Indexes metadata only — never copies transcript contents.
 set -euo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$APP/bin/lib.sh"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 PROJDIR="$CLAUDE_DIR/projects"
-HOST=""
-[ "${1:-}" = "--host" ] && { HOST="${2:?}"; shift 2; }
+[ "${1:-}" = "--host" ] && { CLAUDE_HOST="${2:?}"; export CLAUDE_HOST; shift 2; }
 
-resolve_host() {
-  [ -n "$HOST" ] && { echo "$HOST"; return; }
-  [ -n "${CLAUDE_HOST:-}" ] && { echo "$CLAUDE_HOST"; return; }
-  [ -f "$HOME/.config/dotclaude/host" ] && { cat "$HOME/.config/dotclaude/host"; return; }
-  hostname -s
-}
-HOST="$(resolve_host)"
-OUT="$REPO/hosts/$HOST/chats.index.json"
+HOST="$(dc_host)"
+DATA="$(dc_data)"
+OUT="$DATA/hosts/$HOST/chats.index.json"
 mkdir -p "$(dirname "$OUT")"
 
 tmp="$(mktemp)"; echo "[]" > "$tmp"
@@ -33,7 +28,7 @@ for d in "$PROJDIR"/*/; do
   size="$(du -sh "$d" 2>/dev/null | cut -f1)"
   last_epoch="$(find "$d" -maxdepth 1 -name '*.jsonl' -printf '%T@\n' | sort -nr | head -1)"
   last="$(date -d "@${last_epoch%.*}" +%Y-%m-%d 2>/dev/null || echo unknown)"
-  tdir="${d%/}"; tdir="${tdir/#$HOME/~}"   # link to where the transcripts live ($HOME tokenized)
+  tdir="${d%/}"; tdir="${tdir/#$HOME/~}"
   obj="$(jq -n \
     --arg slug "$slug" --arg cwd "$cwd" --argjson sessions "${#jsonls[@]}" \
     --arg size "$size" --arg last "$last" --arg tdir "$tdir" \

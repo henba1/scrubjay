@@ -1,42 +1,43 @@
-// Source for docs/overview.svg — render with:  dot -Tsvg docs/overview.dot -o docs/overview.svg
+// Source for docs/overview.svg — render: dot -Tsvg docs/overview.dot -o docs/overview.svg
 digraph dotclaude {
-  rankdir=LR;
-  bgcolor="white";
+  rankdir=LR; bgcolor="white";
   fontname="Helvetica"; fontsize=11;
-  node  [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
-         fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
-  edge  [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
+  node [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+        fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
+  edge [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
 
-  GH [shape=cylinder, fontname="Courier", fillcolor="#dbeafe", color="#2563eb",
-      fontcolor="#1e3a8a",
-      label="dotclaude — config repo\l \l├ hosts/      per-machine env\l├ settings/   shared base\l├ claude-md/  rules · commands · agents\l├ templates/  project snippets\l├ memory/     portable facts\l├ hooks/      session-log hook\l├ logs/       chat history\l└ bin/        sync scripts\l"];
-
-  subgraph cluster_A {
-    label="this machine"; labeljust="l"; style="rounded"; color="#94a3b8";
-    fontcolor="#334155"; fontsize=11;
-    C1   [label="local clone"];
-    CFG1 [label="~/.claude\nCLAUDE.md · commands · agents\nsettings.json (merged)"];
-    TX1  [label="~/.claude/projects/**\nchat + agent transcripts",
-          fillcolor="#fde68a", color="#d97706", fontcolor="#92400e"];
+  subgraph cluster_gh {
+    label="GitHub"; style="rounded"; color="#cbd5e1"; fontcolor="#334155"; fontsize=11;
+    APP  [shape=cylinder, fillcolor="#dbeafe", color="#2563eb", fontcolor="#1e3a8a",
+          label="dotclaude\napp · logic (public-able)"];
+    DATA [shape=cylinder, fillcolor="#ede9fe", color="#7c3aed", fontcolor="#5b21b6",
+          label="dotclaude-data\nprivate · config + logs"];
+    CH   [shape=cylinder, fillcolor="#fef3c7", color="#d97706", fontcolor="#92400e",
+          label="claude-chats\nprivate · transcripts"];
   }
 
-  subgraph cluster_B {
-    label="another machine"; labeljust="l"; style="rounded"; color="#94a3b8";
-    fontcolor="#334155"; fontsize=11;
-    C2   [label="local clone"];
-    CFG2 [label="~/.claude"];
-    TX2  [label="projects/** transcripts",
-          fillcolor="#fde68a", color="#d97706", fontcolor="#92400e"];
+  subgraph cluster_m {
+    label="any machine"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+    CFG [label="~/.claude\nconfig + hooks"];
+    TX  [label="~/.claude/projects/**\ntranscripts",
+         fillcolor="#fef3c7", color="#d97706", fontcolor="#92400e"];
   }
 
-  FIND [shape=note, fontname="Helvetica", fillcolor="#dcfce7", color="#16a34a",
-        fontcolor="#166534", label="find a past chat\ngrep logs/*.log"];
-  GH  -> FIND [style=dashed, label="search every host's history"];
+  subgraph cluster_home {
+    label="home (always-on)"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+    PI  [label="Raspberry Pi\npull every 30 min"];
+    NAS [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+         label="NAS\nClaude-Code-chats/"];
+  }
 
-  GH  -> C1  [dir=both, label="git push / pull"];
-  GH  -> C2  [dir=both, label="git clone / pull"];
-  C1  -> CFG1 [label="claude-sync.sh\n(symlink + merge)"];
-  C2  -> CFG2 [label="claude-sync.sh"];
-  TX1 -> C1  [style=dashed, label="claude-index-chats.sh\n(metadata only)"];
-  TX2 -> C2  [style=dashed, label="index"];
+  APP  -> CFG  [label="sync: link hooks +\nmerge settings"];
+  DATA -> CFG  [label="pull: rules, commands, agents"];
+  CFG  -> DATA [style=dashed, label="push: logs + chat index"];
+  TX   -> CH   [label="SessionEnd: ship .jsonl"];
+  CH   -> PI   [label="git pull / 30 min"];
+  PI   -> NAS  [label="rsync --delete"];
+
+  FIND [shape=note, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+        label="find a past chat\ngrep logs/*.log"];
+  DATA -> FIND [style=dashed, label="search history"];
 }
