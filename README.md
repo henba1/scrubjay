@@ -1,5 +1,41 @@
 # dotclaude
 
+```mermaid
+flowchart LR
+    GH[("☁️ GitHub — henba1/dotclaude<br/>private · source of truth")]
+
+    subgraph SNELLIUS["💻 snellius — this host"]
+        direction TB
+        C1["📁 clone<br/>~/code/dotclaude"]
+        CFG1["⚙️ ~/.claude<br/>CLAUDE.md · commands · agents<br/>settings.json (merged)"]
+        TX1["🔒 ~/.claude/projects/**<br/>chat + agent transcripts"]
+    end
+
+    subgraph OTHER["💻 other machine — future"]
+        direction TB
+        C2["📁 clone"]
+        CFG2["⚙️ ~/.claude"]
+        TX2["🔒 projects/** transcripts"]
+    end
+
+    GH <-->|"git push / pull<br/>SSH · signed"| C1
+    GH <-->|"git clone / pull · SSH"| C2
+    C1 -->|"claude-sync.sh<br/>symlink + merge"| CFG1
+    C2 -->|"claude-sync.sh"| CFG2
+    TX1 -.->|"claude-index-chats.sh<br/>metadata only"| C1
+    TX2 -.->|"index"| C2
+
+    classDef remote fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+    classDef priv fill:#fde68a,stroke:#d97706,color:#92400e;
+    class GH remote
+    class TX1,TX2 priv
+```
+
+> **Flow:** config lives in GitHub and flows **down** into each machine's `~/.claude`
+> via `claude-sync.sh`; each host's chat **index** flows **up** via
+> `claude-index-chats.sh`. 🔒 Transcripts are indexed by *location only* — they never
+> leave the host. Git ops use SSH (signed commits); the PAT is read/API only.
+
 Private repo that organizes my [Claude Code](https://claude.ai/code) configuration
 across machines. Top level is keyed by **machine**, so each machine's env stays
 distinct and browseable — I can read one machine's rules and have Claude re-tailor
