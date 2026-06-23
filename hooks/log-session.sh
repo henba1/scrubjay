@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Stop hook — append ONE human-readable line per Claude Code session to
-# logs/<host>.log:  timestamp | host | cwd | "first-user-prompt topic" | session=<id>
-# Dedupes per session (writes once), then commits + pushes just that log file.
+# SessionEnd hook — fires exactly once, when a Claude Code session ends. Appends ONE
+# human-readable line to logs/<host>.log:
+#   timestamp | host | cwd | "first-user-prompt topic" | session=<id>
+# then commits + pushes just that log file. (Dedup below is a safety net in case a
+# session is resumed and ended more than once.)
 # Never blocks the session: always exits 0; git work is isolated to the log file.
 #
 # Env knobs:

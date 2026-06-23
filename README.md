@@ -30,7 +30,7 @@ claude-md/                # global instructions + custom tooling (applied to ~/.
 templates/                # reusable project-rule snippets (CLAUDE.local.md)
 memory/                   # portable memory facts (path-tokenized; adapt per machine)
 hooks/                    # event hooks (symlinked into ~/.claude/hooks/)
-  log-session.sh          #   Stop hook: append + push one line per session
+  log-session.sh          #   SessionEnd hook: append + push one line per session
 logs/                     # session history, one <host>.log per machine
 bin/                      # the sync scripts
 ```
@@ -64,8 +64,9 @@ bin/                      # the sync scripts
 ## Find a past chat
 
 Lost track of *where* a conversation happened? Every Claude Code session is logged — a
-`Stop` hook (`hooks/log-session.sh`) writes one line to `logs/<host>.log` and pushes it,
-so all machines' histories aggregate in the repo and are searchable from any clone:
+`SessionEnd` hook (`hooks/log-session.sh`) fires once when the session ends, writes one
+line to `logs/<host>.log` and pushes it, so all machines' histories aggregate in the repo
+and are searchable from any clone:
 
 ```sh
 git pull                       # pick up sessions logged on other machines

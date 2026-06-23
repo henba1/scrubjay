@@ -51,7 +51,7 @@
   "model": "opus",
   "effortLevel": "high",
   "hooks": {
-    "Stop": [
+    "SessionEnd": [
       {
         "hooks": [
           { "type": "command", "command": "\"$HOME/.claude/hooks/log-session.sh\"" }
