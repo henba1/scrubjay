@@ -29,6 +29,9 @@ claude-md/                # global instructions + custom tooling (applied to ~/.
   CLAUDE.md  commands/  agents/
 templates/                # reusable project-rule snippets (CLAUDE.local.md)
 memory/                   # portable memory facts (path-tokenized; adapt per machine)
+hooks/                    # event hooks (symlinked into ~/.claude/hooks/)
+  log-session.sh          #   Stop hook: append + push one line per session
+logs/                     # session history, one <host>.log per machine
 bin/                      # the sync scripts
 ```
 
@@ -57,6 +60,10 @@ bin/                      # the sync scripts
   `~/.claude/projects/<slug>/<session>/subagents/`). We only record *where* they are:
   `hosts/<host>/chats.index.json` stores each project's `slug`, `cwd`, and
   `transcripts_dir` — a pointer to the dir, not its contents.
+- **Finding a past chat** ("I talked about X somewhere — where?"): a `Stop` hook
+  (`hooks/log-session.sh`) appends one line per session to `logs/<host>.log`
+  (`time | host | cwd | "first prompt" | session=id`) and pushes it, so every machine's
+  history is greppable from any clone: `grep -i <keyword> logs/*.log`.
 
 ## Host identity
 

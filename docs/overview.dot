@@ -9,7 +9,7 @@ digraph dotclaude {
 
   GH [shape=cylinder, fontname="Courier", fillcolor="#dbeafe", color="#2563eb",
       fontcolor="#1e3a8a",
-      label="dotclaude — config repo\l \l├ hosts/      per-machine env\l├ settings/   shared base\l├ claude-md/  rules · commands · agents\l├ templates/  project snippets\l├ memory/     portable facts\l└ bin/        sync scripts\l"];
+      label="dotclaude — config repo\l \l├ hosts/      per-machine env\l├ settings/   shared base\l├ claude-md/  rules · commands · agents\l├ templates/  project snippets\l├ memory/     portable facts\l├ hooks/      session-log hook\l├ logs/       chat history\l└ bin/        sync scripts\l"];
 
   subgraph cluster_A {
     label="this machine"; labeljust="l"; style="rounded"; color="#94a3b8";

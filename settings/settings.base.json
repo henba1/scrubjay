@@ -49,5 +49,14 @@
     ]
   },
   "model": "opus",
-  "effortLevel": "high"
+  "effortLevel": "high",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"$HOME/.claude/hooks/log-session.sh\"" }
+        ]
+      }
+    ]
+  }
 }

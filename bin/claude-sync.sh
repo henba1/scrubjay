@@ -55,6 +55,7 @@ echo "symlinking scopes:"
 link "$REPO/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
 link "$REPO/claude-md/commands"  "$CLAUDE_DIR/commands"
 link "$REPO/claude-md/agents"    "$CLAUDE_DIR/agents"
+link "$REPO/hooks"               "$CLAUDE_DIR/hooks"
 
 echo "merging settings:"
 BASE="$REPO/settings/settings.base.json"
