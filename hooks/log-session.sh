@@ -52,7 +52,8 @@ printf '%s | %s | %s | "%s" | session=%s\n' "$ts" "$host" "$cwd" "$topic" "$sid"
 # changes, so we never disturb in-progress work. All best-effort; never fail the hook.
 (
   cd "$REPO" || exit 0
-  git commit -q "logs/$host.log" -m "chat-log: $host $ts" 2>/dev/null || exit 0
+  git add "logs/$host.log" 2>/dev/null            # stage (needed for a host's first entry)
+  git commit -q -m "chat-log: $host $ts" -- "logs/$host.log" 2>/dev/null || exit 0
   if ! timeout 20 git push -q 2>/dev/null; then
     # Remote may be ahead — only rebase+retry if the rest of the tree is clean.
     if [ -z "$(git status --porcelain 2>/dev/null | grep -v "logs/$host.log")" ]; then
