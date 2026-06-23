@@ -1,35 +1,9 @@
 # dotclaude
 
-```mermaid
-flowchart LR
-    GH[("📦 dotclaude — config repo<br/>├ hosts/ — per-machine env<br/>├ settings/ — shared base<br/>├ claude-md/ — rules · commands · agents<br/>├ templates/ — project snippets<br/>├ memory/ — portable facts<br/>└ bin/ — sync scripts")]
+![dotclaude — system overview](docs/overview.svg)
 
-    subgraph A["💻 this machine"]
-        direction TB
-        C1["📁 local clone"]
-        CFG1["⚙️ ~/.claude<br/>CLAUDE.md · commands · agents<br/>settings.json (merged)"]
-        TX1["🔒 ~/.claude/projects/**<br/>chat + agent transcripts"]
-    end
-
-    subgraph B["💻 another machine"]
-        direction TB
-        C2["📁 local clone"]
-        CFG2["⚙️ ~/.claude"]
-        TX2["🔒 projects/** transcripts"]
-    end
-
-    GH <-->|"git push / pull"| C1
-    GH <-->|"git clone / pull"| C2
-    C1 -->|"claude-sync.sh<br/>symlink + merge"| CFG1
-    C2 -->|"claude-sync.sh"| CFG2
-    TX1 -.->|"claude-index-chats.sh<br/>metadata only"| C1
-    TX2 -.->|"index"| C2
-
-    classDef remote fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
-    classDef priv fill:#fde68a,stroke:#d97706,color:#92400e;
-    class GH remote
-    class TX1,TX2 priv
-```
+<sub>Diagram source: [`docs/overview.dot`](docs/overview.dot) — regenerate with
+`dot -Tsvg docs/overview.dot -o docs/overview.svg`.</sub>
 
 > **Flow:** config lives in the repo and flows **down** into each machine's `~/.claude`
 > via `claude-sync.sh`; each host's chat **index** flows **up** via

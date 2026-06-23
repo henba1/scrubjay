@@ -1,0 +1,38 @@
+// Source for docs/overview.svg — render with:  dot -Tsvg docs/overview.dot -o docs/overview.svg
+digraph dotclaude {
+  rankdir=LR;
+  bgcolor="white";
+  fontname="Helvetica"; fontsize=11;
+  node  [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+         fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
+  edge  [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
+
+  GH [shape=cylinder, fontname="Courier", fillcolor="#dbeafe", color="#2563eb",
+      fontcolor="#1e3a8a",
+      label="dotclaude — config repo\l \l├ hosts/      per-machine env\l├ settings/   shared base\l├ claude-md/  rules · commands · agents\l├ templates/  project snippets\l├ memory/     portable facts\l└ bin/        sync scripts\l"];
+
+  subgraph cluster_A {
+    label="this machine"; labeljust="l"; style="rounded"; color="#94a3b8";
+    fontcolor="#334155"; fontsize=11;
+    C1   [label="local clone"];
+    CFG1 [label="~/.claude\nCLAUDE.md · commands · agents\nsettings.json (merged)"];
+    TX1  [label="~/.claude/projects/**\nchat + agent transcripts",
+          fillcolor="#fde68a", color="#d97706", fontcolor="#92400e"];
+  }
+
+  subgraph cluster_B {
+    label="another machine"; labeljust="l"; style="rounded"; color="#94a3b8";
+    fontcolor="#334155"; fontsize=11;
+    C2   [label="local clone"];
+    CFG2 [label="~/.claude"];
+    TX2  [label="projects/** transcripts",
+          fillcolor="#fde68a", color="#d97706", fontcolor="#92400e"];
+  }
+
+  GH  -> C1  [dir=both, label="git push / pull"];
+  GH  -> C2  [dir=both, label="git clone / pull"];
+  C1  -> CFG1 [label="claude-sync.sh\n(symlink + merge)"];
+  C2  -> CFG2 [label="claude-sync.sh"];
+  TX1 -> C1  [style=dashed, label="claude-index-chats.sh\n(metadata only)"];
+  TX2 -> C2  [style=dashed, label="index"];
+}
