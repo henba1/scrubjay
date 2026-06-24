@@ -112,6 +112,7 @@ push* — every machine converges on its own. The concrete commands are in
 
 ```
 bin/
+  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key)
   lib.sh                 # shared helpers: host + data/chats pointers
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
   claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
@@ -143,6 +144,20 @@ is transient on HPC login nodes).
 
 ## Onboard a new machine
 
+**Fast path — interactive script.** Clone this repo, then run `bin/onboard.sh`. It checks
+deps (and offers to install Claude Code if missing), clones the sibling data repos, writes
+the machine-local pointer, registers the host and applies config, and — for the `rsync-wg`
+backend — optionally generates the dedicated relay SSH key, adds the `claude-receiver`
+ssh-alias, and prints the exact `authorized_keys` line to paste on the receiver. It's
+re-runnable and every prompt has a default (or preset it via env, e.g. `DOTCLAUDE_BACKEND`):
+
+```sh
+git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
+~/.dotclaude/dotclaude/bin/onboard.sh
+```
+
+<details><summary>Manual steps (what the script automates)</summary>
+
 ```sh
 git clone git@github.com:<your-gh-user>/dotclaude.git      ~/.dotclaude/dotclaude
 git clone git@github.com:<your-gh-user>/dotclaude-data.git ~/.dotclaude/dotclaude-data
@@ -164,6 +179,8 @@ git -C ~/.dotclaude/dotclaude-data add -A && git -C ~/.dotclaude/dotclaude-data 
 otherwise arbitrary (it's only referenced via the pointer file above).
 
 Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub. No root.
+
+</details>
 
 ## Day-to-day — nothing to run by hand
 
