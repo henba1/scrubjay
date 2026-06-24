@@ -17,9 +17,14 @@ APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 DATA="$(dc_data 2>/dev/null || true)"
 
-# 1) pull config edited on other machines (fast, best-effort — won't clobber local edits)
-if [ "${DOTCLAUDE_SYNC_NOPULL:-0}" != "1" ] && [ -n "$DATA" ] && [ -d "$DATA/.git" ]; then
-  ( cd "$DATA" && timeout 15 git pull --ff-only -q 2>/dev/null ) || true
+# 1) pull latest from other machines (best-effort, fast). DATA = your config/content;
+#    APP = the scripts & hooks themselves, so hook/script fixes also propagate on their
+#    own. --ff-only never clobbers local edits (it just no-ops on a dirty/diverged tree).
+if [ "${DOTCLAUDE_SYNC_NOPULL:-0}" != "1" ]; then
+  for repo in "$DATA" "$APP"; do
+    [ -n "$repo" ] && [ -d "$repo/.git" ] && \
+      ( cd "$repo" && timeout 15 git pull --ff-only -q 2>/dev/null ) || true
+  done
 fi
 
 # 2) apply into ~/.claude (idempotent; mostly a no-op thanks to symlinks)

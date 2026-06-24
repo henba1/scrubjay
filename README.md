@@ -166,8 +166,11 @@ Both housekeeping scripts run automatically via hooks, so you never update anyth
 
 | When | Hook | Does |
 |---|---|---|
-| session **start** | `sync-session.sh` | `git pull --ff-only` the data repo, then `claude-sync.sh` — config edited on another machine arrives and applies itself. |
-| session **end** | `log-session.sh` | append the log line **and** refresh `chats.index.json`, then commit + push. |
+| session **start** | `sync-session.sh` | `git pull --ff-only` **both** repos (data *and* app, so hook/script fixes propagate too), then `claude-sync.sh` — config edited on another machine arrives and applies itself. |
+| session **end** | `log-session.sh` | append the log line, refresh `chats.index.json`, then `git add -A` + commit + push the **whole** data repo — `memory/`, `templates/`, host config and all. Nothing needs a manual sync. |
+
+`git add -A` is safe because the data repo's `.gitignore` blocks secrets and transcripts
+(`*.credentials*`, `*.jsonl`, `.claude.json`), so those can never be staged.
 
 Symlinked scopes (`CLAUDE.md`, `commands/`, `agents/`, `hooks/`) go live on the pull
 alone — `claude-sync.sh` only has real work when `settings.json` changed. You can still run
