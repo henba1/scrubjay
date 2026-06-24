@@ -209,12 +209,6 @@ Current backend `git` pushes to `claude-chats`; a Pi mirrors it to the NAS
 **peer-to-peer rsync over WireGuard** (no third-party server) —
 [`docs/transcript-transport.md`](docs/transcript-transport.md).
 
-Upload the existing back catalogue once (sessions that pre-date the hook):
-
-```sh
-bin/backfill-transcripts.sh    # ships every existing transcript; idempotent
-```
-
 ## Useful commands
 
 Day-to-day this all runs from hooks; reach for these when you want to do something by hand.
