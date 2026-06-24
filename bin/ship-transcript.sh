@@ -37,3 +37,13 @@ sess_dir="$(dirname "$src")/$sid"
 claude_root="${src%/projects/*}"
 [ "$claude_root" != "$src" ] && [ -d "$claude_root/plans" ] && \
   transport_ship "$claude_root/plans" "$host/plans"
+
+# 4) human-readable rendering (clean conversation) → <host>/readable/<project>/<date>_<topic>__<sid8>.md
+#    Additive: machine .jsonl tree above is untouched; this is the browsable layer.
+rel="$(dc_readable_relpath "$src" "$sid")"
+tmpmd="$(mktemp 2>/dev/null)" || tmpmd=""
+if [ -n "$tmpmd" ]; then
+  bash "$APP/bin/render-transcript.sh" "$src" > "$tmpmd" 2>/dev/null
+  [ -s "$tmpmd" ] && transport_ship "$tmpmd" "$host/readable/$rel.md"
+  rm -f "$tmpmd"
+fi
