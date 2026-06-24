@@ -9,11 +9,12 @@ it into `$NAS1/Claude-Code-chats`.
 1. SSH key on the Pi added to GitHub (read access to `claude-chats`).
 2. Clone the app for the script:
    ```sh
-   git clone git@github.com:henba1/dotclaude.git ~/dotclaude
+   git clone git@github.com:<your-gh-user>/dotclaude.git ~/dotclaude
    ```
 3. Make sure the NAS is mounted (e.g. `/mnt/nas1/Claude-Code-chats`).
-4. Test once:
+4. Test once (`CHATS_REPO_URL` is only needed the first run, to clone `claude-chats`):
    ```sh
+   CHATS_REPO_URL=git@github.com:<your-gh-user>/claude-chats.git \
    NAS_DIR=/mnt/nas1/Claude-Code-chats ~/dotclaude/bin/pull-and-mirror.sh
    ```
 

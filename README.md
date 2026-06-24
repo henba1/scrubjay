@@ -142,21 +142,24 @@ is transient on HPC login nodes).
 ## Onboard a new machine
 
 ```sh
-git clone git@github.com:henba1/dotclaude.git      ~/code/dotclaude
-git clone git@github.com:henba1/dotclaude-data.git ~/code/dotclaude-data
-git clone git@github.com:henba1/claude-chats.git   ~/code/claude-chats   # if syncing transcripts
+git clone git@github.com:<your-gh-user>/dotclaude.git      ~/.dotclaude/dotclaude
+git clone git@github.com:<your-gh-user>/dotclaude-data.git ~/.dotclaude/dotclaude-data
+git clone git@github.com:<your-gh-user>/claude-chats.git   ~/.dotclaude/claude-chats   # if syncing transcripts
 
 mkdir -p ~/.config/dotclaude && cat > ~/.config/dotclaude/config <<'EOF'
-: "${DOTCLAUDE_DATA:=$HOME/code/dotclaude-data}"
-: "${DOTCLAUDE_CHATS:=$HOME/code/claude-chats}"
+: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
+: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
 : "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
 EOF
 
-~/code/dotclaude/bin/claude-register-host.sh --host <name>   # scaffold + pin + index
-# review ~/code/dotclaude-data/hosts/<name>/
-~/code/dotclaude/bin/claude-sync.sh                          # apply into ~/.claude
-git -C ~/code/dotclaude-data add -A && git -C ~/code/dotclaude-data commit -m "host <name>" && git -C ~/code/dotclaude-data push
+~/.dotclaude/dotclaude/bin/claude-register-host.sh --host <name>   # scaffold + pin + index
+# review ~/.dotclaude/dotclaude-data/hosts/<name>/
+~/.dotclaude/dotclaude/bin/claude-sync.sh                          # apply into ~/.claude
+git -C ~/.dotclaude/dotclaude-data add -A && git -C ~/.dotclaude/dotclaude-data commit -m "host <name>" && git -C ~/.dotclaude/dotclaude-data push
 ```
+
+`~/.dotclaude/` keeps the machinery out of your project workspace; the clone location is
+otherwise arbitrary (it's only referenced via the pointer file above).
 
 Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub. No root.
 
@@ -191,8 +194,8 @@ Every session is logged by the `SessionEnd` hook to `dotclaude-data/logs/<host>.
 machines' histories are searchable from any clone of the data repo:
 
 ```sh
-git -C ~/code/dotclaude-data pull
-grep -i foolbox ~/code/dotclaude-data/logs/*.log
+git -C ~/.dotclaude/dotclaude-data pull
+grep -i refactor ~/.dotclaude/dotclaude-data/logs/*.log
 ```
 
 The full transcript (the `.jsonl`) lives in `claude-chats` / on the NAS under
