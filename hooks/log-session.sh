@@ -10,6 +10,20 @@
 input="$(cat)"
 command -v jq >/dev/null 2>&1 || exit 0
 
+# SessionEnd fires during shutdown; Claude cancels hooks that haven't returned by the time the
+# session process goes away (-> "Hook cancelled", killing the network-bound git+relay mid-run).
+# So on first entry, re-launch ourselves DETACHED with the same input and return immediately;
+# the detached copy (--detached) finishes the work independently.
+if [ "${1:-}" != "--detached" ]; then
+  self0="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+  if command -v setsid >/dev/null 2>&1; then
+    printf '%s' "$input" | setsid "$self0" --detached >/dev/null 2>&1 &
+  else
+    printf '%s' "$input" | nohup "$self0" --detached >/dev/null 2>&1 &
+  fi
+  exit 0
+fi
+
 # App root: this script is symlinked into ~/.claude/hooks/ but its real path is in the app repo.
 self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
 APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 0
