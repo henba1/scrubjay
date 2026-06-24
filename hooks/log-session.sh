@@ -22,9 +22,12 @@ tpath="$(printf '%s' "$input"| jq -r '.transcript_path // empty')"
 host="$(dc_host)"
 DATA="$(dc_data 2>/dev/null || true)"
 
-# ---- 1) human-readable session line in the data repo ----
+# ---- 1) session line + chat index in the data repo ----
 if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   LOG="$DATA/logs/$host.log"; mkdir -p "$DATA/logs"; touch "$LOG"
+  ts="$(date '+%Y-%m-%d %H:%M')"
+
+  # 1a) append the human-readable session line (once per session)
   if ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
     topic=""
     if [ -n "$tpath" ] && [ -f "$tpath" ]; then
@@ -34,20 +37,26 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
                 "$tpath" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//')"
     fi
     [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
-    ts="$(date '+%Y-%m-%d %H:%M')"
     printf '%s | %s | %s | "%s" | session=%s\n' "$ts" "$host" "$cwd" "$topic" "$sid" >> "$LOG"
-    if [ "${DOTCLAUDE_LOG_NOGIT:-0}" != "1" ]; then
-      (
-        cd "$DATA" || exit 0
-        git add "logs/$host.log" 2>/dev/null
-        git commit -q -m "chat-log: $host $ts" -- "logs/$host.log" 2>/dev/null || exit 0
-        if ! timeout 20 git push -q 2>/dev/null; then
-          if [ -z "$(git status --porcelain 2>/dev/null | grep -v "logs/$host.log")" ]; then
-            timeout 20 git pull --rebase -q 2>/dev/null && timeout 20 git push -q 2>/dev/null
-          fi
+  fi
+
+  # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended)
+  "$APP/bin/claude-index-chats.sh" >/dev/null 2>&1 || true
+
+  # 1c) commit + push whatever changed (log line and/or index)
+  if [ "${DOTCLAUDE_LOG_NOGIT:-0}" != "1" ]; then
+    (
+      cd "$DATA" || exit 0
+      git add "logs/$host.log" "hosts/$host/chats.index.json" 2>/dev/null
+      git diff --cached --quiet 2>/dev/null && exit 0   # nothing to commit
+      git commit -q -m "chat-log + index: $host $ts" 2>/dev/null || exit 0
+      if ! timeout 20 git push -q 2>/dev/null; then
+        if [ -z "$(git status --porcelain 2>/dev/null \
+                    | grep -vE "logs/$host.log|hosts/$host/chats.index.json")" ]; then
+          timeout 20 git pull --rebase -q 2>/dev/null && timeout 20 git push -q 2>/dev/null
         fi
-      ) >/dev/null 2>&1 || true
-    fi
+      fi
+    ) >/dev/null 2>&1 || true
   fi
 fi
 
