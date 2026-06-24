@@ -32,24 +32,31 @@ it. A Raspberry Pi pulls and mirrors to the NAS (`raspberry-pi.md`).
 ⚠️ Tradeoff: transcripts transit GitHub's servers. The repo is private and treated as a
 *relay* (NAS is canonical), but this is why it's a stopgap.
 
-## Upcoming backend: `rsync-wg`  (peer-to-peer, no third party)
+## Backend: `rsync-wg`  (peer-to-peer, no third party)
 
-Planned switch: each machine holds a per-machine SSH key and rsyncs transcripts **over a
-WireGuard tunnel** directly to a home login node, which writes to the NAS. No data on any
-third-party server.
+Each machine holds a per-machine SSH key and rsyncs **over a WireGuard/SSH tunnel** directly
+to the NAS receiver. No data on any third-party server.
 
-To switch, set in `~/.config/dotclaude/config`:
+Set in `~/.config/dotclaude/config`:
 
 ```sh
 DOTCLAUDE_TRANSCRIPT_BACKEND="rsync-wg"
-DOTCLAUDE_WG_TARGET="claude@home.example.net:/srv/claude-chats"   # reachable over WG
+DOTCLAUDE_WG_TARGET="claude-rx@claude-receiver"            # ssh destination ONLY — no remote path
 DOTCLAUDE_WG_SSHKEY="$HOME/.ssh/claude_transcripts_ed25519"
 ```
 
-The stub lives in `hooks/transports/rsync-wg.sh`. Remaining work to activate:
-- stand up the home receiver (restricted `rsync`-only account, append-only target);
-- provision a per-machine key, authorize it on the receiver (over WG);
-- retire the Pi GitHub pull (the receiver writes straight to the NAS).
+⚠️ **No remote path in `DOTCLAUDE_WG_TARGET`.** The receiver authorizes the key with a forced
+`command="rrsync -wo <root>"`, which pins the destination root; everything the client sends is
+taken **relative** to it. Including `:/srv/claude-chats` would make `rrsync` re-root it *under*
+itself (`/srv/claude-chats/srv/claude-chats/…`). Per-machine reachability — `HostName`, the
+(often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `claude-receiver`
+alias, so this config line is identical on every machine. `bin/onboard.sh` writes both.
+
+Receiver requirements (see the private `runbooks/wireguard-transcripts.md`):
+- a restricted `command="rrsync -wo <root>",restrict` line per machine key (write-only, no shell);
+- the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:claude-rx:x`
+  on a `0750` parent like `/media/<user>`);
+- `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
 
 ## Backend: `local`  (the box that *is* the NAS)
 

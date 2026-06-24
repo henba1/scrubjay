@@ -87,14 +87,16 @@ BACKEND="$DOTCLAUDE_BACKEND"
 ok "backend: $BACKEND"
 
 # backend-specific settings
-WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PATH=""; GEN_KEY=0
+WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PORT=""; RECV_PATH=""; GEN_KEY=0
 case "$BACKEND" in
   rsync-wg)
     ask RECV_USER "receiver SSH user" "claude-rx"
     ask RECV_HOST "receiver host/IP (reachable over WG/LAN)" "192.168.178.52"
-    ask RECV_PATH "receiver rrsync root" "/srv/claude-chats"
+    ask RECV_PORT "receiver SSH port" "22"
+    ask RECV_PATH "receiver rrsync root (its authorized_keys -wo dir)" "/srv/claude-chats"
     ask WG_KEY "relay SSH key path" "$HOME/.ssh/claude_transcripts_ed25519"
-    WG_TARGET="$RECV_USER@claude-receiver:$RECV_PATH"   # alias resolved via ~/.ssh/config
+    # ssh destination ONLY — no remote path. rrsync pins the root; paths are relative to it.
+    WG_TARGET="$RECV_USER@claude-receiver"              # alias resolved via ~/.ssh/config
     [ -f "$WG_KEY" ] || confirm "generate the dedicated relay SSH key now?" Y && GEN_KEY=1
     ;;
   local)
@@ -139,8 +141,9 @@ if [ "$GEN_KEY" = 1 ]; then
     ok "ssh alias 'claude-receiver' already present"
   else
     { echo; echo "Host claude-receiver"; echo "    HostName $RECV_HOST"
-      echo "    User $RECV_USER"; echo "    IdentityFile $WG_KEY"; } >> "$SSHCFG"
-    ok "added ssh alias 'claude-receiver' → $RECV_USER@$RECV_HOST"
+      echo "    Port $RECV_PORT"; echo "    User $RECV_USER"
+      echo "    IdentityFile $WG_KEY"; } >> "$SSHCFG"
+    ok "added ssh alias 'claude-receiver' → $RECV_USER@$RECV_HOST:$RECV_PORT"
   fi
 fi
 
