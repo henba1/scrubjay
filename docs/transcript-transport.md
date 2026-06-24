@@ -42,5 +42,18 @@ The stub lives in `hooks/transports/rsync-wg.sh`. Remaining work to activate:
 - provision a per-machine key, authorize it on the receiver (over WG);
 - retire the Pi GitHub pull (the receiver writes straight to the NAS).
 
+## Backend: `local`  (the box that *is* the NAS)
+
+The receiver itself (the machine with the NAS mounted) shouldn't rsync to itself over WG.
+The `local` backend just copies the transcript straight into the NAS chats root:
+
+```sh
+DOTCLAUDE_TRANSCRIPT_BACKEND="local"
+DOTCLAUDE_LOCAL_CHATS="/media/hendrik/NAS1/Claude-Code-chats"   # the NAS chats root
+```
+
+Layout matches every other backend (`<host>/<slug>/<session>.jsonl`), so a `local` sender and
+the WG receivers all write into one tree. Lives in `hooks/transports/local.sh`.
+
 Adding any other transport (e.g. S3, syncthing) is just another
 `hooks/transports/<name>.sh` defining `transport_ship`.
