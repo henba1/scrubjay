@@ -16,10 +16,12 @@ transport_ship() {  # transport_ship <src> <relpath>   (src may be a file or a d
   fi
   local key="${DOTCLAUDE_WG_SSHKEY:-$HOME/.ssh/id_ed25519}"
   local ssh="ssh -i $key -o StrictHostKeyChecking=accept-new"
-  # relpath is relative to the receiver's rrsync root; --mkpath creates it.
+  # --no-perms: don't clone the source's 0600 transcript mode; let the receiver's umask apply
+  #   (→ group-readable on the NAS, so the human can browse the archive). relpath is relative
+  #   to the receiver's rrsync root; --mkpath creates it.
   if [ -d "$src" ]; then                       # directory: trailing slashes mirror contents into <relpath>/
-    rsync -a --mkpath -e "$ssh" "$src/" "$DOTCLAUDE_WG_TARGET:$relpath/" 2>/dev/null || true
+    rsync -a --no-perms --mkpath -e "$ssh" "$src/" "$DOTCLAUDE_WG_TARGET:$relpath/" 2>/dev/null || true
   else
-    rsync -a --mkpath -e "$ssh" "$src" "$DOTCLAUDE_WG_TARGET:$relpath" 2>/dev/null || true
+    rsync -a --no-perms --mkpath -e "$ssh" "$src" "$DOTCLAUDE_WG_TARGET:$relpath" 2>/dev/null || true
   fi
 }
