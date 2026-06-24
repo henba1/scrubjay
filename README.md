@@ -16,9 +16,10 @@ leaking anything:
 
 > **Flow:** `dotclaude` (logic) + `dotclaude-data` (your config) → applied into each
 > machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line
-> entry to `dotclaude-data/logs/<host>.log` *and* ships the full transcript to
-> `claude-chats`; a Raspberry Pi mirrors that into the NAS. Top-level is keyed by machine
-> so envs stay distinct and Claude can re-tailor one host's rules for another.
+> entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents,
+> plans) to the NAS via a pluggable backend — peer-to-peer over WireGuard, or `claude-chats`
+> on GitHub as a stopgap. Top-level is keyed by machine so envs stay distinct and Claude can
+> re-tailor one host's rules for another.
 
 ## HOW-TO (start here)
 
@@ -115,13 +116,14 @@ bin/
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
   claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
   claude-register-host.sh# scaffold a new host into the data repo
-  ship-transcript.sh     # relay a transcript via the selected backend
+  ship-transcript.sh     # relay a session (transcript + subagents + plans) via the selected backend
   pull-and-mirror.sh     # (Pi) pull claude-chats -> NAS
 hooks/
   sync-session.sh        # SessionStart hook: pull data repo + claude-sync (auto-fresh config)
-  log-session.sh         # SessionEnd hook: log line + refresh index + ship transcript
-  transports/git.sh      # transcript backend: git (current)
-  transports/rsync-wg.sh # transcript backend: WireGuard rsync (upcoming, stub)
+  log-session.sh         # SessionEnd hook: log line + refresh index + ship session
+  transports/git.sh      # backend: git stopgap (-> claude-chats, Pi mirrors to NAS)
+  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
+  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
 skeleton/host/           # template copied when registering a new machine
 docs/                    # overview diagram, raspberry-pi.md, transcript-transport.md
 ```
@@ -203,11 +205,43 @@ The full transcript (the `.jsonl`) lives in `claude-chats` / on the NAS under
 
 ## Transcripts: relay + NAS
 
-`SessionEnd` ships each transcript via a **pluggable backend** (`ship-transcript.sh`).
-Current backend `git` pushes to `claude-chats`; a Pi mirrors it to the NAS
-([`docs/raspberry-pi.md`](docs/raspberry-pi.md)). The transport is designed to switch to
-**peer-to-peer rsync over WireGuard** (no third-party server) —
-[`docs/transcript-transport.md`](docs/transcript-transport.md).
+`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend**
+(`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by
+`DOTCLAUDE_TRANSCRIPT_BACKEND`). What rides which path is split by **privacy**:
+
+**Sensitive → peer-to-peer, never a third party.** Full conversation content stays off
+GitHub and goes straight to your NAS over your own WireGuard link:
+
+| Artifact | Lands at |
+|---|---|
+| full transcript | `<host>/<slug>/<session>.jsonl` |
+| subagent transcripts + tool-results | `<host>/<slug>/<session>/` |
+| plans | `<host>/plans/` |
+
+**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, `memory/`, host
+config and `logs/` are low-sensitivity, need merge/history across machines, and must be
+reachable to bootstrap a new box — so they ride normal git, not the tunnel. (Memory is
+deliberately *not* part of the session relay.)
+
+**Backends** — one file each, defining `transport_ship <src> <relpath>` (`src` may be a file
+*or* a directory):
+- **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set
+  `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
+- **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set
+  `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
+- **`git`** — stopgap: push to `claude-chats`, a Pi mirrors to the NAS
+  ([`docs/raspberry-pi.md`](docs/raspberry-pi.md)).
+
+**P2P requirements** (the `rsync-wg` path):
+- the sender can reach the receiver (the NAS box) over WireGuard;
+- a **per-machine** SSH key (`DOTCLAUDE_WG_SSHKEY`), authorized on the receiver as a
+  **write-only** `command="rrsync -wo …",restrict` line — a leaked key can't read the archive
+  back, get a shell, or forward;
+- `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
+
+Full design + the WireGuard activation runbook:
+[`docs/transcript-transport.md`](docs/transcript-transport.md) and (private)
+`dotclaude-data/runbooks/wireguard-transcripts.md`.
 
 ## Useful commands
 
@@ -244,7 +278,7 @@ or inline before a command (one-off):
 
 | Env var | Effect |
 |---|---|
-| `DOTCLAUDE_TRANSCRIPT_BACKEND=off` | pause transcript shipping (other values: `git`, `rsync-wg`) |
+| `DOTCLAUDE_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`) |
 | `DOTCLAUDE_NOSYNC=1` | skip the start-of-session pull + sync entirely |
 | `DOTCLAUDE_SYNC_NOPULL=1` | sync at start but don't `git pull` first |
 | `DOTCLAUDE_NOSHIP=1` | end the session without shipping its transcript |
