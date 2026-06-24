@@ -4,13 +4,18 @@
 #   DOTCLAUDE_TRANSCRIPT_BACKEND="local"
 #   DOTCLAUDE_LOCAL_CHATS="/media/hendrik/NAS1/Claude-Code-chats"
 # Best-effort; never fails the session.
-transport_ship() {  # transport_ship <src> <relpath>
+transport_ship() {  # transport_ship <src> <relpath>   (src may be a file or a directory)
   local src="$1" relpath="$2" root="${DOTCLAUDE_LOCAL_CHATS:-}"
   if [ -z "$root" ] || [ ! -d "$root" ]; then
     echo "local: DOTCLAUDE_LOCAL_CHATS unset or missing ('$root') — backend inactive" >&2
     return 0
   fi
   local dst="$root/$relpath"
-  mkdir -p "$(dirname "$dst")" 2>/dev/null || return 0
-  cp -f "$src" "$dst" 2>/dev/null || true
+  if [ -d "$src" ]; then                       # directory: mirror its contents into <root>/<relpath>/
+    mkdir -p "$dst" 2>/dev/null || return 0
+    cp -a "$src/." "$dst/" 2>/dev/null || true
+  elif [ -f "$src" ]; then                     # file: place at <root>/<relpath>
+    mkdir -p "$(dirname "$dst")" 2>/dev/null || return 0
+    cp -f "$src" "$dst" 2>/dev/null || true
+  fi
 }
