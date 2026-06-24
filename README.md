@@ -320,6 +320,25 @@ nothing else needs touching. Confirm with
 `readlink -e ~/.claude/{CLAUDE.md,commands,agents,hooks}` (no dangling links). The pinned host
 name in `~/.config/dotclaude/host` is unaffected. This is machine-local — nothing to commit.
 
+## Troubleshooting
+
+**Hooks only activate on the *next* session.** `claude-sync.sh` (and `onboard.sh`, which runs
+it) install the hooks — symlinking `~/.claude/hooks` and registering them in
+`~/.claude/settings.json`. But Claude reads its hooks **at session start**, so a `claude`
+instance that was *already running* when you onboarded won't see them: its `SessionStart`
+already fired, with no hooks to load. **Quit and reopen `claude`** after onboarding — only
+sessions started afterwards run `SessionEnd` (the transcript/subagents/plans relay + log/index
+push). This is the usual reason a freshly-onboarded machine "ships nothing".
+
+- **`SessionEnd` triggers on both `/exit` and `/clear`** (the latter then starts a fresh
+  session). Either way, a session that began *before* the hooks were active won't ship.
+- **"SessionEnd hook … Hook cancelled":** Claude cancels hooks that haven't returned by the
+  time the session process exits. `log-session.sh` detaches its network work (git push +
+  relay) so shutdown can't interrupt it — just ensure the machine has pulled the app repo
+  (`git -C <app-clone> pull`; `SessionStart` does this automatically next time).
+- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `dotclaude-data`
+  git sync, not the session relay (see [Transcripts: relay + NAS](#transcripts-relay--nas)).
+
 ## Cross-machine tailoring with Claude
 
 Everything is plain Markdown/JSON, so from any project you can ask Claude: *"read
