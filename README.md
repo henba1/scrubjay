@@ -69,12 +69,12 @@ directories. Each one feeds Claude in a specific way:
   demand rather than symlinked.
 
 - **`templates/`** — reusable starting points for *project-level* config, kept out of the
-  always-on path. `templates/verona-foolbox/CLAUDE.local.md` is a ready-made rules file you
-  can drop into a specific project so Claude picks up that project's conventions.
+  always-on path. A file like `templates/<project>/CLAUDE.local.md` is a ready-made rules
+  file you can drop into a specific project so Claude picks up that project's conventions.
 
 - **`logs/`** — a human-readable history of every session, one file per machine
   (`<host>.log`). Each line records the time, machine, working directory, and your first
-  prompt, so you can later `grep` for *"that chat about foolbox"* across all machines.
+  prompt, so you can later `grep` for *"that chat about the auth refactor"* across all machines.
 
 - **`runbooks/`** — operational notes for *you* (not Claude), like the plan for moving chat
   transcripts off GitHub onto a private WireGuard link.
@@ -131,8 +131,8 @@ docs/                    # overview diagram, raspberry-pi.md, transcript-transpo
 The app finds your data/transcript repos via `~/.config/dotclaude/config` (env overrides):
 
 ```sh
-: "${DOTCLAUDE_DATA:=$HOME/code/dotclaude-data}"
-: "${DOTCLAUDE_CHATS:=$HOME/code/claude-chats}"
+: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
+: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
 : "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
 ```
 
