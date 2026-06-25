@@ -121,6 +121,8 @@ bin/
   render-transcript.sh   # render a .jsonl as a clean human-readable Markdown conversation
   backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
   pull-and-mirror.sh     # (Pi) pull claude-chats -> NAS
+  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
+  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
 hooks/
   sync-session.sh        # SessionStart hook: pull data repo + claude-sync (auto-fresh config)
   log-session.sh         # SessionEnd hook: log line + refresh index + ship session
