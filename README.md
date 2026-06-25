@@ -67,9 +67,13 @@ directories. Each one feeds Claude in a specific way:
   without asking), the default model, and which hooks fire. The sync step merges this
   baseline with the per-host overrides from `hosts/<machine>/` into the final settings file.
 
-- **`memory/`** — durable facts Claude has learned about you and should remember across
-  sessions, one fact per file (e.g. `feedback_no_coauthored_by.md`). These are pulled in on
-  demand rather than symlinked.
+- **`memory/`** — durable facts Claude has learned and should remember across sessions, one
+  fact per file. Claude Code's built-in auto-memory lives per-project at
+  `~/.claude/projects/<project>/memory/`; `claude-sync.sh` symlinks each of those into this
+  repo under `memory/<host>/<project>/`, so auto-saved memories are synced and sorted by the
+  machine they were created on, then by project (mirroring Claude's native layout). A flat
+  file at the `memory/` root (e.g. `feedback_no_coauthored_by.md`) is a legacy global fact,
+  pulled in on demand rather than auto-loaded.
 
 - **`templates/`** — reusable starting points for *project-level* config, kept out of the
   always-on path. A file like `templates/<project>/CLAUDE.local.md` is a ready-made rules
@@ -93,9 +97,9 @@ The moving parts fit together like this:
    hostnames change between logins).
 
 2. **Sync turns the database into `~/.claude/`.** Running `bin/claude-sync.sh` symlinks the
-   shared `claude-md/` scopes into `~/.claude/` and merges `settings/` + the host overrides
-   into `~/.claude/settings.json`. It's safe to re-run; it only changes what actually
-   differs.
+   shared `claude-md/` scopes into `~/.claude/`, points each project's auto-memory dir at the
+   synced `memory/<host>/<project>/`, and merges `settings/` + the host overrides into
+   `~/.claude/settings.json`. It's safe to re-run; it only changes what actually differs.
 
 3. **Two hooks keep it hands-off.** When a session *starts*, a hook pulls the latest
    `dotclaude-data` and re-runs sync, so config you edited on another machine is already in
