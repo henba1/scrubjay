@@ -18,6 +18,7 @@
 #   --bastion-user U    jump user on the edge node
 #   --receiver-host H   receiver address as seen FROM the edge node (its LAN IP)
 # Optional:
+#   --receiver-port P   receiver sshd port (as seen from the bastion; omit = ssh default 22)
 #   --receiver-user U   default: claude-rx
 #   --receiver-path P   rrsync root on the receiver (default: /srv/claude-chats)
 #   --alias A           ssh_config Host alias for the receiver (default: claude-receiver)
@@ -27,12 +28,13 @@ set -euo pipefail
 
 RECEIVER_USER=claude-rx; RECEIVER_PATH=/srv/claude-chats; ALIAS=claude-receiver
 KEY="$HOME/.ssh/claude_transcripts_ed25519"; ACTIVATE=0
-BASTION_HOST=; BASTION_PORT=; BASTION_USER=; RECEIVER_HOST=
+BASTION_HOST=; BASTION_PORT=; BASTION_USER=; RECEIVER_HOST=; RECEIVER_PORT=
 while [ $# -gt 0 ]; do case "$1" in
   --bastion-host) BASTION_HOST="$2"; shift 2;;
   --bastion-port) BASTION_PORT="$2"; shift 2;;
   --bastion-user) BASTION_USER="$2"; shift 2;;
   --receiver-host) RECEIVER_HOST="$2"; shift 2;;
+  --receiver-port) RECEIVER_PORT="$2"; shift 2;;
   --receiver-user) RECEIVER_USER="$2"; shift 2;;
   --receiver-path) RECEIVER_PATH="$2"; shift 2;;
   --alias) ALIAS="$2"; shift 2;;
@@ -62,22 +64,16 @@ tmp="$(mktemp)"; awk -v b="$B" -v e="$E" '
   $0==b{s=1} !s{print} $0==e{s=0}' "$CFG" > "$tmp"   # drop any prior block
 {
   cat "$tmp"
-  cat <<EOF
-$B
-Host $JUMP_ALIAS
-    HostName $BASTION_HOST
-    Port $BASTION_PORT
-    User $BASTION_USER
-    IdentityFile $KEY
-    IdentitiesOnly yes
-Host $ALIAS
-    HostName $RECEIVER_HOST
-    User $RECEIVER_USER
-    IdentityFile $KEY
-    IdentitiesOnly yes
-    ProxyJump $JUMP_ALIAS
-$E
-EOF
+  echo "$B"
+  # StrictHostKeyChecking accept-new is set in BOTH blocks: a command-line -o does NOT reach
+  # the ProxyJump hop, so each host needs its own policy (TOFU on first connect, then pinned).
+  printf 'Host %s\n    HostName %s\n    Port %s\n    User %s\n    IdentityFile %s\n    IdentitiesOnly yes\n    StrictHostKeyChecking accept-new\n' \
+    "$JUMP_ALIAS" "$BASTION_HOST" "$BASTION_PORT" "$BASTION_USER" "$KEY"
+  printf 'Host %s\n    HostName %s\n' "$ALIAS" "$RECEIVER_HOST"
+  [ -n "$RECEIVER_PORT" ] && printf '    Port %s\n' "$RECEIVER_PORT"   # receiver sshd port (omit => 22)
+  printf '    User %s\n    IdentityFile %s\n    IdentitiesOnly yes\n    StrictHostKeyChecking accept-new\n    ProxyJump %s\n' \
+    "$RECEIVER_USER" "$KEY" "$JUMP_ALIAS"
+  echo "$E"
 } > "$CFG.new" && mv "$CFG.new" "$CFG"; chmod 600 "$CFG"; rm -f "$tmp"
 echo "wrote ssh_config blocks: $JUMP_ALIAS, $ALIAS"
 
