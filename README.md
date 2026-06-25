@@ -71,9 +71,7 @@ directories. Each one feeds Claude in a specific way:
   fact per file. Claude Code's built-in auto-memory lives per-project at
   `~/.claude/projects/<project>/memory/`; `claude-sync.sh` symlinks each of those into this
   repo under `memory/<host>/<project>/`, so auto-saved memories are synced and sorted by the
-  machine they were created on, then by project (mirroring Claude's native layout). A flat
-  file at the `memory/` root (e.g. `feedback_no_coauthored_by.md`) is a legacy global fact,
-  pulled in on demand rather than auto-loaded.
+  machine they were created on, then by project (mirroring Claude's native layout).
 
 - **`templates/`** — reusable starting points for *project-level* config, kept out of the
   always-on path. A file like `templates/<project>/CLAUDE.local.md` is a ready-made rules
