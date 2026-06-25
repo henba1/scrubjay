@@ -122,7 +122,7 @@ bin/
   claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
   claude-register-host.sh# scaffold a new host into the data repo
   ship-transcript.sh     # relay a session (transcript + subagents + plans + readable render) via the selected backend
-  render-transcript.sh   # render a .jsonl as a clean human-readable Markdown conversation
+  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
   backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
   pull-and-mirror.sh     # (Pi) pull claude-chats -> NAS
   onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
@@ -246,9 +246,9 @@ GitHub and goes straight to your NAS over your own WireGuard link:
 
 The NAS holds **two parallel trees per host**. The `.jsonl` tree above is canonical — exact,
 machine-readable, the thing you'd resume or feed to a tool. Alongside it, a `readable/` tree
-holds the same sessions rendered as clean Markdown conversations (user + assistant text, tool
-calls collapsed to one-line `→ <tool>` notes; thinking and tool-noise dropped) — for browsing,
-not ingestion. It's organised for humans: foldered by **project** (the session's working dir),
+holds the same sessions rendered as Markdown session logs (user + assistant text plus the full
+tool stream — each call shows its input, Bash commands verbatim, and the tool's output inline;
+only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by **project** (the session's working dir),
 each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified.
 Rendering happens automatically on every ship (`bin/render-transcript.sh`, additive — it never
 touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS.
