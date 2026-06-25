@@ -19,7 +19,9 @@ leaking anything:
 > entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents,
 > plans) to the NAS via a pluggable backend — peer-to-peer over WireGuard, or `claude-chats`
 > on GitHub as a stopgap. Top-level is keyed by machine so envs stay distinct and Claude can
-> re-tailor one host's rules for another.
+> re-tailor one host's rules for another. The two peer-to-peer transcript paths — over
+> WireGuard, and over SSH for machines that can't run it (e.g. HPC) — are drawn out under
+> [Transcripts: relay + NAS](#transcripts-relay--nas).
 
 ## HOW-TO (start here)
 
@@ -130,7 +132,7 @@ hooks/
   transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
   transports/local.sh    # backend: local copy (the box that has the NAS mounted)
 skeleton/host/           # template copied when registering a new machine
-docs/                    # overview diagram, raspberry-pi.md, transcript-transport.md
+docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg), raspberry-pi.md, transcript-transport.md
 ```
 
 ## Pointers (machine-local)
@@ -253,6 +255,41 @@ touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already
 config and `logs/` are low-sensitivity, need merge/history across machines, and must be
 reachable to bootstrap a new box — so they ride normal git, not the tunnel. (Memory is
 deliberately *not* part of the session relay.)
+
+### The two peer-to-peer paths to your NAS
+
+However a machine reaches home, the sensitive content goes **straight to your NAS and never
+touches a third party**. There are two paths; which one a machine uses depends only on
+whether it can run WireGuard.
+
+**1. Over WireGuard — the default.** Most machines (laptops, desktops) join your WireGuard
+network and rsync the session straight to the receiver:
+
+![Transcript relay over WireGuard](docs/transport-wg.svg)
+
+**2. Without WireGuard — over SSH (e.g. an HPC login node).** Some machines can't use
+WireGuard: an HPC cluster typically blocks the outbound UDP it needs. They reach the NAS over
+plain SSH instead, hopping through a small internet-facing **edge/bastion** that holds no data
+and can only forward to the receiver:
+
+![Transcript relay without WireGuard, over SSH/ProxyJump](docs/transport-ssh.svg)
+
+The bastion is the *only* box exposed to the internet; the receiver and NAS stay on the home
+network, reachable solely through that one jump. A leaked key still can't get a shell, read
+the archive back, or reach anything but the receiver.
+
+**What the no-WireGuard path needs** (the diagram shows placeholders — substitute your own):
+- a **DDNS** name (e.g. `home.ddns.example`) so the sender always finds your home even when
+  the ISP rotates your public IP;
+- **one public TCP port** forwarded on your router to the bastion — the single inbound hole;
+- an **edge/bastion** machine (always-on, internet-facing, holds no NAS) whose jump key is
+  restricted to *port-forwarding to the receiver only*, no shell;
+- the **receiver** (the NAS box) authorizes that same key as a write-only
+  `command="rrsync -wo …",restrict` line;
+- `rsync ≥ 3.2.3` on both ends.
+
+`bin/onboard-hpc-client.sh` (on the sender) and `bin/onboard-edge-node.sh` (on the bastion)
+configure both ends; the private `runbooks/wireguard-transcripts.md` is the full walk-through.
 
 **Backends** — one file each, defining `transport_ship <src> <relpath>` (`src` may be a file
 *or* a directory):

@@ -1,0 +1,23 @@
+// Source for docs/transport-wg.svg — render: dot -Tsvg docs/transport-wg.dot -o docs/transport-wg.svg
+digraph transport_wg {
+  rankdir=LR; bgcolor="white";
+  fontname="Helvetica"; fontsize=12;
+  label="Transcript relay — peer-to-peer over WireGuard (the default)";
+  labelloc=t; labeljust=l; fontcolor="#0f172a";
+  node [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+        fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
+  edge [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
+
+  SND [label="your machine\nlaptop · desktop\n(WireGuard peer)"];
+
+  subgraph cluster_home {
+    label="home (always-on)"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+    RX  [label="receiver\nwrite-only rsync (rrsync -wo)\nholds no shell, can't read back"];
+    NAS [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+         label="NAS\nClaude-Code-chats/"];
+    RX -> NAS [label="land transcript +\nsubagents + plans"];
+  }
+
+  SND -> RX [color="#16a34a", fontcolor="#166534", penwidth=1.6,
+             label="WireGuard tunnel — encrypted, direct\nno third party in the path"];
+}

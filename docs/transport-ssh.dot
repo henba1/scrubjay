@@ -1,0 +1,36 @@
+// Source for docs/transport-ssh.svg — render: dot -Tsvg docs/transport-ssh.dot -o docs/transport-ssh.svg
+// Placeholder addresses/ports only — substitute your own DDNS name and forwarded ports.
+digraph transport_ssh {
+  rankdir=LR; bgcolor="white";
+  fontname="Helvetica"; fontsize=12;
+  label="Transcript relay — peer-to-peer WITHOUT WireGuard (SSH/ProxyJump, e.g. an HPC login node)";
+  labelloc=t; labeljust=l; fontcolor="#0f172a";
+  node [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+        fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
+  edge [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
+
+  HPC [label="HPC login node\nno WireGuard\n(outbound UDP blocked)"];
+
+  subgraph cluster_home {
+    label="home (always-on)"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+
+    RT   [label="home router\nforwards ONE public port (DNAT)"];
+    BAST [fillcolor="#fef3c7", color="#d97706", fontcolor="#92400e",
+          label="edge / bastion\nonly internet-facing box, holds no data\njump key tunnels to the receiver only"];
+
+    subgraph cluster_internal {
+      label="internal — never internet-facing"; style="rounded,dashed"; color="#16a34a"; fontcolor="#166534"; fontsize=10;
+      RX  [label="receiver\nwrite-only rsync (rrsync -wo)\nno shell, can't read back"];
+      NAS [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+           label="NAS\nClaude-Code-chats/"];
+      RX -> NAS [label="land transcript +\nsubagents + plans"];
+    }
+
+    RT   -> BAST [label="DNAT public port\nto bastion SSH port"];
+    BAST -> RX   [color="#16a34a", fontcolor="#166534", penwidth=1.6,
+                  label="ProxyJump tunnel (LAN)\nto receiver only"];
+  }
+
+  HPC -> RT [color="#d97706", fontcolor="#92400e", penwidth=1.6,
+             label="public TCP via DDNS\nhome.ddns.example"];
+}

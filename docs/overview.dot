@@ -33,9 +33,11 @@ digraph dotclaude {
   APP  -> CFG  [label="sync: link hooks +\nmerge settings"];
   DATA -> CFG  [label="pull: rules, commands, agents"];
   CFG  -> DATA [style=dashed, label="push: logs + chat index"];
-  TX   -> CH   [label="SessionEnd: ship .jsonl"];
-  CH   -> PI   [label="git pull / 30 min"];
-  PI   -> NAS  [label="rsync --delete"];
+  TX   -> NAS  [color="#16a34a", fontcolor="#166534", penwidth=1.6,
+                label="SessionEnd: peer-to-peer relay\n(default → NAS; see transport diagrams)"];
+  TX   -> CH   [style=dashed, label="GitHub stopgap: ship .jsonl"];
+  CH   -> PI   [style=dashed, label="git pull / 30 min"];
+  PI   -> NAS  [style=dashed, label="rsync --delete"];
 
   FIND [shape=note, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
         label="find a past chat\ngrep logs/*.log"];
