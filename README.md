@@ -258,6 +258,10 @@ Plans get the same human-friendly treatment: Claude Code saves each plan under t
 them *in place* to `<date>_<topic>.md` — date from the file's mtime, topic from the plan's first
 heading (a leading `Plan:` stripped) — before the `plans/` dir is mirrored. It's idempotent
 (already-dated names are left alone), so each machine self-normalizes its own plans going forward.
+Unlike the always-additive transcript/`readable/` trees, the `plans/` mirror is **authoritative**
+(`transport_ship … mirror`): the relay copy is made an exact copy of the local `plans/`, so a plan
+that was already shipped under its old random-word name doesn't linger as a stale duplicate after
+the rename.
 
 **Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, `memory/`, host
 config and `logs/` are low-sensitivity, need merge/history across machines, and must be

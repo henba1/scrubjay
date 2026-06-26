@@ -39,7 +39,10 @@ sess_dir="$(dirname "$src")/$sid"
 claude_root="${src%/projects/*}"
 if [ "$claude_root" != "$src" ] && [ -d "$claude_root/plans" ]; then
   dc_normalize_plans "$claude_root/plans"
-  transport_ship "$claude_root/plans" "$host/plans"
+  # `mirror`: the relay copy is an *exact* mirror of the (normalized) local plans/, so a plan
+  #  that was shipped under its old random-word name and then renamed in place doesn't linger
+  #  as a stale duplicate on the NAS.
+  transport_ship "$claude_root/plans" "$host/plans" mirror
 fi
 
 # 4) human-readable rendering (clean conversation) → <host>/readable/<project>/<date>_<topic>__<sid8>.md

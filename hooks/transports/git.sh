@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # Transcript backend: git. Copy the transcript into the claude-chats clone and push it.
 # Requires DOTCLAUDE_CHATS (a clone of the private relay repo). Best-effort; never fails.
-transport_ship() {  # transport_ship <src> <relpath>   (src may be a file or a directory)
-  local src="$1" relpath="$2" chats
+transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a file or a directory)
+  local src="$1" relpath="$2" mode="${3:-}" chats d b
   chats="$(dc_chats)"
   [ -n "$chats" ] && [ -d "$chats/.git" ] || return 0
   local dst="$chats/$relpath"
   if [ -d "$src" ]; then
-    mkdir -p "$dst"; cp -a "$src/." "$dst/"
+    mkdir -p "$dst"
+    if [ "$mode" = mirror ]; then              # authoritative: drop dest entries not in src (flat dir)
+      for d in "$dst"/*; do
+        [ -e "$d" ] || continue; b="$(basename "$d")"
+        [ -e "$src/$b" ] || rm -rf -- "$d" 2>/dev/null || true
+      done
+    fi
+    cp -a "$src/." "$dst/"
   else
     mkdir -p "$(dirname "$dst")"; cp -f "$src" "$dst"
   fi
