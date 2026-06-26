@@ -32,11 +32,15 @@ transport_ship "$src" "$host/$slug/$sid.jsonl"
 sess_dir="$(dirname "$src")/$sid"
 [ -d "$sess_dir" ] && transport_ship "$sess_dir" "$host/$slug/$sid"
 
-# 3) plan files (sensitive; not session-keyed) — mirror the whole small plans/ dir.
+# 3) plan files (sensitive; not session-keyed) — first give them meaningful <date>_<topic>.md
+#    names in place (Claude Code names plans with three random words), then mirror the whole
+#    small plans/ dir. Renaming is idempotent, so already-dated names survive across ships.
 #    Derive the Claude config root from the transcript path (…/<root>/projects/<slug>/…).
 claude_root="${src%/projects/*}"
-[ "$claude_root" != "$src" ] && [ -d "$claude_root/plans" ] && \
+if [ "$claude_root" != "$src" ] && [ -d "$claude_root/plans" ]; then
+  dc_normalize_plans "$claude_root/plans"
   transport_ship "$claude_root/plans" "$host/plans"
+fi
 
 # 4) human-readable rendering (clean conversation) → <host>/readable/<project>/<date>_<topic>__<sid8>.md
 #    Additive: machine .jsonl tree above is untouched; this is the browsable layer.

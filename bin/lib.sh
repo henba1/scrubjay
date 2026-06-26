@@ -45,3 +45,31 @@ dc_readable_relpath() {  # dc_readable_relpath <transcript.jsonl> <session_id>
   d="$(date -r "$src" +%F 2>/dev/null || date +%F)"
   printf '%s/%s_%s__%s' "$project" "$d" "$topic" "${sid:0:8}"
 }
+
+# Give plan files meaningful, date-prefixed names *in place*, so the relay tree (and the local
+# plans/ dir) is browsable like readable/ instead of Claude Code's three-random-word names:
+#   <date>_<topic>.md   (date = file mtime; topic = the plan's first markdown heading, slugified,
+#   with a leading "Plan:"/"Plan -" stripped). Idempotent: files already named <YYYY-MM-DD>_… are
+#   left untouched, so it can run on every ship. On a name clash with a *different* file a -N suffix
+#   is added. Best-effort and silent — it must never fail the caller (the ship).
+dc_normalize_plans() {  # dc_normalize_plans <plans_dir>
+  local dir="$1" f base topic d target n
+  [ -d "$dir" ] || return 0
+  for f in "$dir"/*.md; do
+    [ -f "$f" ] || continue
+    base="$(basename "$f")"
+    case "$base" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_*) continue ;; esac
+    topic="$(grep -m1 -E '^#+[[:space:]]+' "$f" 2>/dev/null \
+              | sed -E 's/^#+[[:space:]]+//; s/^[Pp]lan[[:space:]]*[:-][[:space:]]*//')"
+    topic="$(printf '%s' "$topic" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
+              | sed -E "s/^-+//; s/-+$//" | cut -c1-50 | sed -E "s/-+$//")"
+    [ -n "$topic" ] || topic="${base%.md}"
+    d="$(date -r "$f" +%F 2>/dev/null || date +%F)"
+    target="$dir/${d}_${topic}.md"
+    if [ -e "$target" ] && [ "$target" != "$f" ]; then
+      n=2; while [ -e "$dir/${d}_${topic}-${n}.md" ]; do n=$((n + 1)); done
+      target="$dir/${d}_${topic}-${n}.md"
+    fi
+    [ "$target" = "$f" ] || mv -- "$f" "$target" 2>/dev/null || true
+  done
+}

@@ -8,7 +8,7 @@ same backend (so sensitive content never takes a separate third-party path):
 |---|---|---|
 | transcript | `~/.claude/projects/<slug>/<session>.jsonl` | `<host>/<slug>/<session>.jsonl` |
 | subagents (subagent transcripts, tool-results) | `~/.claude/projects/<slug>/<session>/` | `<host>/<slug>/<session>/` |
-| plans (sensitive; not session-keyed) | `~/.claude/plans/` | `<host>/plans/` |
+| plans (sensitive; not session-keyed) | `~/.claude/plans/` | `<host>/plans/<date>_<topic>.md` |
 
 `transport_ship <src> <relpath>` accepts a file *or* a directory. (Memory is **not** shipped
 here — it rides the `dotclaude-data` git sync.)

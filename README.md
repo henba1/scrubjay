@@ -241,7 +241,7 @@ GitHub and goes straight to your NAS over your own WireGuard link:
 |---|---|
 | full transcript (machine-readable) | `<host>/<slug>/<session>.jsonl` |
 | subagent transcripts + tool-results | `<host>/<slug>/<session>/` |
-| plans | `<host>/plans/` |
+| plans | `<host>/plans/<date>_<topic>.md` |
 | clean Markdown render (human-readable) | `<host>/readable/<project>/<date>_<topic>__<sid8>.md` |
 
 The NAS holds **two parallel trees per host**. The `.jsonl` tree above is canonical — exact,
@@ -252,6 +252,12 @@ only thinking and system/meta lines dropped) — for browsing and manually repea
 each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified.
 Rendering happens automatically on every ship (`bin/render-transcript.sh`, additive — it never
 touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS.
+
+Plans get the same human-friendly treatment: Claude Code saves each plan under three random words
+(`rippling-sprouting-whisper.md`), so on every ship `dc_normalize_plans` (in `bin/lib.sh`) renames
+them *in place* to `<date>_<topic>.md` — date from the file's mtime, topic from the plan's first
+heading (a leading `Plan:` stripped) — before the `plans/` dir is mirrored. It's idempotent
+(already-dated names are left alone), so each machine self-normalizes its own plans going forward.
 
 **Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, `memory/`, host
 config and `logs/` are low-sensitivity, need merge/history across machines, and must be
