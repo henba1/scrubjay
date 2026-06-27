@@ -23,6 +23,23 @@ leaking anything:
 > WireGuard, and over SSH for machines that can't run it (e.g. HPC) — are drawn out under
 > [Transcripts: relay + NAS](#transcripts-relay--nas).
 
+## The core idea: two kinds of sync
+
+Everything dotclaude moves is one of two things — and which one it is decides the *mechanism*.
+Get this distinction and the rest of the system follows:
+
+| Semantic | Meaning | Mechanism | What it fits |
+|---|---|---|---|
+| **Shared / bidirectional** ("cross-machine") | Same content on every machine; edits *merge* | **git** (pull + push) | things you *author*: `CLAUDE.md`, `commands`, `agents`, `settings`, `plugins`, **memory** |
+| **Archive / one-way** | machine → NAS; never edited in two places, no read-back | **rsync** (the P2P "cart") | *records*: transcripts, subagents, plans, `readable/`, `history.jsonl`, `tasks` |
+
+The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own
+NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of
+*authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the
+merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the
+non-sensitive authored config rides GitHub (`dotclaude-data`). That's the whole design in one sentence:
+**author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
+
 ## HOW-TO (start here)
 
 ### 0. What is dotclaude?
