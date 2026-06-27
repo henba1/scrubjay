@@ -28,8 +28,8 @@ if [ -n "$remote" ]; then
 else
   case "$backend" in
     local)
-      base="$(dirname "${DOTCLAUDE_LOCAL_CHATS:-$HOME}")"
-      remote="${MEM_BARE:-$base/Claude-Code-memory.git}"
+      # the bare repo lives INSIDE the NAS storage folder, next to the transcript trees
+      remote="${MEM_BARE:-${DOTCLAUDE_LOCAL_CHATS:-/mnt/nas1/dotclaude-storage}/memory.git}"
       info "local backend → bare repo on the NAS: $remote"
       ;;
     rsync-wg)
@@ -38,7 +38,7 @@ else
       guser="${MEM_GIT_USER:-$USER}"
       local_host="${MEM_RECV_HOST:-}"; local_port="${MEM_RECV_PORT:-22}"
       gkey="${MEM_KEY:-$HOME/.ssh/claude_memory_ed25519}"
-      gbare="${MEM_BARE:-/srv/Claude-Code-memory.git}"
+      gbare="${MEM_BARE:-/srv/claude-chats/memory.git}"   # /srv/claude-chats → the NAS storage folder
       if [ -z "$local_host" ]; then     # crib host/port from the existing relay alias if present
         local_host="$(ssh -G claude-receiver 2>/dev/null | awk '/^hostname /{print $2; exit}')"
         local_port="$(ssh -G claude-receiver 2>/dev/null | awk '/^port /{print $2; exit}')"
@@ -73,12 +73,27 @@ else
   export DOTCLAUDE_MEMORY="$mem" DOTCLAUDE_MEMORY_REMOTE="$remote"
 fi
 
-# local backend: create the bare repo on the NAS if it doesn't exist yet
+# local backend: create the bare repo on the NAS if it doesn't exist yet, and install a post-receive
+# hook that checks the latest `main` out into a sibling `memory/` dir — a browsable copy on the NAS,
+# refreshed on every push (from this box or any WG client).
 if [ "$backend" = local ] && [ -n "$remote" ]; then
   if [ ! -d "$remote" ]; then
     mkdir -p "$(dirname "$remote")" && git init -q --bare "$remote" && ok "created bare repo $remote" \
       || warn "could not create bare repo at $remote"
   else ok "bare repo present: $remote"; fi
+  hook="$remote/hooks/post-receive"
+  if [ -d "$remote" ] && [ ! -f "$hook" ]; then
+    cat > "$hook" <<'HOOK'
+#!/bin/sh
+# Keep a browsable working copy of memory on the NAS, refreshed whenever any machine pushes.
+unset GIT_DIR GIT_WORK_TREE
+BARE="$(cd "$(dirname "$0")/.." && pwd)"
+TARGET="$(dirname "$BARE")/memory"
+mkdir -p "$TARGET"
+git --git-dir="$BARE" --work-tree="$TARGET" checkout -f main 2>/dev/null || true
+HOOK
+    chmod +x "$hook" && ok "installed post-receive hook → browsable copy at $(dirname "$remote")/memory"
+  fi
 fi
 
 # clone/pull, link per-project memory dirs, publish anything migrated in (first run on the NAS box)

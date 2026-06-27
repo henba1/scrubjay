@@ -2,7 +2,7 @@
 
 The always-on Pi is the bridge between GitHub (which remote machines can reach) and your
 home NAS (which they can't). It pulls the `claude-chats` relay every 30 min and mirrors
-it into `$NAS1/Claude-Code-chats`.
+it into `$NAS1/dotclaude-storage`.
 
 ## One-time setup
 
@@ -11,11 +11,11 @@ it into `$NAS1/Claude-Code-chats`.
    ```sh
    git clone git@github.com:<your-gh-user>/dotclaude.git ~/dotclaude
    ```
-3. Make sure the NAS is mounted (e.g. `/mnt/nas1/Claude-Code-chats`).
+3. Make sure the NAS is mounted (e.g. `/mnt/nas1/dotclaude-storage`).
 4. Test once (`CHATS_REPO_URL` is only needed the first run, to clone `claude-chats`):
    ```sh
    CHATS_REPO_URL=git@github.com:<your-gh-user>/claude-chats.git \
-   NAS_DIR=/mnt/nas1/Claude-Code-chats ~/dotclaude/bin/pull-and-mirror.sh
+   NAS_DIR=/mnt/nas1/dotclaude-storage ~/dotclaude/bin/pull-and-mirror.sh
    ```
 
 ## Cron (every 30 min)
@@ -23,11 +23,11 @@ it into `$NAS1/Claude-Code-chats`.
 `crontab -e`:
 
 ```cron
-*/30 * * * * NAS_DIR=/mnt/nas1/Claude-Code-chats CHATS_REPO=/home/pi/claude-chats /home/pi/dotclaude/bin/pull-and-mirror.sh >> /home/pi/claude-mirror.log 2>&1
+*/30 * * * * NAS_DIR=/mnt/nas1/dotclaude-storage CHATS_REPO=/home/pi/claude-chats /home/pi/dotclaude/bin/pull-and-mirror.sh >> /home/pi/claude-mirror.log 2>&1
 ```
 
 Result: every machine's transcripts land on the NAS at
-`Claude-Code-chats/<host>/<project-slug>/<session>.jsonl` within 30 min of a session
+`dotclaude-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session
 ending. The NAS copy is the canonical archive; the GitHub relay can be pruned/rotated.
 
 ## When you switch to the WireGuard transport

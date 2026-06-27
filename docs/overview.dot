@@ -27,7 +27,7 @@ digraph dotclaude {
     label="home (always-on)"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
     PI  [label="Raspberry Pi\npull every 30 min"];
     NAS [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
-         label="NAS\nClaude-Code-chats/"];
+         label="NAS\ndotclaude-storage/"];
   }
 
   APP  -> CFG  [label="sync: link hooks +\nmerge settings"];

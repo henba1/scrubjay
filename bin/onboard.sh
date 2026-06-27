@@ -101,7 +101,7 @@ case "$BACKEND" in
     [ -f "$WG_KEY" ] || confirm "generate the dedicated relay SSH key now?" Y && GEN_KEY=1
     ;;
   local)
-    ask LOCAL_CHATS "NAS chats root (this box's mount)" "/mnt/nas1/Claude-Code-chats"
+    ask LOCAL_CHATS "NAS storage root (this box's mount)" "/mnt/nas1/dotclaude-storage"
     ;;
 esac
 

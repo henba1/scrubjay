@@ -65,7 +65,7 @@ The `local` backend just copies the transcript straight into the NAS chats root:
 
 ```sh
 DOTCLAUDE_TRANSCRIPT_BACKEND="local"
-DOTCLAUDE_LOCAL_CHATS="/mnt/nas1/Claude-Code-chats"   # the NAS chats root
+DOTCLAUDE_LOCAL_CHATS="/mnt/nas1/dotclaude-storage"   # the NAS storage root
 ```
 
 Layout matches every other backend (`<host>/<slug>/<session>.jsonl`), so a `local` sender and

@@ -126,7 +126,7 @@
 <title>NAS</title>
 <polygon fill="#dcfce7" stroke="#16a34a" points="771,-52 768,-56 747,-56 744,-52 659,-52 659,-16 771,-16 771,-52"/>
 <text text-anchor="middle" x="715" y="-37" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#166534">NAS</text>
-<text text-anchor="middle" x="715" y="-26" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#166534">Claude&#45;Code&#45;chats/</text>
+<text text-anchor="middle" x="715" y="-26" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#166534">dotclaude&#45;storage/</text>
 </g>
 <!-- TX&#45;&gt;NAS -->
 <g id="edge4" class="edge">
