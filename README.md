@@ -185,6 +185,16 @@ git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
 ~/.dotclaude/dotclaude/bin/onboard.sh
 ```
 
+> **⚠️ One manual step the script can't do for you — authorize the new host on the receiver.**
+> For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each
+> **print an `authorized_keys` line**; you must paste it into the receiver account's
+> `~/.ssh/authorized_keys` (e.g. `claude-rx` on the NAS box, needs sudo). This is deliberate — a new
+> machine must not be able to self-authorize; granting it access requires a human with root on the
+> receiver. Each line is locked to one forced command (`rrsync -wo` for transcripts, `git-shell` for
+> memory), so a leaked key can't get a shell or read the archive back. Until you add the line, that
+> host's sync silently no-ops. (Receiver also needs a one-time `safe.directory` trust for the memory
+> repo — see [docs/memory-sync.md](docs/memory-sync.md).)
+
 <details><summary>Manual steps (what the script automates)</summary>
 
 ```sh
