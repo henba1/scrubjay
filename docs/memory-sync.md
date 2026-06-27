@@ -28,27 +28,40 @@ NAS**, reached over the existing WireGuard tunnel. No third party ever sees it.
 
 If `DOTCLAUDE_MEMORY_REMOTE` is unset, memory sync is **off** — the dir is just machine-local.
 
-## One-time setup on the NAS box (the machine that has the NAS mounted)
+## Setup — automated
+
+`bin/onboard-memory.sh` does all of the below, idempotently, on any machine — it's also run by
+`bin/onboard.sh` and exposed as the **`/dconboard`** slash command. Run it once; re-running on an
+already-configured machine is a safe no-op:
 
 ```sh
-git init --bare /media/<you>/NAS1/Claude-Code-memory.git        # the bare repo
-# point this machine at it via a LOCAL path (no SSH hop needed here):
-#   DOTCLAUDE_MEMORY_REMOTE=/media/<you>/NAS1/Claude-Code-memory.git
-bin/memory-sync.sh pull       # clone it (empty is fine)
-bin/claude-sync.sh            # migrate legacy memory in + repoint symlinks
-bin/memory-sync.sh push       # publish
+bin/onboard-memory.sh        # or: /dconboard   (from inside a session)
 ```
 
-## Onboarding a client (over WireGuard)
+- **NAS box** (`local` backend): derives the bare-repo path from the NAS root, `git init --bare`s it
+  if absent, sets the config keys, then clones + migrates legacy memory in + links the memory dirs.
+- **WG client** (`rsync-wg` backend): generates a dedicated `claude_memory_ed25519` key + a
+  `claude-memory` ssh alias (cribbing host/port from the `claude-receiver` alias), sets the config
+  keys, and **prints the one `authorized_keys` line** to add on the receiver (the server-side step
+  stays manual — see below). Override anything via `MEM_BARE`, `MEM_GIT_USER`, `MEM_RECV_HOST`, etc.
 
-A client reaches the bare repo with **full git-over-SSH** — note the transcript relay key uses a
-forced `rrsync -wo` command and therefore **cannot** be reused for git. Add a separate key (optionally
-restricted to `git-shell`) authorized on the NAS box, reachable through the same WG `claude-receiver`
-SSH alias, then:
+## Setup — what it does by hand (reference)
+
+NAS box:
+```sh
+git init --bare /media/<you>/NAS1/Claude-Code-memory.git        # the bare repo
+# DOTCLAUDE_MEMORY_REMOTE=/media/<you>/NAS1/Claude-Code-memory.git   (a LOCAL path; no SSH hop here)
+bin/memory-sync.sh pull && bin/claude-sync.sh && bin/memory-sync.sh push
+```
+
+WG client — git needs **full git-over-SSH**, and the transcript relay key can't be reused (its
+forced `rrsync -wo` command blocks git). `onboard-memory.sh` makes the key + alias; you add its
+public key on the receiver, restricted to git:
 
 ```sh
-# ~/.config/dotclaude/config on the client:
-: "${DOTCLAUDE_MEMORY_REMOTE:=ssh://<user>@claude-receiver/media/<you>/NAS1/Claude-Code-memory.git}"
+# on the receiver, in the git user's ~/.ssh/authorized_keys (printed for you by onboard-memory.sh):
+command="git-shell -c \"$SSH_ORIGINAL_COMMAND\"",restrict ssh-ed25519 AAAA... <host> memory-git
+# then on the client:  DOTCLAUDE_MEMORY_REMOTE=claude-memory:/srv/Claude-Code-memory.git
 bin/memory-sync.sh pull && bin/claude-sync.sh
 ```
 

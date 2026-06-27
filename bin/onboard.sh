@@ -7,6 +7,7 @@
 #   - register the host + apply config into ~/.claude
 #   - for the rsync-wg (P2P) backend: optionally generate a dedicated relay SSH key,
 #     add the `claude-receiver` ssh-alias, and print the receiver authorized_keys line
+#   - set up cross-machine memory (self-hosted NAS git repo) via onboard-memory.sh
 #
 # Re-runnable: skips anything already in place. Prompts have sensible defaults; any value
 # can be preset via its env var (DOTCLAUDE_HOST, DOTCLAUDE_BACKEND, …) to run unattended.
@@ -152,6 +153,12 @@ export CLAUDE_HOST="$HOST"
 info "registering host '$HOST' and applying config…"
 "$APP/bin/claude-register-host.sh" --host "$HOST" || die "host registration failed"
 "$APP/bin/claude-sync.sh"          --host "$HOST" || die "claude-sync failed"
+
+# ---- 7b) cross-machine memory (self-hosted NAS git repo) ------------------------------
+if confirm "set up cross-machine memory (its own self-hosted NAS git repo)?" Y; then
+  MEM_RECV_HOST="${RECV_HOST:-}" MEM_RECV_PORT="${RECV_PORT:-22}" \
+    "$APP/bin/onboard-memory.sh" || warn "memory onboarding had issues — see docs/memory-sync.md"
+fi
 
 # ---- 8) offer to push the new host dir ------------------------------------------------
 if confirm "commit + push the new hosts/$HOST entry to dotclaude-data?" Y; then

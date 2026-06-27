@@ -133,7 +133,8 @@ push* — every machine converges on its own. The concrete commands are in
 
 ```
 bin/
-  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key)
+  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory)
+  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /dconboard command)
   lib.sh                 # shared helpers: host + data/chats pointers
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
   claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
