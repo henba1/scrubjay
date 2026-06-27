@@ -37,15 +37,20 @@ else
       # key + ssh alias 'claude-memory' to a SHELL user on the receiver that can serve the bare repo.
       gkey="${MEM_KEY:-$HOME/.ssh/claude_memory_ed25519}"
       gbare="${MEM_BARE:-/srv/claude-chats/memory.git}"   # /srv/claude-chats → the NAS storage folder
-      # Crib host/port/USER from the existing transcript-relay alias — git must reach the SAME
-      # receiver box AND the SAME account (the one that owns/serves the NAS repo, e.g. claude-rx),
-      # NOT the local $USER. (Defaulting to $USER was a bug: it'd ssh in as a nonexistent account.)
-      recv_user="$(ssh -G claude-receiver 2>/dev/null | awk '/^user /{print $2; exit}')"
-      recv_host="$(ssh -G claude-receiver 2>/dev/null | awk '/^hostname /{print $2; exit}')"
-      recv_port="$(ssh -G claude-receiver 2>/dev/null | awk '/^port /{print $2; exit}')"
+      # Memory rides the SAME connection as the transcript relay — same receiver box, same account
+      # (claude-rx), same jump host. The ONLY thing that differs is the key (the receiver pins each
+      # key to one forced command: rrsync for transcripts, git-shell for memory). So derive EVERY
+      # connection field from the working `claude-receiver` alias — host, port, user AND ProxyJump —
+      # and never hand-pick them. (Earlier bugs: defaulting user to $USER reached a nonexistent
+      # account; forgetting ProxyJump aimed straight at the LAN IP and timed out.)
+      recv_user="$(ssh -G claude-receiver 2>/dev/null  | awk '/^user /{print $2; exit}')"
+      recv_host="$(ssh -G claude-receiver 2>/dev/null  | awk '/^hostname /{print $2; exit}')"
+      recv_port="$(ssh -G claude-receiver 2>/dev/null  | awk '/^port /{print $2; exit}')"
+      recv_jump="$(ssh -G claude-receiver 2>/dev/null  | awk '/^proxyjump /{print $2; exit}')"
       guser="${MEM_GIT_USER:-${recv_user:-$USER}}"
       local_host="${MEM_RECV_HOST:-$recv_host}"
       local_port="${MEM_RECV_PORT:-${recv_port:-22}}"
+      jump="${MEM_RECV_JUMP:-$recv_jump}"
       [ -n "$local_host" ] || { warn "set MEM_RECV_HOST=<receiver host/IP> and re-run"; exit 1; }
       mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
       [ -f "$gkey" ] || { ssh-keygen -t ed25519 -N "" -f "$gkey" -C "$(dc_host) memory-git" >/dev/null \
@@ -53,8 +58,9 @@ else
       SSHCFG="$HOME/.ssh/config"; touch "$SSHCFG"; chmod 600 "$SSHCFG"
       if ! grep -qE '^[Hh]ost[[:space:]]+claude-memory$' "$SSHCFG"; then
         { echo; echo "Host claude-memory"; echo "    HostName $local_host"; echo "    Port $local_port"
-          echo "    User $guser"; echo "    IdentityFile $gkey"; } >> "$SSHCFG"
-        ok "ssh alias 'claude-memory' → $guser@$local_host:$local_port"
+          echo "    User $guser"; echo "    IdentityFile $gkey"; echo "    IdentitiesOnly yes"
+          [ -n "$jump" ] && [ "$jump" != none ] && echo "    ProxyJump $jump"; } >> "$SSHCFG"
+        ok "ssh alias 'claude-memory' → $guser@$local_host:$local_port${jump:+ via $jump}"
       fi
       remote="claude-memory:$gbare"
       authorize_key="$gkey.pub"
