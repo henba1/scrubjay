@@ -74,3 +74,31 @@ bin/memory-sync.sh pull && bin/claude-sync.sh
 From then on the client pulls others' memory at session start and publishes its own at session end.
 Concurrent edits merge via `git pull --rebase --autostash`; a genuine conflict is left for you to
 resolve in the clone (memory files are small Markdown, so this is rare).
+
+## Receiver one-time admin (per box, NOT per client)
+
+The memory ride reuses the transcript relay's *connection* (same host, port, account, jump host) —
+the only thing that differs is the **key** (the receiver pins each key to one forced command:
+`rrsync -wo` for transcripts, `git-shell` for memory). So `onboard-memory.sh` on a WG client just
+generates a second key and an alias that inherits the relay's connection. Three things on the
+**receiver** are inherently manual (they need root and/or a *different* user than the one running
+onboard) and aren't auto-applied — do them once when you first enable client memory:
+
+1. **The bare repo must be group-shared.** It's multi-writer: the NAS box pushes locally as its
+   owner, WG clients push as the relay account. `onboard-memory.sh` now creates it with
+   `git init --bare --shared=group`; for a repo that predates that, fix it in place:
+   ```sh
+   git --git-dir=<repo> config core.sharedRepository group
+   find <repo> -type d -exec chmod g+rwxs {} + ; find <repo> -type f -exec chmod g+rw {} +
+   ```
+   The relay account must be in the repo owner's group (it already is, for the relay to traverse).
+2. **Trust the repo for the git-shell account** (git's "dubious ownership" guard fires because the
+   repo is owned by the NAS user, not the relay account):
+   ```sh
+   sudo -u <relay-account> git config --global --add safe.directory <repo>          # real path
+   sudo -u <relay-account> git config --global --add safe.directory <symlink-path>  # e.g. /srv/claude-chats/memory.git
+   ```
+3. **Authorize each client key** with the `git-shell` forced-command line from step above, and make
+   sure `git-shell` is installed on the receiver.
+
+After these, every new client is fully covered by `onboard-memory.sh` + adding its one printed key.

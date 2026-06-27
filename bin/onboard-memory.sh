@@ -87,8 +87,11 @@ fi
 # refreshed on every push (from this box or any WG client).
 if [ "$backend" = local ] && [ -n "$remote" ]; then
   if [ ! -d "$remote" ]; then
-    mkdir -p "$(dirname "$remote")" && git init -q --bare "$remote" && ok "created bare repo $remote" \
-      || warn "could not create bare repo at $remote"
+    # --shared=group: the repo is multi-writer — the NAS box pushes locally as the owner, while WG
+    # clients push over SSH as the relay account (e.g. claude-rx). Group-shared perms + setgid let
+    # both write. (The relay account must be in the owner's group; it already is for the relay.)
+    mkdir -p "$(dirname "$remote")" && git init -q --bare --shared=group "$remote" \
+      && ok "created bare repo $remote (group-shared)" || warn "could not create bare repo at $remote"
   else ok "bare repo present: $remote"; fi
   hook="$remote/hooks/post-receive"
   if [ -d "$remote" ] && [ ! -f "$hook" ]; then
