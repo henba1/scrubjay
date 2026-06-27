@@ -148,6 +148,7 @@ bin/
 hooks/
   sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
   log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
+  publish-now.sh         # manual SessionEnd-on-demand (the /dclog command); reconstructs the hook payload
   transports/git.sh      # backend: git stopgap (-> claude-chats, Pi mirrors to NAS)
   transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
   transports/local.sh    # backend: local copy (the box that has the NAS mounted)
@@ -291,7 +292,9 @@ a dedicated **bare git repo on the NAS, reached over WireGuard** (`DOTCLAUDE_MEM
 path on the NAS box, `ssh://…` over WG on clients). `claude-sync.sh` symlinks each project's native
 `~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines —
 *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`)
-publishes it on session end. No third party ever sees it. (Older versions kept memory per-host in
+publishes it on session end. No third party ever sees it. The pull and the publish also run on
+demand mid-session via the **`/dcsync`** and **`/dclog`** slash commands (data-repo commands wrapping
+`sync-session.sh` and `hooks/publish-now.sh`). (Older versions kept memory per-host in
 `dotclaude-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.)
 See [docs/memory-sync.md](docs/memory-sync.md) for the bare-repo setup and per-client WG onboarding.
 
