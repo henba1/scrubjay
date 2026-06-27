@@ -31,11 +31,11 @@ If `DOTCLAUDE_MEMORY_REMOTE` is unset, memory sync is **off** — the dir is jus
 ## Setup — automated
 
 `bin/onboard-memory.sh` does all of the below, idempotently, on any machine — it's also run by
-`bin/onboard.sh` and exposed as the **`/dconboard`** slash command. Run it once; re-running on an
+`bin/onboard.sh` and exposed as the **`/dcmemory`** slash command. Run it once; re-running on an
 already-configured machine is a safe no-op:
 
 ```sh
-bin/onboard-memory.sh        # or: /dconboard   (from inside a session)
+bin/onboard-memory.sh        # or: /dcmemory   (from inside a session)
 ```
 
 - **NAS box** (`local` backend): derives the bare-repo path from the NAS root, `git init --bare`s it
