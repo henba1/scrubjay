@@ -133,7 +133,7 @@ push* — every machine converges on its own. The concrete commands are in
 
 ```
 bin/
-  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory)
+  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /dconboard command
   onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /dcmemory command)
   lib.sh                 # shared helpers: host + data/chats pointers
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
@@ -372,7 +372,8 @@ so they're available on every machine). These trigger the otherwise-automatic ho
 |---|---|---|
 | **`/dcsync`** | SessionStart | Pull the data repo + cross-machine memory, then re-apply config into `~/.claude`. |
 | **`/dclog`** | SessionEnd | Publish *now* without ending the session: log line + chats index + push data repo + push memory + relay this session's transcript/plans/history/tasks to the NAS. |
-| **`/dcmemory`** | — | Enable/repair cross-machine memory on this machine (idempotent — runs `bin/onboard-memory.sh`). Full machine onboarding is the `bin/onboard.sh` shell script. |
+| **`/dconboard`** | — | Onboard / re-configure this machine — a guided wrapper around `bin/onboard.sh` (gathers choices in chat, then runs it unattended). For a *brand-new* machine without dotclaude yet, run `bin/onboard.sh` in a terminal instead. |
+| **`/dcmemory`** | — | Enable/repair cross-machine memory on this machine (idempotent — runs `bin/onboard-memory.sh`). |
 
 **Apply / refresh config now** (normally automatic at session start/end):
 ```sh
