@@ -35,14 +35,17 @@ else
     rsync-wg)
       # Client over WG. Git can't reuse the rrsync relay key (forced command), so make a dedicated
       # key + ssh alias 'claude-memory' to a SHELL user on the receiver that can serve the bare repo.
-      guser="${MEM_GIT_USER:-$USER}"
-      local_host="${MEM_RECV_HOST:-}"; local_port="${MEM_RECV_PORT:-22}"
       gkey="${MEM_KEY:-$HOME/.ssh/claude_memory_ed25519}"
       gbare="${MEM_BARE:-/srv/claude-chats/memory.git}"   # /srv/claude-chats → the NAS storage folder
-      if [ -z "$local_host" ]; then     # crib host/port from the existing relay alias if present
-        local_host="$(ssh -G claude-receiver 2>/dev/null | awk '/^hostname /{print $2; exit}')"
-        local_port="$(ssh -G claude-receiver 2>/dev/null | awk '/^port /{print $2; exit}')"
-      fi
+      # Crib host/port/USER from the existing transcript-relay alias — git must reach the SAME
+      # receiver box AND the SAME account (the one that owns/serves the NAS repo, e.g. claude-rx),
+      # NOT the local $USER. (Defaulting to $USER was a bug: it'd ssh in as a nonexistent account.)
+      recv_user="$(ssh -G claude-receiver 2>/dev/null | awk '/^user /{print $2; exit}')"
+      recv_host="$(ssh -G claude-receiver 2>/dev/null | awk '/^hostname /{print $2; exit}')"
+      recv_port="$(ssh -G claude-receiver 2>/dev/null | awk '/^port /{print $2; exit}')"
+      guser="${MEM_GIT_USER:-${recv_user:-$USER}}"
+      local_host="${MEM_RECV_HOST:-$recv_host}"
+      local_port="${MEM_RECV_PORT:-${recv_port:-22}}"
       [ -n "$local_host" ] || { warn "set MEM_RECV_HOST=<receiver host/IP> and re-run"; exit 1; }
       mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
       [ -f "$gkey" ] || { ssh-keygen -t ed25519 -N "" -f "$gkey" -C "$(dc_host) memory-git" >/dev/null \
