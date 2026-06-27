@@ -46,6 +46,29 @@ link() {  # link <src> <dst>
   ln -s "$src" "$dst"; echo "  link  $dst"
 }
 
+# Slash commands come from TWO sources: the app repo ships the generic dotclaude commands
+# (the /dc* family — anyone who installs dotclaude gets them), the data repo holds personal
+# ones. We materialize ~/.claude/commands as a REAL dir of per-file symlinks into both, so the
+# app and personal commands coexist. Data-repo files win on a name clash (personal override).
+link_commands() {  # link_commands <dst-dir> <src-dir>...
+  local dst="$1"; shift
+  [ -L "$dst" ] && { rm -f "$dst"; }                 # was a single dir-symlink (old layout)
+  mkdir -p "$dst"
+  ( shopt -s nullglob
+    for f in "$dst"/*.md; do [ -L "$f" ] && rm -f "$f"; done   # drop our stale links, keep real files
+    for srcdir in "$@"; do
+      [ -d "$srcdir" ] || continue
+      for src in "$srcdir"/*.md; do
+        local name; name="$(basename "$src")"
+        if [ -e "$dst/$name" ] && [ ! -L "$dst/$name" ]; then
+          echo "  SKIP  $dst/$name (real file)"; continue
+        fi
+        ln -sf "$src" "$dst/$name"
+      done
+    done )
+  echo "  link  $dst/  (app + data commands)"
+}
+
 # Point a project's harness memory dir at the synced repo (<data>/memory/<host>/<project>/).
 # Claude auto-writes/reads ~/.claude/projects/<project>/memory/; we make that a symlink so the
 # files live in the data repo (synced) instead of stranded machine-locally. Migrates any
@@ -72,9 +95,10 @@ link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
 
 echo "symlinking scopes:"
 link "$DATA/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
-link "$DATA/claude-md/commands"  "$CLAUDE_DIR/commands"
 link "$DATA/claude-md/agents"    "$CLAUDE_DIR/agents"
 link "$APP/hooks"                "$CLAUDE_DIR/hooks"
+# commands: app ships the generic /dc* family, data adds personal ones (data wins on clash)
+link_commands "$CLAUDE_DIR/commands" "$APP/commands" "$DATA/claude-md/commands"
 
 # plugins: share *which marketplaces are registered* (the rest of plugins/ is re-fetchable cache,
 # so it stays machine-local). The file is symlinked into the data repo like the other config; if

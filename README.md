@@ -66,10 +66,11 @@ directories. Each one feeds Claude in a specific way:
   always-on instruction file Claude reads at the top of every session (e.g. *"never add a
   `Co-Authored-By` trailer to commits"*). `commands/` holds custom slash-commands you can
   invoke by name — `commands/explain-diff.md` becomes `/explain-diff`, which might tell
-  Claude to summarise your staged git changes. `agents/` holds sub-agents Claude can
-  delegate to — `agents/test-runner.md` defines a focused helper that runs your test suite
-  and reports back. These three are symlinked straight into `~/.claude/`, so editing a file
-  here changes Claude's behaviour everywhere on the next pull.
+  Claude to summarise your staged git changes. (The generic `/dc*` commands aren't here — they
+  ship with the app; `claude-sync.sh` merges both into `~/.claude/commands/`.) `agents/` holds
+  sub-agents Claude can delegate to — `agents/test-runner.md` defines a focused helper that runs
+  your test suite and reports back. `CLAUDE.md` and `agents/` are symlinked straight into
+  `~/.claude/`, so editing a file here changes Claude's behaviour everywhere on the next pull.
 
 - **`hosts/<machine>/`** — the part that is *different* per machine. `env.md` describes that
   box in prose (its OS, where Python lives, cluster quirks) so Claude knows the lay of the
@@ -222,8 +223,9 @@ Both housekeeping scripts run automatically via hooks, so you never update anyth
 `git add -A` is safe because the data repo's `.gitignore` blocks secrets and transcripts
 (`*.credentials*`, `*.jsonl`, `.claude.json`), so those can never be staged.
 
-Symlinked scopes (`CLAUDE.md`, `commands/`, `agents/`, `hooks/`) go live on the pull
-alone — `claude-sync.sh` only has real work when `settings.json` changed. You can still run
+Symlinked scopes (`CLAUDE.md`, `agents/`, `hooks/`, and the per-file links in `commands/`)
+go live on the pull alone — `claude-sync.sh` only has real work when `settings.json` changed
+or a *new* command/agent file appeared (it relinks `commands/` from the app + data sources). You can still run
 either by hand (both idempotent); the hooks just mean you don't have to:
 
 ```sh
@@ -294,15 +296,17 @@ path on the NAS box, `ssh://…` over WG on clients). `claude-sync.sh` symlinks 
 `~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines —
 *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`)
 publishes it on session end. No third party ever sees it. The pull and the publish also run on
-demand mid-session via the **`/dcsync`** and **`/dclog`** slash commands (data-repo commands wrapping
+demand mid-session via the **`/dcsync`** and **`/dclog`** slash commands (shipped with the app, wrapping
 `sync-session.sh` and `hooks/publish-now.sh`). (Older versions kept memory per-host in
 `dotclaude-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.)
 See [docs/memory-sync.md](docs/memory-sync.md) for the bare-repo setup and per-client WG onboarding.
 
-**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, `commands`, `agents`,
-the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need merge/history
-across machines, and must be reachable to bootstrap a new box — so they ride normal git. (Memory
-used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
+**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, *personal* `commands`,
+`agents`, the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need
+merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal
+git. (The generic `/dc*` slash commands instead ship with the **app** in `dotclaude/commands/`, so a
+fresh install has them immediately; `claude-sync.sh` merges both sources into `~/.claude/commands/`.
+Memory used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
 
 ### The two peer-to-peer paths to your NAS
 
@@ -365,8 +369,9 @@ Day-to-day this all runs from hooks; reach for these when you want to do somethi
 Paths assume the default `~/.dotclaude/` layout from [Onboard](#onboard-a-new-machine)
 (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo).
 
-**Slash commands** (run from inside a Claude Code session — they're in `dotclaude-data/claude-md/commands/`,
-so they're available on every machine). These trigger the otherwise-automatic hook actions on demand:
+**Slash commands** (run from inside a Claude Code session — they ship with the **app** in `dotclaude/commands/`,
+so every machine that installs dotclaude gets them out of the box). These trigger the otherwise-automatic
+hook actions on demand:
 
 | Command | Mirrors | Does |
 |---|---|---|
