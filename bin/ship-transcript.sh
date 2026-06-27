@@ -4,9 +4,11 @@
 #   2) this session's subagent dir (if any: subagent transcripts, tool-results)
 #                                          -> <host>/<slug>/<session>/
 #   3) all plan files for this host       -> <host>/plans/
-# (2) and (3) are full conversation / sensitive content, so they ride the same
+#   …plus readable rendering, prompt history, this session's tasks, and the
+#      project's CLAUDE.local.md (see numbered steps below).
+# These are full conversation / sensitive content, so they ride the same
 # (P2P) backend as the transcript — never a separate third-party path.
-#   usage: ship-transcript.sh <transcript_path> <slug> <session_id> [host]
+#   usage: ship-transcript.sh <transcript_path> <slug> <session_id> [host] [cwd]
 # Selects $DOTCLAUDE_TRANSCRIPT_BACKEND (default: git). Each backend lives in
 # hooks/transports/<backend>.sh and must define:  transport_ship <src> <relpath>
 # (src may be a file or a directory).
@@ -17,6 +19,7 @@ APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 src="${1:?transcript path}"; slug="${2:?slug}"; sid="${3:?session id}"
 host="${4:-$(dc_host)}"
+cwd="${5:-}"                                   # session working dir (for project-root files)
 [ -f "$src" ] || exit 0
 
 backend="${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}"
@@ -63,3 +66,11 @@ fi
 # 6) this session's task list (TaskCreate items), if any → alongside the session's artifacts.
 [ -n "${claude_root:-}" ] && [ -d "$claude_root/tasks/$sid" ] && \
   transport_ship "$claude_root/tasks/$sid" "$host/$slug/$sid/tasks"
+
+# 7) the project's CLAUDE.local.md (personal, gitignored project rules — sensitive: holds private
+#    paths/cluster details, and host-specific, so it's a one-way per-host archive next to the
+#    project's transcripts, NOT merged across machines like memory). Lives in the working tree
+#    root, not under ~/.claude, so we need the session cwd. Fall back to the transcript's own cwd.
+[ -n "$cwd" ] || cwd="$(jq -r 'select(.cwd!=null) | .cwd' "$src" 2>/dev/null | head -1)"
+[ -n "$cwd" ] && [ -f "$cwd/CLAUDE.local.md" ] && \
+  transport_ship "$cwd/CLAUDE.local.md" "$host/$slug/CLAUDE.local.md"

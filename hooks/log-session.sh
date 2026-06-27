@@ -83,7 +83,7 @@ fi
 # ---- 2) relay the full transcript (pluggable backend) ----
 if [ "${DOTCLAUDE_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
   slug="$(basename "$(dirname "$tpath")")"
-  "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" >/dev/null 2>&1 || true
+  "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true
 fi
 
 exit 0

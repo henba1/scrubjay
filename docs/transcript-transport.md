@@ -9,6 +9,12 @@ same backend (so sensitive content never takes a separate third-party path):
 | transcript | `~/.claude/projects/<slug>/<session>.jsonl` | `<host>/<slug>/<session>.jsonl` |
 | subagents (subagent transcripts, tool-results) | `~/.claude/projects/<slug>/<session>/` | `<host>/<slug>/<session>/` |
 | plans (sensitive; not session-keyed) | `~/.claude/plans/` | `<host>/plans/<date>_<topic>.md` |
+| `CLAUDE.local.md` (personal project rules; host-specific) | `<project working tree>/CLAUDE.local.md` | `<host>/<slug>/CLAUDE.local.md` |
+
+The layout is uniform: **`<host>/` + the same path Claude uses locally.** (Memory is the one
+exception — it drops the host prefix because it's *shared* across machines, not archived per-host;
+see `memory-sync.md`.) `CLAUDE.local.md` is host-specific, so it's a one-way per-host archive, not
+merged like memory.
 
 `transport_ship <src> <relpath>` accepts a file *or* a directory. (Memory is **not** shipped
 here — it rides the `dotclaude-data` git sync.)
