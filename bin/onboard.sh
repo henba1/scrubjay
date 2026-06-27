@@ -92,7 +92,7 @@ WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PORT="
 case "$BACKEND" in
   rsync-wg)
     ask RECV_USER "receiver SSH user" "claude-rx"
-    ask RECV_HOST "receiver host/IP (reachable over WG/LAN)" "192.168.178.52"
+    ask RECV_HOST "receiver host/IP (reachable over WG/LAN)" "192.168.1.10"
     ask RECV_PORT "receiver SSH port" "22"
     ask RECV_PATH "receiver rrsync root (its authorized_keys -wo dir)" "/srv/claude-chats"
     ask WG_KEY "relay SSH key path" "$HOME/.ssh/claude_transcripts_ed25519"
@@ -101,7 +101,7 @@ case "$BACKEND" in
     [ -f "$WG_KEY" ] || confirm "generate the dedicated relay SSH key now?" Y && GEN_KEY=1
     ;;
   local)
-    ask LOCAL_CHATS "NAS chats root (this box's mount)" "/media/hendrik/NAS1/Claude-Code-chats"
+    ask LOCAL_CHATS "NAS chats root (this box's mount)" "/mnt/nas1/Claude-Code-chats"
     ;;
 esac
 
