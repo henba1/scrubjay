@@ -365,6 +365,15 @@ Day-to-day this all runs from hooks; reach for these when you want to do somethi
 Paths assume the default `~/.dotclaude/` layout from [Onboard](#onboard-a-new-machine)
 (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo).
 
+**Slash commands** (run from inside a Claude Code session — they're in `dotclaude-data/claude-md/commands/`,
+so they're available on every machine). These trigger the otherwise-automatic hook actions on demand:
+
+| Command | Mirrors | Does |
+|---|---|---|
+| **`/dcsync`** | SessionStart | Pull the data repo + cross-machine memory, then re-apply config into `~/.claude`. |
+| **`/dclog`** | SessionEnd | Publish *now* without ending the session: log line + chats index + push data repo + push memory + relay this session's transcript/plans/history/tasks to the NAS. |
+| **`/dconboard`** | — | Enable/repair cross-machine memory on this machine (idempotent — runs `bin/onboard-memory.sh`). |
+
 **Apply / refresh config now** (normally automatic at session start/end):
 ```sh
 ~/.dotclaude/dotclaude/bin/claude-sync.sh           # re-apply data-repo config into ~/.claude
