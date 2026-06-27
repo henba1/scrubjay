@@ -27,6 +27,10 @@ if [ "${DOTCLAUDE_SYNC_NOPULL:-0}" != "1" ]; then
   done
 fi
 
+# 1b) pull cross-machine memory from its own NAS-hosted git repo (no-op if not configured),
+#     BEFORE claude-sync links the per-project memory dirs at it, so others' memory is present.
+"$APP/bin/memory-sync.sh" pull >/dev/null 2>&1 || true
+
 # 2) apply into ~/.claude (idempotent; mostly a no-op thanks to symlinks)
 "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 

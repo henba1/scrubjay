@@ -54,3 +54,12 @@ if [ -n "$tmpmd" ]; then
   [ -s "$tmpmd" ] && transport_ship "$tmpmd" "$host/readable/$rel.md"
   rm -f "$tmpmd"
 fi
+
+# 5) prompt history (sensitive — every prompt typed across all projects) → per-host archive.
+#    One growing file; latest copy wins. claude_root was derived in step 3.
+[ -n "${claude_root:-}" ] && [ -f "$claude_root/history.jsonl" ] && \
+  transport_ship "$claude_root/history.jsonl" "$host/history.jsonl"
+
+# 6) this session's task list (TaskCreate items), if any → alongside the session's artifacts.
+[ -n "${claude_root:-}" ] && [ -d "$claude_root/tasks/$sid" ] && \
+  transport_ship "$claude_root/tasks/$sid" "$host/$slug/$sid/tasks"

@@ -76,6 +76,16 @@ link "$DATA/claude-md/commands"  "$CLAUDE_DIR/commands"
 link "$DATA/claude-md/agents"    "$CLAUDE_DIR/agents"
 link "$APP/hooks"                "$CLAUDE_DIR/hooks"
 
+# plugins: share *which marketplaces are registered* (the rest of plugins/ is re-fetchable cache,
+# so it stays machine-local). The file is symlinked into the data repo like the other config; if
+# the harness rewrites it in place we adopt the new content into the repo before re-linking.
+PLUG_SRC="$DATA/claude-md/plugins/known_marketplaces.json"
+PLUG_DST="$CLAUDE_DIR/plugins/known_marketplaces.json"
+if [ -e "$PLUG_DST" ] && [ ! -L "$PLUG_DST" ]; then
+  mkdir -p "$(dirname "$PLUG_SRC")"; cp -f "$PLUG_DST" "$PLUG_SRC"; rm -f "$PLUG_DST"
+fi
+[ -d "$CLAUDE_DIR/plugins" ] && link "$PLUG_SRC" "$PLUG_DST"
+
 echo "merging settings:"
 BASE="$DATA/settings/settings.base.json"
 OVER="$HOSTDIR/claude/settings.json"
@@ -93,14 +103,32 @@ fi
 if [ -f "$OUT" ] && cmp -s "$tmp" "$OUT"; then echo "  ok    (unchanged)"; rm -f "$tmp"
 else mv "$tmp" "$OUT"; echo "  wrote $OUT"; fi
 
-# Per-project memory: mirror Claude's native ~/.claude/projects/<project>/memory/ into the data
-# repo under memory/<host>/<project>/ so auto-memories are synced (sorted by host, then project).
-echo "linking per-project memory  (<data>/memory/$HOST/<project>):"
+# Per-project memory: Claude auto-reads/writes ~/.claude/projects/<project>/memory/. We point each
+# at the SHARED, cross-machine memory clone (<mem>/<project>/) — its own git repo self-hosted on the
+# NAS over WireGuard (dc_memory_remote), so the sensitive paths in memory sync between machines
+# WITHOUT touching GitHub. Shared (not per-host) so the same project recalls memory written anywhere.
+MEM="$(dc_memory)"
+mkdir -p "$MEM" 2>/dev/null || true
+
+# One-time migration: older versions kept memory in the data repo at <data>/memory/<host>/<project>/
+# (per-host, on GitHub). Move that content into the shared clone before re-linking, never clobbering.
+OLD="$DATA/memory/$HOST"
+if [ -d "$OLD" ]; then
+  echo "migrating legacy memory  ($OLD -> $MEM):"
+  for od in "$OLD"/*/; do
+    [ -d "$od" ] || continue
+    proj="$(basename "$od")"; mkdir -p "$MEM/$proj"
+    ( shopt -s dotglob nullglob
+      for f in "$od"*; do [ -e "$MEM/$proj/$(basename "$f")" ] || cp -a "$f" "$MEM/$proj/"; done )
+  done
+fi
+
+echo "linking per-project memory  (<mem>/<project>):"
 if [ -d "$CLAUDE_DIR/projects" ]; then
   linked=0
   for projdir in "$CLAUDE_DIR/projects"/*/; do
     [ -d "$projdir" ] || continue                  # nullglob guard (literal path if no match)
-    link_memory "$DATA/memory/$HOST/$(basename "$projdir")" "${projdir%/}/memory"
+    link_memory "$MEM/$(basename "$projdir")" "${projdir%/}/memory"
     linked=1
   done
   [ "$linked" = 1 ] || echo "  (no project dirs yet)"
@@ -108,4 +136,4 @@ else
   echo "  (no ~/.claude/projects yet)"
 fi
 
-echo "done. (templates/ is pull-on-demand; memory/ is per-project synced — see README)"
+echo "done. (templates/ is pull-on-demand; memory/ rides its own NAS git repo — see README)"

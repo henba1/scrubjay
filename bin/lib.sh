@@ -28,6 +28,15 @@ dc_data() {
 # Path to the transcripts relay repo (optional; empty if transcript sync is off).
 dc_chats() { dc_load_config; printf '%s' "${DOTCLAUDE_CHATS:-}"; }
 
+# Cross-machine memory rides its OWN git repo, self-hosted on the NAS over WireGuard — so the
+# sensitive paths in auto-memory sync between machines (merge + history) without ever touching a
+# third party like GitHub (which still holds only the non-sensitive config).
+#   dc_memory         local working clone (Claude's per-project memory dirs symlink into it)
+#   dc_memory_remote  the bare repo: a local path on the NAS box, ssh://…over-WG on clients.
+#                     Empty -> memory git sync is OFF (the dir is then just machine-local).
+dc_memory()        { dc_load_config; printf '%s' "${DOTCLAUDE_MEMORY:-$HOME/.dotclaude/claude-memory}"; }
+dc_memory_remote() { dc_load_config; printf '%s' "${DOTCLAUDE_MEMORY_REMOTE:-}"; }
+
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
 #   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
 #   real user prompt, slugified). Derived from the .jsonl itself so it also works for backfill.

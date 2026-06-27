@@ -121,15 +121,16 @@ bin/
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
   claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
   claude-register-host.sh# scaffold a new host into the data repo
-  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable render) via the selected backend
+  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
+  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
   render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
   backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
   pull-and-mirror.sh     # (Pi) pull claude-chats -> NAS
   onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
   onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
 hooks/
-  sync-session.sh        # SessionStart hook: pull data repo + claude-sync (auto-fresh config)
-  log-session.sh         # SessionEnd hook: log line + refresh index + ship session
+  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
+  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
   transports/git.sh      # backend: git stopgap (-> claude-chats, Pi mirrors to NAS)
   transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
   transports/local.sh    # backend: local copy (the box that has the NAS mounted)
@@ -241,8 +242,11 @@ GitHub and goes straight to your NAS over your own WireGuard link:
 |---|---|
 | full transcript (machine-readable) | `<host>/<slug>/<session>.jsonl` |
 | subagent transcripts + tool-results | `<host>/<slug>/<session>/` |
+| this session's task list (TaskCreate) | `<host>/<slug>/<session>/tasks/` |
 | plans | `<host>/plans/<date>_<topic>.md` |
 | clean Markdown render (human-readable) | `<host>/readable/<project>/<date>_<topic>__<sid8>.md` |
+| prompt history (all projects, this host) | `<host>/history.jsonl` |
+| auto-memory (cross-machine) | its **own** git repo on the NAS, *not* this tree — see below |
 
 The NAS holds **two parallel trees per host**. The `.jsonl` tree above is canonical — exact,
 machine-readable, the thing you'd resume or feed to a tool. Alongside it, a `readable/` tree
@@ -263,10 +267,21 @@ Unlike the always-additive transcript/`readable/` trees, the `plans/` mirror is 
 that was already shipped under its old random-word name doesn't linger as a stale duplicate after
 the rename.
 
-**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, `memory/`, host
-config and `logs/` are low-sensitivity, need merge/history across machines, and must be
-reachable to bootstrap a new box — so they ride normal git, not the tunnel. (Memory is
-deliberately *not* part of the session relay.)
+**Memory → its own git repo, self-hosted on the NAS (never GitHub).** Auto-memory needs git's
+*bidirectional merge + history* (so the same project recalls memory written on any machine), but it
+also holds **sensitive paths** — so it can't ride GitHub like the rest of the config. The answer is
+a dedicated **bare git repo on the NAS, reached over WireGuard** (`DOTCLAUDE_MEMORY_REMOTE` — a local
+path on the NAS box, `ssh://…` over WG on clients). `claude-sync.sh` symlinks each project's native
+`~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines —
+*not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`)
+publishes it on session end. No third party ever sees it. (Older versions kept memory per-host in
+`dotclaude-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.)
+See [docs/memory-sync.md](docs/memory-sync.md) for the bare-repo setup and per-client WG onboarding.
+
+**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, `commands`, `agents`,
+the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need merge/history
+across machines, and must be reachable to bootstrap a new box — so they ride normal git. (Memory
+used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
 
 ### The two peer-to-peer paths to your NAS
 

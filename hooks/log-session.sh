@@ -75,6 +75,11 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   fi
 fi
 
+# ---- 1d) publish cross-machine memory to its own NAS-hosted git repo (not GitHub) ----
+# Memory holds sensitive paths, so it rides its own self-hosted repo over WireGuard, separate
+# from the data repo above. No-op if memory sync isn't configured on this machine.
+"$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
+
 # ---- 2) relay the full transcript (pluggable backend) ----
 if [ "${DOTCLAUDE_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
   slug="$(basename "$(dirname "$tpath")")"
