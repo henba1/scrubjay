@@ -9,3 +9,7 @@ projects/
 # editor / OS noise
 *.swp
 .DS_Store
+
+# python (the mcp/ server runs via `uv run --script`; no build artifacts belong here)
+__pycache__/
+*.pyc

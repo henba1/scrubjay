@@ -93,6 +93,36 @@ link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
   ln -s "$src" "$dst"; echo "  link  $dst -> $src"
 }
 
+# Register the dcmcp read-archive MCP server (the /dcrecall, /dcfind, /dcbrowse engine) at USER
+# scope, so it's available in every project on this machine. Gated on this box actually having the
+# archive mounted (DOTCLAUDE_LOCAL_CHATS) — the server is read-only over that tree, so there's
+# nothing to serve without it. Uses the official `claude mcp` CLI (not a hand-edit of the big
+# ~/.claude.json) and is idempotent: it only (re)adds when missing or when our server path changed
+# (e.g. after re-homing the clones). Best-effort — never fails the sync.
+register_mcp() {
+  command -v claude >/dev/null 2>&1 || { echo "  (skip mcp: no claude cli)"; return 0; }
+  command -v uv     >/dev/null 2>&1 || { echo "  (skip mcp: no uv runtime)"; return 0; }
+  dc_load_config
+  local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py"
+  [ -n "$chats" ] && [ -d "$chats" ] || { echo "  (skip mcp: no local archive — DOTCLAUDE_LOCAL_CHATS)"; return 0; }
+  [ -f "$server" ] || { echo "  (skip mcp: server missing $server)"; return 0; }
+  if claude mcp get dcmcp >/dev/null 2>&1; then
+    case "$(claude mcp get dcmcp 2>/dev/null)" in
+      *"$server"*) echo "  ok    mcp dcmcp"; return 0 ;;        # already points at our server
+    esac
+    claude mcp remove dcmcp -s user >/dev/null 2>&1 || claude mcp remove dcmcp >/dev/null 2>&1 || true
+  fi
+  if claude mcp add -s user dcmcp \
+       -e DOTCLAUDE_LOCAL_CHATS="$chats" \
+       -e DOTCLAUDE_MEMORY="$(dc_memory)" \
+       -e DOTCLAUDE_DATA="$DATA" \
+       -- uv run --script "$server" >/dev/null 2>&1; then
+    echo "  add   mcp dcmcp (user scope)"
+  else
+    echo "  WARN  mcp dcmcp registration failed (run: claude mcp add … by hand)"
+  fi
+}
+
 echo "symlinking scopes:"
 link "$DATA/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
 link "$DATA/claude-md/agents"    "$CLAUDE_DIR/agents"
@@ -159,5 +189,8 @@ if [ -d "$CLAUDE_DIR/projects" ]; then
 else
   echo "  (no ~/.claude/projects yet)"
 fi
+
+echo "registering MCP archive server:"
+register_mcp
 
 echo "done. (templates/ is pull-on-demand; memory/ rides its own NAS git repo — see README)"
