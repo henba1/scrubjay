@@ -55,6 +55,17 @@ else
       || warn "Claude install reported an error — continuing; install it manually later."
   fi
 fi
+# uv runs the dcmcp archive server (mcp/dcmcp_server.py via `uv run --script`). Only the box that
+# serves the archive strictly needs it, but check+offer here so claude-sync can wire MCP in one go.
+if have uv; then ok "uv present ($(command -v uv))"
+else
+  warn "uv not found — the dcmcp MCP server (/dcrecall, /dcfind, /dcbrowse) won't register without it."
+  if confirm "Install it now via the official installer?" Y; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh \
+      && ok "uv installed (you may need to reopen your shell so 'uv' is on PATH)" \
+      || warn "uv install reported an error — continuing; install it manually later."
+  fi
+fi
 
 # ---- 2) where the repos live + remote owner (inferred from this clone's origin) -------
 ORIGIN="$(git -C "$APP" remote get-url origin 2>/dev/null || echo)"

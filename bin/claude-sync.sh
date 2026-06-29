@@ -99,13 +99,16 @@ link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
 # nothing to serve without it. Uses the official `claude mcp` CLI (not a hand-edit of the big
 # ~/.claude.json) and is idempotent: it only (re)adds when missing or when our server path changed
 # (e.g. after re-homing the clones). Best-effort — never fails the sync.
+# A loud, visible skip — MCP registration silently doing nothing is exactly the onboarding
+# surprise we want to avoid. Each reason says what to do about it. Returns 0 (never fails sync).
+skip_mcp() { echo "  ┌─ MCP archive server NOT registered (/dcrecall, /dcfind, /dcbrowse stay inert)"; echo "  └─ reason: $1"; return 0; }
 register_mcp() {
-  command -v claude >/dev/null 2>&1 || { echo "  (skip mcp: no claude cli)"; return 0; }
-  command -v uv     >/dev/null 2>&1 || { echo "  (skip mcp: no uv runtime)"; return 0; }
+  command -v claude >/dev/null 2>&1 || { skip_mcp "no 'claude' CLI on PATH — install Claude Code, then rerun bin/claude-sync.sh"; return 0; }
+  command -v uv     >/dev/null 2>&1 || { skip_mcp "no 'uv' runtime on PATH — install uv (curl -LsSf https://astral.sh/uv/install.sh | sh), reopen shell, rerun bin/claude-sync.sh"; return 0; }
   dc_load_config
   local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py"
-  [ -n "$chats" ] && [ -d "$chats" ] || { echo "  (skip mcp: no local archive — DOTCLAUDE_LOCAL_CHATS)"; return 0; }
-  [ -f "$server" ] || { echo "  (skip mcp: server missing $server)"; return 0; }
+  [ -n "$chats" ] && [ -d "$chats" ] || { skip_mcp "no local archive (DOTCLAUDE_LOCAL_CHATS unset or not a dir) — expected on non-NAS clients; Phase 1 serves only where the archive is mounted (henpi)"; return 0; }
+  [ -f "$server" ] || { skip_mcp "server file missing: $server"; return 0; }
   if claude mcp get dcmcp >/dev/null 2>&1; then
     case "$(claude mcp get dcmcp 2>/dev/null)" in
       *"$server"*) echo "  ok    mcp dcmcp"; return 0 ;;        # already points at our server
