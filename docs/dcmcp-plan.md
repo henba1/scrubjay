@@ -109,13 +109,22 @@ established.*
 | Tool | Input | Returns | Backed by |
 |---|---|---|---|
 | `dc_list` | `type?`, `host?`, `project?`, `since?/until?`, `limit?` | structured rows: host, project, date, topic, sid, type, path, turns, size | filesystem scan + `chats.index.json` |
-| `dc_recall` | `query` (free text), `host?`, `project?`, `since?`, `k?` | ranked candidate sessions: topic, host, date, path, **matched snippets**, anchors | ripgrep prefilter over `readable/`+`logs/`+`memory/`+`plans/`, then metadata/score sort (model reranks) |
+| `dc_recall` | `query` (free text), `host?`, `project?`, `since?`, `k?` | ranked candidate sessions: topic, host, date, path, **matched snippets**, anchors | ripgrep prefilter over `readable/`+`plans/`+`memory/` **and the `logs/` session catalogue**, then metadata/score sort (model reranks) |
 | `dc_search_within` | `id`/`path`, `query`, `context?` | matching passages with **turn # + line anchors** and surrounding context | ripgrep `-n` over one readable file (+ map to `.jsonl` turn) |
 | `dc_get` | `id`/`path`, `format?` (`readable`\|`raw`), `turns?`/`lines?` slice | the artifact (or a slice) as text, ready to inject into context | direct file read; slice by turn/line |
 
 Design notes:
 - `dc_recall` returns *candidates with snippets*, not a single answer — the in-session model
   reads the snippets and picks/asks. That's the "semantic" step, done by the model, no embeddings.
+- **The `logs/<host>.log` catalogue is folded into recall as a topic index** (it carries one line
+  per session — first-prompt/topic, cwd, date, full uuid — across *all* machines, including
+  sessions whose transcript never reached this archive). A log topic-hit keys onto the transcript
+  when one exists here (so a session surfaces even if only its first prompt matched, not its body —
+  and the result is enriched with the exact `cwd`); when no transcript is local it stands alone as
+  a `type:log` **pointer** (host/cwd/date + "recall it on this host"). That's what makes recall
+  useful on a *partial-archive* machine (snellius/laptops) — the catalogue is complete even when
+  the `readable/` tree isn't. `dc_list type=log` browses the catalogue directly. (`"(no text)"`
+  sessions are filtered.)
 - `dc_get` is the actual context-injection primitive (use case i's payload, and the follow-through
   after a recall hit). Slicing keeps a 329-turn transcript from blowing the context window.
 - All four take optional `host`/`project`/`since` so "I had it on henpi a couple weeks ago about

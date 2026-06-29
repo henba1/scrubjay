@@ -178,6 +178,71 @@ def _all_artifacts(r: Roots) -> list[Artifact]:
     return _iter_transcripts(r) + _iter_plans(r) + _iter_memories(r)
 
 
+# ── session-log catalogue ──────────────────────────────────────────────────────────────────
+# <data>/logs/<host>.log carries ONE line per session, appended by the SessionEnd hook:
+#   "YYYY-MM-DD HH:MM | host | cwd | "first user prompt (topic)" | session=<uuid>"
+# This is the *complete* cross-machine index — it includes sessions whose full transcript never
+# reached this archive (other machines, un-relayed runs). Recall folds it in: a topic match here
+# links to the transcript when present, else stands alone as a "look on <host>" pointer.
+
+_LOG = re.compile(
+    r'^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}) \| '
+    r'(?P<host>[^|]*?) \| (?P<cwd>[^|]*?) \| '
+    r'"(?P<topic>.*)" \| session=(?P<sid>[0-9a-fA-F][0-9a-fA-F-]+)\s*$'
+)
+_NOISE_TOPICS = {"", "(no text)"}
+
+
+@dataclass
+class LogEntry:
+    date: str
+    time: str
+    host: str
+    cwd: str
+    topic: str
+    sid: str  # full uuid as logged
+
+    @property
+    def sid8(self) -> str:
+        return self.sid.replace("-", "")[:8].lower()
+
+    @property
+    def project(self) -> str:
+        return Path(self.cwd).name if self.cwd else ""
+
+
+def _parse_log_line(line: str) -> LogEntry | None:
+    m = _LOG.match(line.rstrip("\n"))
+    if not m:
+        return None
+    topic = m.group("topic").lstrip("❯>").strip()  # drop stray prompt markers
+    if topic in _NOISE_TOPICS:  # empty / "(no text)" sessions carry nothing to recall on
+        return None
+    return LogEntry(m.group("date"), m.group("time"), m.group("host").strip(),
+                    m.group("cwd").strip(), topic, m.group("sid").strip())
+
+
+def _logs_dir(r: Roots) -> Path | None:
+    d = (r.data / "logs") if r.data else None
+    return d if d and d.is_dir() else None
+
+
+def _iter_logs(r: Roots) -> list[LogEntry]:
+    d = _logs_dir(r)
+    if not d:
+        return []
+    out: list[LogEntry] = []
+    for lf in sorted(d.glob("*.log")):
+        try:
+            for line in lf.read_text(errors="replace").splitlines():
+                e = _parse_log_line(line)
+                if e:
+                    out.append(e)
+        except OSError:
+            continue
+    return out
+
+
 # ── id / path resolution ───────────────────────────────────────────────────────────────────
 # A `ref` accepted by dc_get / dc_search_within may be: an absolute path under a known root, a
 # root-relative path, a `dc://…` resource URI, or a bare 8-char session id. We resolve to a real
@@ -243,6 +308,23 @@ def _jsonl_for(readable: Path, r: Roots) -> Path | None:
 
 def core_list(type=None, host=None, project=None, since=None, until=None, limit=50, r=None):
     r = r or roots()
+    if type == "log":  # browse the cross-machine session catalogue (not a file-backed artifact)
+        rows = []
+        for e in _iter_logs(r):
+            if host and e.host != host:
+                continue
+            if project and project.lower() not in e.project.lower():
+                continue
+            if since and e.date < since:
+                continue
+            if until and e.date > until:
+                continue
+            rows.append({"type": "log", "host": e.host, "project": e.project, "date": e.date,
+                         "time": e.time, "topic": e.topic, "sid": e.sid8, "cwd": e.cwd})
+        rows.sort(key=lambda d: (d["date"], d["time"]), reverse=True)
+        total = len(rows)
+        rows = rows[: int(limit)] if limit else rows
+        return {"total": total, "shown": len(rows), "items": rows}
     arts = _all_artifacts(r)
     if type:
         arts = [a for a in arts if a.type == type]
@@ -335,16 +417,19 @@ def _search_paths(r: Roots, type=None) -> list[Path]:
     return paths
 
 
-def _grep(query: str, paths: list[Path], max_count_per_file=3) -> list[tuple[str, int, str]]:
-    """Return (file, lineno, line) hits. Case-insensitive, fixed-string, .md only."""
+def _grep(query: str, paths: list[Path], globs=("*.md",), max_count_per_file=3
+          ) -> list[tuple[str, int, str]]:
+    """Return (file, lineno, line) hits. Case-insensitive, fixed-string, restricted to `globs`."""
     if not paths:
         return []
     hits: list[tuple[str, int, str]] = []
     if _rg_available():
+        gargs = [a for g in globs for a in ("-g", g)]
         cmd = ["rg", "-i", "-F", "--no-heading", "--line-number", "-m", str(max_count_per_file),
-               "-g", "*.md", "--", query, *map(str, paths)]
+               *gargs, "--", query, *map(str, paths)]
     else:
-        cmd = ["grep", "-r", "-i", "-F", "-n", "--include=*.md", "-m", str(max_count_per_file),
+        gargs = [f"--include={g}" for g in globs]
+        cmd = ["grep", "-r", "-i", "-F", "-n", *gargs, "-m", str(max_count_per_file),
                "--", query, *map(str, paths)]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -375,21 +460,53 @@ def _index_meta(path: str, r: Roots) -> dict:
 
 def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     r = r or roots()
-    terms = [t for t in re.split(r"\s+", query.strip()) if len(t) > 2]
+    terms = [t for t in re.split(r"\s+", query.strip()) if len(t) > 2] or [query]
     paths = _search_paths(r)
     # Union hits across the individual terms (OR), then score files by distinct-term coverage +
     # hit count. This is the lexical *prefilter*; the calling model does the semantic ranking.
     per_file: dict[str, dict] = {}
-    for term in terms or [query]:
+    for term in terms:
         for path, lineno, text in _grep(term, paths):
-            f = per_file.setdefault(path, {"terms": set(), "hits": [], "n": 0})
+            f = per_file.setdefault(path, {"terms": set(), "hits": [], "n": 0, "log": None})
             f["terms"].add(term.lower())
             f["n"] += 1
             if len(f["hits"]) < 4:
                 f["hits"].append({"line": lineno, "text": text.strip()[:240]})
+
+    # Fold in the session-log catalogue. A topic match in the log keys onto the *transcript* when
+    # one exists here (so a session surfaces even if only its first-prompt/topic matched, not its
+    # body) — otherwise it stands alone as a cross-machine pointer (type=log). One sid → one key,
+    # so a session matched in BOTH its body and its log naturally scores higher (more terms/hits).
+    logs_dir = _logs_dir(r)
+    if logs_dir:
+        readable_by_sid = {a.sid: a.path for a in _iter_transcripts(r) if a.sid}
+        for term in terms:
+            for _lf, lineno, text in _grep(term, [logs_dir], globs=("*.log",), max_count_per_file=80):
+                e = _parse_log_line(text)
+                if not e:
+                    continue
+                key = readable_by_sid.get(e.sid8) or f"log:{e.sid8}"
+                f = per_file.setdefault(key, {"terms": set(), "hits": [], "n": 0, "log": None})
+                f["terms"].add(term.lower())
+                f["n"] += 1
+                f["log"] = e
+                snip = {"line": lineno, "text": f"🗒 log · {e.host} · {e.date} · {e.project}: {e.topic}"[:240]}
+                if snip not in f["hits"] and len(f["hits"]) < 5:
+                    f["hits"].append(snip)
+
     scored = []
-    for path, f in per_file.items():
-        meta = _index_meta(path, r)
+    for key, f in per_file.items():
+        log = f.get("log")
+        if isinstance(key, str) and key.startswith("log:") and log:
+            # log-only: no transcript in this archive — surface as a "look on <host>" pointer
+            meta = {"type": "log", "host": log.host, "project": log.project, "date": log.date,
+                    "topic": log.topic, "sid": log.sid8, "cwd": log.cwd,
+                    "path": str((logs_dir / f"{log.host}.log")) if logs_dir else "",
+                    "note": "transcript not in this archive — recall it on this host"}
+        else:
+            meta = _index_meta(key, r)
+            if log:  # enrich a transcript hit with the log's exact cwd (readables keep only basename)
+                meta.setdefault("cwd", log.cwd)
         if host and meta.get("host") != host:
             continue
         if project and project.lower() not in str(meta.get("project", "")).lower():
@@ -400,8 +517,9 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
         scored.append((score, {**meta, "score": score, "snippets": f["hits"]}))
     scored.sort(key=lambda x: (x[0], x[1].get("date", "")), reverse=True)
     results = [r_ for _, r_ in scored[: int(k)]]
-    note = ("ripgrep" if _rg_available() else "grep") + " prefilter — rank these candidates by " \
-           "reading the snippets; use dc_get to pull the best one into context."
+    note = ("ripgrep" if _rg_available() else "grep") + " prefilter (transcripts·plans·memory + " \
+           "the session-log catalogue) — rank these by reading the snippets; dc_get the best one. " \
+           "type=log hits have no transcript here: their host/cwd/date tell you where to find it."
     return {"query": query, "engine": note, "count": len(results), "results": results}
 
 
@@ -447,14 +565,16 @@ def core_status(r=None):
     by_type: dict[str, int] = {}
     for a in arts:
         by_type[a.type] = by_type.get(a.type, 0) + 1
+    by_type["log_sessions"] = len(_iter_logs(r))
     return {
         "archive_root": str(r.chats) if r.chats else None,
         "memory_root": str(r.memory) if r.memory else None,
         "data_root": str(r.data) if r.data else None,
+        "logs_dir": str(_logs_dir(r)) if _logs_dir(r) else None,
         "ripgrep": _rg_available(),
         "counts": by_type,
         "unavailable": [name for name, present in
-                        (("transcripts/plans", r.chats), ("memory", r.memory), ("logs", r.data))
+                        (("transcripts/plans", r.chats), ("memory", r.memory), ("logs", _logs_dir(r)))
                         if not present],
     }
 
@@ -473,8 +593,9 @@ def build_server():
                 since: str | None = None, until: str | None = None, limit: int = 50) -> dict:
         """List archived artifacts (transcripts, plans, memories) with metadata.
 
-        Filters: type (transcript|plan|memory), host, project (substring), since/until
-        (YYYY-MM-DD). Newest first. Use this to browse, then dc_get to pull one in."""
+        Filters: type (transcript|plan|memory|log), host, project (substring), since/until
+        (YYYY-MM-DD). Newest first. Use this to browse, then dc_get to pull one in.
+        type=log browses the cross-machine session catalogue (one row per session, all hosts)."""
         return core_list(type, host, project, since, until, limit)
 
     @mcp.tool()
@@ -609,6 +730,8 @@ def _selftest():
     print("== status =="); print(json.dumps(core_status(r=r), indent=2))
     print("\n== list transcripts (5) =="); print(json.dumps(core_list(type="transcript", limit=5, r=r), indent=2))
     print("\n== recall 'extend dotclaude with an MCP server' =="); print(json.dumps(core_recall("extend dotclaude with an MCP server", k=4, r=r), indent=2))
+    print("\n== list logs (catalogue, 5) =="); print(json.dumps(core_list(type="log", limit=5, r=r), indent=2))
+    print("\n== recall 'VERONA foolbox' (log-only / cross-machine pointer) =="); print(json.dumps(core_recall("VERONA foolbox attack", k=4, r=r), indent=2))
     # search within the known transcript for 'mcp'
     rec = core_recall("read and understand the dotclaude project", k=1, r=r)
     if rec["results"]:
