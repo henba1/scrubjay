@@ -171,6 +171,16 @@ if confirm "set up cross-machine memory (its own self-hosted NAS git repo)?" Y; 
     "$APP/bin/onboard-memory.sh" || warn "memory onboarding had issues — see docs/memory-sync.md"
 fi
 
+# ---- 7c) MCP remote: a client with no local archive queries the archive host over SSH -
+# (On a 'local' backend the box HAS the archive — claude-sync already registered MCP locally.)
+if [ "$BACKEND" != local ]; then
+  if confirm "set up archive querying over MCP (/dcrecall, /dcfind, /dcbrowse against the archive host)?" Y; then
+    ask MCP_USER "owner account ON THE ARCHIVE HOST (the one with uv + the dotclaude clone)" "${MCP_USER:-$USER}"
+    MCP_USER="$MCP_USER" MCP_RECV_HOST="${RECV_HOST:-}" MCP_RECV_PORT="${RECV_PORT:-22}" \
+      "$APP/bin/onboard-mcp-client.sh" || warn "MCP-client onboarding had issues — see docs/dcmcp-plan.md"
+  fi
+fi
+
 # ---- 8) offer to push the new host dir ------------------------------------------------
 if confirm "commit + push the new hosts/$HOST entry to dotclaude-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \

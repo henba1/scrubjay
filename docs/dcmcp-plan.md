@@ -1,9 +1,12 @@
 # Plan: `dcmcp` — make the dotclaude archive queryable from inside a session
 
-> Status: **Phase 1 implemented** (`mcp/dcmcp_server.py`, `commands/dc{recall,find,browse}.md`,
-> registration in `bin/claude-sync.sh`). Phases 2 (HTTP-over-WG) and 3 (embedding rerank) remain
-> proposals. This doc keeps the full design + rationale; the build itself is described here and in
-> the README's "Query the archive (MCP)" section.
+> Status: **Phases 1 & 2 implemented.** Phase 1 (`mcp/dcmcp_server.py`,
+> `commands/dc{recall,find,browse}.md`, local registration in `bin/claude-sync.sh`) serves the
+> archive where it's mounted (henpi). Phase 2 (`bin/dcmcp-serve.sh`, `bin/onboard-mcp-client.sh`,
+> the remote branch in `register_mcp`) lets a client with no local archive — snellius, laptops —
+> query henpi's server **over SSH** (a forced command runs the server on the archive host and pipes
+> MCP stdio back). Phase 3 (embedding rerank) remains a proposal. This doc keeps the full design +
+> rationale; the build is also described in the README's "Query the archive (MCP)" section.
 
 ## 1. The problem (restated)
 
@@ -236,20 +239,31 @@ mostly independent.
   layout + `.gitignore`/onboard touchpoints.
 - **Slab E — native `commands/dcrecall.md`, `dcfind.md`, `dcbrowse.md`** wrappers + README section.
 
-**Phase 2 — remote machines reach henpi's archive (the snellius case)**
-- **Slab F — HTTP transport + WG-iface bind + optional bearer token**; `DOTCLAUDE_MCP_REMOTE`
-  pointer; client-side `claude mcp add --transport http` in sync; a small systemd/user-service or
-  `pull-and-mirror`-style keepalive on henpi so the server is up when a remote session connects.
-- **Slab G — docs:** a `docs/transport-mcp.{dot,svg}` diagram in the style of the existing
-  transport diagrams; README "Query the archive" section.
+**Phase 2 — remote machines reach henpi's archive (the snellius case) — ✓ built (SSH-stdio)**
+- **Slab F — SSH-stdio transport.** ✓ Chose (B) SSH-stdio over (A) HTTP: no always-on listener, no
+  new auth surface, and it rides *both* the WG path (laptops/hensipi) and the plain-TCP ProxyJump
+  path (snellius, UDP-disabled) with one mechanism. Receiver runs `bin/dcmcp-serve.sh` as a forced
+  command; client registers `ssh <alias>` via the `_mcp_add_remote` branch + `DOTCLAUDE_MCP_REMOTE`;
+  `bin/onboard-mcp-client.sh` generates the dedicated key/alias (deriving host/port/ProxyJump from
+  the `claude-receiver` relay alias) and prints the receiver (+ edge) authorized_keys line(s).
+- **Slab G — docs:** README "Query the archive (MCP)" section (remote setup). *(A
+  `docs/transport-mcp` diagram in the style of the existing transport diagrams is still nice-to-have.)*
 
-### Snellius integration — concrete changes (logged 2026-06-29, NOT yet built)
+### Snellius integration — **built 2026-06-29** (SSH-stdio)
+
+> **As built:** `bin/dcmcp-serve.sh` (receiver-side forced-command launcher), the `_mcp_add_remote`
+> branch in `register_mcp` (`bin/claude-sync.sh`), and `bin/onboard-mcp-client.sh` (client setup),
+> wired into `bin/onboard.sh` step 7c. Transport = **(B) SSH-stdio** below. The forced command runs
+> under the archive **owner** account on henpi (which has `uv` + the clone + archive read — the
+> locked `claude-rx` relay account has none of those), pinned with `command="…/dcmcp-serve.sh",restrict`
+> so a leaked key can only run the one read-only server. Activation stays a two-step manual authorize
+> on the receiver (and the edge, for HPC ProxyJump), exactly like the relay + memory keys.
 
 Snellius (the SURF HPC) is the motivating remote: it holds **only its own** live transcripts +
 the shared `memory/` clone + `logs/` — **not** the aggregated archive (which lives only on the
 NAS/henpi). Running Phase-1 stdio dcmcp *on snellius* would therefore recall only snellius's own
 chats + memory, never the cross-machine archive. To recall the whole corpus it must reach henpi.
-The actual delta from Phase 1:
+The delta from Phase 1:
 
 1. **Transport — two candidates; lean SSH-stdio.**
    - **(A) HTTP-over-WG:** henpi runs dcmcp as a long-lived HTTP server bound *only* to its WG IP;

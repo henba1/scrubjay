@@ -94,24 +94,22 @@ link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
 }
 
 # Register the dcmcp read-archive MCP server (the /dcrecall, /dcfind, /dcbrowse engine) at USER
-# scope, so it's available in every project on this machine. Gated on this box actually having the
-# archive mounted (DOTCLAUDE_LOCAL_CHATS) — the server is read-only over that tree, so there's
-# nothing to serve without it. Uses the official `claude mcp` CLI (not a hand-edit of the big
-# ~/.claude.json) and is idempotent: it only (re)adds when missing or when our server path changed
-# (e.g. after re-homing the clones). Best-effort — never fails the sync.
+# scope, so it's available in every project on this machine. TWO modes, chosen by what this box has:
+#   • LOCAL  (henpi): the archive is mounted (DOTCLAUDE_LOCAL_CHATS) → a stdio server reads it here.
+#   • REMOTE (clients): no local archive but DOTCLAUDE_MCP_REMOTE points at the archive host → register
+#                       `ssh <target>`; a forced command (bin/dcmcp-serve.sh) runs the server THERE
+#                       and pipes MCP stdio back. Set up by bin/onboard-mcp-client.sh.
+# Uses the official `claude mcp` CLI (not a hand-edit of the big ~/.claude.json) and is idempotent:
+# it only (re)adds when missing or when the target changed. Best-effort — never fails the sync.
 # A loud, visible skip — MCP registration silently doing nothing is exactly the onboarding
 # surprise we want to avoid. Each reason says what to do about it. Returns 0 (never fails sync).
 skip_mcp() { echo "  ┌─ MCP archive server NOT registered (/dcrecall, /dcfind, /dcbrowse stay inert)"; echo "  └─ reason: $1"; return 0; }
-register_mcp() {
-  command -v claude >/dev/null 2>&1 || { skip_mcp "no 'claude' CLI on PATH — install Claude Code, then rerun bin/claude-sync.sh"; return 0; }
-  command -v uv     >/dev/null 2>&1 || { skip_mcp "no 'uv' runtime on PATH — install uv (curl -LsSf https://astral.sh/uv/install.sh | sh), reopen shell, rerun bin/claude-sync.sh"; return 0; }
-  dc_load_config
-  local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py"
-  [ -n "$chats" ] && [ -d "$chats" ] || { skip_mcp "no local archive (DOTCLAUDE_LOCAL_CHATS unset or not a dir) — expected on non-NAS clients; Phase 1 serves only where the archive is mounted (henpi)"; return 0; }
-  [ -f "$server" ] || { skip_mcp "server file missing: $server"; return 0; }
+
+_mcp_add_local() {  # _mcp_add_local <chats> <server.py>
+  local chats="$1" server="$2"
   if claude mcp get dcmcp >/dev/null 2>&1; then
     case "$(claude mcp get dcmcp 2>/dev/null)" in
-      *"$server"*) echo "  ok    mcp dcmcp"; return 0 ;;        # already points at our server
+      *"$server"*) echo "  ok    mcp dcmcp (local)"; return 0 ;;   # already points at our server
     esac
     claude mcp remove dcmcp -s user >/dev/null 2>&1 || claude mcp remove dcmcp >/dev/null 2>&1 || true
   fi
@@ -120,9 +118,45 @@ register_mcp() {
        -e DOTCLAUDE_MEMORY="$(dc_memory)" \
        -e DOTCLAUDE_DATA="$DATA" \
        -- uv run --script "$server" >/dev/null 2>&1; then
-    echo "  add   mcp dcmcp (user scope)"
+    echo "  add   mcp dcmcp (local, user scope)"
   else
     echo "  WARN  mcp dcmcp registration failed (run: claude mcp add … by hand)"
+  fi
+}
+
+_mcp_add_remote() {  # _mcp_add_remote <ssh-target>   (forced command on the far end runs the server)
+  local target="$1"
+  if claude mcp get dcmcp >/dev/null 2>&1; then
+    case "$(claude mcp get dcmcp 2>/dev/null)" in
+      *"ssh"*"$target"*) echo "  ok    mcp dcmcp (remote → $target)"; return 0 ;;
+    esac
+    claude mcp remove dcmcp -s user >/dev/null 2>&1 || claude mcp remove dcmcp >/dev/null 2>&1 || true
+  fi
+  # No -e env: the far-end forced command (dcmcp-serve.sh) supplies the archive pointers. BatchMode
+  # so a missing/uninstalled key fails fast instead of hanging the MCP transport on a prompt.
+  if claude mcp add -s user dcmcp \
+       -- ssh -T -o BatchMode=yes -o ConnectTimeout=10 "$target" >/dev/null 2>&1; then
+    echo "  add   mcp dcmcp (remote → ssh $target)"
+  else
+    echo "  WARN  mcp dcmcp remote registration failed (run: claude mcp add … by hand)"
+  fi
+}
+
+register_mcp() {
+  command -v claude >/dev/null 2>&1 || { skip_mcp "no 'claude' CLI on PATH — install Claude Code, then rerun bin/claude-sync.sh"; return 0; }
+  dc_load_config
+  local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py" remote="${DOTCLAUDE_MCP_REMOTE:-}"
+  if [ -n "$chats" ] && [ -d "$chats" ]; then
+    # LOCAL: the archive lives here (henpi). The stdio server runs in-process via uv.
+    command -v uv >/dev/null 2>&1 || { skip_mcp "no 'uv' runtime on PATH — install uv (curl -LsSf https://astral.sh/uv/install.sh | sh), reopen shell, rerun bin/claude-sync.sh"; return 0; }
+    [ -f "$server" ] || { skip_mcp "server file missing: $server"; return 0; }
+    _mcp_add_local "$chats" "$server"
+  elif [ -n "$remote" ]; then
+    # REMOTE: no archive here → reach the archive host over SSH (uv runs THERE, not on this client).
+    command -v ssh >/dev/null 2>&1 || { skip_mcp "no 'ssh' to reach the remote archive host ($remote)"; return 0; }
+    _mcp_add_remote "$remote"
+  else
+    skip_mcp "no local archive (DOTCLAUDE_LOCAL_CHATS) and no remote (DOTCLAUDE_MCP_REMOTE) — on a client, run bin/onboard-mcp-client.sh to reach the archive host's server"
   fi
 }
 

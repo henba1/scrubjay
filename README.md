@@ -147,6 +147,8 @@ bin/
   pull-and-mirror.sh     # (Pi) pull claude-chats -> NAS
   onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
   onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
+  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + DOTCLAUDE_MCP_REMOTE to query the archive host over SSH
+  dcmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
 hooks/
   sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
   log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
@@ -274,17 +276,29 @@ It's a single-file, **read-only** server (`mcp/dcmcp_server.py`, run via `uv run
 reads the same storage pointers as the rest of dotclaude (`DOTCLAUDE_LOCAL_CHATS`,
 `DOTCLAUDE_MEMORY`, `DOTCLAUDE_DATA`). Recall is deliberately **embedding-free** — a fast ripgrep
 prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic
-ranking — so there's no index to build and nothing sensitive ever leaves the NAS. `claude-sync.sh`
-registers it at **user scope** automatically, but only on a machine that has the archive mounted
-(`DOTCLAUDE_LOCAL_CHATS` → the NAS box). It exposes:
+ranking — so there's no index to build and nothing sensitive ever leaves the NAS. It also folds the
+`logs/<host>.log` **session catalogue** into recall: a topic match there links to the transcript
+when present, or stands alone as a "you had this on `<host>`" pointer — so recall spans even
+sessions whose full transcript isn't on the machine you're asking from. It exposes:
 
 | Surface | What |
 |---|---|
-| **tools** | `dc_list` (browse w/ filters), `dc_recall` (topic → ranked candidates + anchors), `dc_search_within` (a topic *inside* one session → turn/line anchors), `dc_get` (fetch an artifact or a `turns=`/`lines=` slice), `dc_status` |
+| **tools** | `dc_list` (browse w/ filters, incl. `type=log` for the catalogue), `dc_recall` (topic → ranked candidates + anchors), `dc_search_within` (a topic *inside* one session → turn/line anchors), `dc_get` (fetch an artifact or a `turns=`/`lines=` slice), `dc_status` |
 | **resources** | every transcript/plan/memory as an `@`-pickable resource (`dc://transcript/…`, `dc://plan/…`, `dc://memory/…`) with a human, date-sorted title |
 | **commands** | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]` — thin wrappers that drive the tools |
 
-Design + the deferred remote-over-WireGuard and local-embedding-rerank phases:
+**Registration is automatic, two ways**, both done by `claude-sync.sh` at **user scope**:
+- **On the archive host** (henpi — `DOTCLAUDE_LOCAL_CHATS` → the NAS): a local stdio server reads
+  the mounted archive directly. Nothing to do beyond onboarding.
+- **On a client with no local archive** (snellius, laptops): run `bin/onboard-mcp-client.sh` (offered
+  by `onboard.sh`). It points `DOTCLAUDE_MCP_REMOTE` at the archive host and registers an `ssh`
+  entry; on connect, a forced command (`bin/dcmcp-serve.sh`) runs the server **on the archive host**
+  and pipes MCP stdio back over the same SSH/ProxyJump path the relay uses. The server side stays a
+  manual `authorized_keys` authorize (printed by the script), like the relay + memory keys. One
+  mechanism covers both WG peers and UDP-disabled HPC nodes. If neither path applies, `claude-sync.sh`
+  prints a loud, actionable skip rather than silently doing nothing.
+
+Design + the (now-built) remote-over-SSH path and the deferred local-embedding-rerank phase:
 [`docs/dcmcp-plan.md`](docs/dcmcp-plan.md), [`docs/dcmcp-embedding-rerank.md`](docs/dcmcp-embedding-rerank.md).
 
 ## Transcripts: relay + NAS
