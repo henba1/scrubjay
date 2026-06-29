@@ -227,12 +227,55 @@ mostly independent.
   layout + `.gitignore`/onboard touchpoints.
 - **Slab E — native `commands/dcrecall.md`, `dcfind.md`, `dcbrowse.md`** wrappers + README section.
 
-**Phase 2 — HTTP-over-WG (remote machines reach henpi's archive)**
+**Phase 2 — remote machines reach henpi's archive (the snellius case)**
 - **Slab F — HTTP transport + WG-iface bind + optional bearer token**; `DOTCLAUDE_MCP_REMOTE`
   pointer; client-side `claude mcp add --transport http` in sync; a small systemd/user-service or
   `pull-and-mirror`-style keepalive on henpi so the server is up when a remote session connects.
 - **Slab G — docs:** a `docs/transport-mcp.{dot,svg}` diagram in the style of the existing
   transport diagrams; README "Query the archive" section.
+
+### Snellius integration — concrete changes (logged 2026-06-29, NOT yet built)
+
+Snellius (the SURF HPC) is the motivating remote: it holds **only its own** live transcripts +
+the shared `memory/` clone + `logs/` — **not** the aggregated archive (which lives only on the
+NAS/henpi). Running Phase-1 stdio dcmcp *on snellius* would therefore recall only snellius's own
+chats + memory, never the cross-machine archive. To recall the whole corpus it must reach henpi.
+The actual delta from Phase 1:
+
+1. **Transport — two candidates; lean SSH-stdio.**
+   - **(A) HTTP-over-WG:** henpi runs dcmcp as a long-lived HTTP server bound *only* to its WG IP;
+     snellius registers `claude mcp add --transport http http://<henpi-wg-ip>:<port>/mcp`.
+     Cost: a new always-on listener + a keepalive service (systemd `--user`) + a new network auth
+     surface (bearer token even on WG).
+   - **(B) SSH-stdio (reuse the existing channel):** snellius registers a *stdio* server whose
+     command SSHes into henpi over WG and runs the server there —
+     `claude mcp add -s user dcmcp -- ssh <henpi-relay-alias> uv run --script <app>/mcp/dcmcp_server.py`.
+     No new listener, no HTTP auth; rides the exact SSH-over-WG path (`:63772`) the relay already
+     uses. **Preferred** — it matches §2 point 2 (read access stays centralized + revocable on
+     henpi) and keeps the dotclaude grain (one channel, no new daemon).
+2. **Account — must NOT reuse the write-only relay receiver.** The relay's receiver account is
+   locked to `rrsync -wo` (write-only, forced command); it cannot read. SSH-stdio (B) needs a
+   **separate read-only forced-command** key/account on henpi whose `command=` execs *only*
+   `dcmcp_server.py` (with the `DOTCLAUDE_*` env baked into the wrapper) — so a compromised snellius
+   key can read the archive but run nothing else, and the grant is revocable independently of the
+   write path. HTTP (A) sidesteps the account but adds the listener+token instead.
+3. **`claude-sync.sh` gating — add a remote branch.** `register_mcp()` today gates on
+   `DOTCLAUDE_LOCAL_CHATS` being a real dir (henpi-only) and registers the local stdio server.
+   Add: *else if* `DOTCLAUDE_MCP_REMOTE` is set (snellius's host config), register the remote
+   entry instead — the `ssh … uv run --script` stdio command (B) or the `--transport http` URL (A).
+   Same idempotent remove-then-add pattern.
+4. **Config pointer.** New `DOTCLAUDE_MCP_REMOTE` in `hosts/snellius/...` config: either the henpi
+   relay SSH alias (B) or the `http://<wg-ip>:<port>/mcp` URL (A). Mirrors how the transcript
+   *backend* is chosen by env today.
+5. **What snellius does NOT need.** In both models the server still runs **on henpi** (where the
+   archive is) — snellius needs only `ssh` (B) or just the HTTP client (A), **not** `uv` or the
+   archive mount. That dodges the HPC module/`uv`-on-login-node friction entirely.
+6. **Reachability is already proven.** Snellius → henpi outbound SSH over WG works today (the relay
+   ships transcripts that way); HPC blocks *inbound* to snellius, which is fine since both transport
+   options are snellius-initiated. No new firewall holes.
+7. **Optional dual-mode.** Snellius could *also* keep a local stdio dcmcp for its own chats+memory
+   and add the remote for the aggregate — but two servers is confusing; prefer the single henpi
+   server serving the whole archive (snellius's own transcripts are already in it after relay).
 
 **Phase 3 — optional, only if lexical recall proves too blunt**
 - **Slab H — local embedding rerank.** Ollama `nomic-embed-text` (or sentence-transformers) on
