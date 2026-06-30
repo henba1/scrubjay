@@ -177,7 +177,7 @@ if [ "$BACKEND" != local ]; then
   if confirm "set up archive querying over MCP (/dcrecall, /dcfind, /dcbrowse against the archive host)?" Y; then
     ask MCP_USER "owner account ON THE ARCHIVE HOST (the one with uv + the dotclaude clone)" "${MCP_USER:-$USER}"
     MCP_USER="$MCP_USER" MCP_RECV_HOST="${RECV_HOST:-}" MCP_RECV_PORT="${RECV_PORT:-22}" \
-      "$APP/bin/onboard-mcp-client.sh" || warn "MCP-client onboarding had issues — see docs/dcmcp-plan.md"
+      "$APP/bin/onboard-mcp-client.sh" || warn "MCP-client onboarding had issues — see the README 'Query the archive (MCP)' section"
   fi
 fi
 

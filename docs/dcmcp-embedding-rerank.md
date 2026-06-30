@@ -1,6 +1,6 @@
 # Side-note: optional local-embedding rerank for `dc_recall` (Phase 3)
 
-> **Deferred.** The shipped `dc_recall` (see [`dcmcp-plan.md`](dcmcp-plan.md)) uses a ripgrep
+> **Deferred.** The shipped `dc_recall` uses a ripgrep
 > lexical prefilter and lets the in-session model rank candidates — zero dependencies, fully
 > local. This note records *if/when lexical proves too blunt* how a local-embedding rerank would
 > be added, what hardware it needs, and a coarse plan. Nothing here is built yet.
@@ -19,9 +19,11 @@ Same rule as the rest of dotclaude — transcripts/memory carry sensitive paths,
 embedding API** (Voyage/OpenAI/etc.). The embedder must run on the NAS box. That rules the
 hardware question.
 
-## Hardware reality on the archive host (Raspberry Pi 5)
+## Hardware reality on the archive host
 
-- the archive host is a **Pi 5 (`rpi-2712`), ARM64, ~8 GB RAM**, CPU-only (no usable GPU/NPU for this).
+- assume the archive host is a **modest always-on box — CPU-only, a few GB RAM, no usable GPU/NPU**
+  (a small ARM64 or x86 home server). The plan below holds for any such box; it does not assume a
+  particular make or model.
 - Corpus is tiny: **~39 readables + 9 plans + 12 memories ≈ 60–100 docs**, chunked maybe
   ~1–3k chunks. Embedding that **once** is seconds-to-minutes on CPU; re-embedding only the
   *new* session on each relay is trivial. Query-time is one embedding + a brute-force cosine over
@@ -30,11 +32,11 @@ hardware question.
 - Model options (all CPU-friendly, ARM64):
   - **Ollama `nomic-embed-text`** (768-dim, ~274 MB) — simplest to operate; `ollama serve`
     already a tidy local daemon, one HTTP call to embed. Recommended if Ollama is acceptable on
-    the Pi.
+    the host.
   - **`sentence-transformers` `all-MiniLM-L6-v2`** (384-dim, ~90 MB) — lighter, pure-Python via
     `uv`, no separate daemon; slightly weaker but more than enough at this scale.
   - **`bge-small-en-v1.5`** (384-dim) — a notch better than MiniLM, similar footprint.
-- RAM/throughput: any of these fit comfortably in <1 GB resident on the Pi; the bottleneck is
+- RAM/throughput: any of these fit comfortably in <1 GB resident on such a box; the bottleneck is
   first-run model download, not inference at this corpus size.
 
 ## Coarse plan (Phase 3, slab H)
@@ -62,5 +64,5 @@ hardware question.
 - Effort: small — the search plumbing (`dc_recall`, anchors, candidate set) already exists from
   Phase 1; this adds an embed step + a cosine sort + an incremental cache. ~Half a day.
 - Risk: low and **contained** — it's a rerank over an existing candidate list, fully local, gated,
-  and falls back cleanly. Main cost is operational (a model/daemon to keep alive on the Pi), which
+  and falls back cleanly. Main cost is operational (a model/daemon to keep alive on the host), which
   is exactly why it's deferred until lexical recall demonstrably falls short.

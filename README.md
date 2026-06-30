@@ -337,8 +337,8 @@ server and nothing else:
 Then verify from the client — `ssh <mcp-alias> </dev/null && echo OK` (first run is slow once while
 `uv` resolves deps on the archive host, then caches). dcmcp activates on the next Claude session.
 
-Design + the (now-built) remote-over-SSH path and the deferred local-embedding-rerank phase:
-[`docs/dcmcp-plan.md`](docs/dcmcp-plan.md), [`docs/dcmcp-embedding-rerank.md`](docs/dcmcp-embedding-rerank.md).
+The deferred local-embedding-rerank phase (only if lexical recall proves too blunt) is sketched in
+[`docs/dcmcp-embedding-rerank.md`](docs/dcmcp-embedding-rerank.md).
 
 ## Transcripts: relay + NAS
 

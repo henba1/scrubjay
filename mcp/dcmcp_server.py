@@ -18,8 +18,8 @@ Where a tree is absent (e.g. a non-NAS machine has no readable/ archive) the ser
 serves what it can and reports the rest as unavailable, rather than failing.
 
 The recall path is deliberately embedding-free: a fast ripgrep prefilter surfaces candidate
-snippets and the in-session model does the semantic ranking. (Rationale + the deferred local
-embedding option: docs/dcmcp-plan.md, docs/dcmcp-embedding-rerank.md.)
+snippets and the in-session model does the semantic ranking. (The deferred local
+embedding option is sketched in docs/dcmcp-embedding-rerank.md.)
 
 Run `python dcmcp_server.py --selftest` to exercise the core logic against the real archive
 without the MCP stdio handshake.
