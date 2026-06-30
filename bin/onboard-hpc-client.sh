@@ -77,19 +77,29 @@ tmp="$(mktemp)"; awk -v b="$B" -v e="$E" '
 } > "$CFG.new" && mv "$CFG.new" "$CFG"; chmod 600 "$CFG"; rm -f "$tmp"
 echo "wrote ssh_config blocks: $JUMP_ALIAS, $ALIAS"
 
-# 3) dotclaude pointer: marker-bounded WG block (backend flipped only with --activate)
+# 3) dotclaude pointer. The WG block holds ONLY target+key. The backend is the single
+#    existing DOTCLAUDE_TRANSCRIPT_BACKEND line, flipped IN PLACE to rsync-wg with --activate
+#    (a second ':=' line is a no-op — ':=' is first-assignment-wins). The target carries NO
+#    remote path: the receiver's `rrsync -wo <root>` forced command roots it; an absolute path
+#    here double-nests under the root (verified by the archive-host smoke test).
 DCFG="$HOME/.config/dotclaude/config"; mkdir -p "$(dirname "$DCFG")"; touch "$DCFG"
 BB="# >>> dotclaude wg >>>"; EE="# <<< dotclaude wg <<<"
 tmp="$(mktemp)"; awk -v b="$BB" -v e="$EE" '$0==b{s=1} !s{print} $0==e{s=0}' "$DCFG" > "$tmp"
+if [ "$ACTIVATE" = 1 ]; then
+  if grep -q 'DOTCLAUDE_TRANSCRIPT_BACKEND' "$tmp"; then
+    sed -i -E 's/(DOTCLAUDE_TRANSCRIPT_BACKEND:=)[^}"]*/\1rsync-wg/' "$tmp"
+  else
+    printf ': "${DOTCLAUDE_TRANSCRIPT_BACKEND:=rsync-wg}"\n' >> "$tmp"
+  fi
+fi
 {
   cat "$tmp"
   echo "$BB"
-  [ "$ACTIVATE" = 1 ] && echo ': "${DOTCLAUDE_TRANSCRIPT_BACKEND:=rsync-wg}"'
-  echo ": \"\${DOTCLAUDE_WG_TARGET:=$RECEIVER_USER@$ALIAS:$RECEIVER_PATH}\""
+  echo ": \"\${DOTCLAUDE_WG_TARGET:=$RECEIVER_USER@$ALIAS}\""
   echo ": \"\${DOTCLAUDE_WG_SSHKEY:=$KEY}\""
   echo "$EE"
 } > "$DCFG.new" && mv "$DCFG.new" "$DCFG"; rm -f "$tmp"
-echo "wrote dotclaude WG pointer (backend $([ "$ACTIVATE" = 1 ] && echo 'ACTIVATED=rsync-wg' || echo 'unchanged — pass --activate to flip'))"
+echo "wrote dotclaude WG pointer (backend $([ "$ACTIVATE" = 1 ] && echo 'flipped to rsync-wg' || echo 'unchanged — pass --activate to flip'))"
 
 # 4) report: egress, pubkey, the lines to install at home
 EGRESS="$(curl -s --max-time 8 https://api.ipify.org 2>/dev/null || true)"
@@ -115,7 +125,7 @@ B) on the RECEIVER ($RECEIVER_HOST) — add to ~$RECEIVER_USER/.ssh/authorized_k
 VERIFY (after the home side + router port-forward are up):
    ssh $ALIAS true                                  # silent success via ProxyJump
    DOTCLAUDE_TRANSCRIPT_BACKEND=rsync-wg \\
-   DOTCLAUDE_WG_TARGET=$RECEIVER_USER@$ALIAS:$RECEIVER_PATH \\
+   DOTCLAUDE_WG_TARGET=$RECEIVER_USER@$ALIAS \\
    ~/.dotclaude/dotclaude/bin/ship-transcript.sh <a-real.jsonl> testslug testsid \$(hostname -s)
 THEN activate permanently:  re-run this script with --activate (or edit ~/.config/dotclaude/config)
 ──────────────────────────────────────────────────────────────────────────────
