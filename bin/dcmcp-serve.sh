@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Receiver-side launcher for the dcmcp archive server — the Phase-2 read path. A remote client
-# with no local archive (snellius, laptops) reaches henpi's full archive by SSHing in and having
+# with no local archive (a laptop or HPC login node) reaches the archive host's full archive by SSHing in and having
 # THIS run as a forced command, so the server executes here (where the archive + uv + config are)
 # and speaks MCP stdio back over the SSH pipe. Pin it in the owner account's authorized_keys:
 #

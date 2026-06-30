@@ -19,9 +19,9 @@ Same rule as the rest of dotclaude — transcripts/memory carry sensitive paths,
 embedding API** (Voyage/OpenAI/etc.). The embedder must run on the NAS box. That rules the
 hardware question.
 
-## Hardware reality on henpi (Raspberry Pi 5)
+## Hardware reality on the archive host (Raspberry Pi 5)
 
-- henpi is a **Pi 5 (`rpi-2712`), ARM64, ~8 GB RAM**, CPU-only (no usable GPU/NPU for this).
+- the archive host is a **Pi 5 (`rpi-2712`), ARM64, ~8 GB RAM**, CPU-only (no usable GPU/NPU for this).
 - Corpus is tiny: **~39 readables + 9 plans + 12 memories ≈ 60–100 docs**, chunked maybe
   ~1–3k chunks. Embedding that **once** is seconds-to-minutes on CPU; re-embedding only the
   *new* session on each relay is trivial. Query-time is one embedding + a brute-force cosine over
@@ -53,7 +53,7 @@ hardware question.
    today's behaviour rather than breaking recall.
 5. **Gate it.** Behind `DOTCLAUDE_MCP_EMBED=1` (or auto-on if the model/daemon is present), so the
    zero-dependency lexical path stays the default and a fresh machine needs nothing extra.
-6. **Runtime.** Embedder runs on henpi only (where the archive + the server live); remote machines
+6. **Runtime.** Embedder runs on the archive host only (where the archive + the server live); remote machines
    get reranked results for free once Phase 2's HTTP-over-WG endpoint exists — they never run the
    model themselves.
 

@@ -7,7 +7,7 @@
 
 dotclaude *writes* every session's records to the NAS (transcripts, plans, cross-machine
 memory); this server is the missing *read* path back into a live Claude Code session. It is
-**read-only** and runs where the archive is mounted (henpi). Config comes from the same
+**read-only** and runs where the archive is mounted (the archive host). Config comes from the same
 pointers the rest of dotclaude uses (`~/.config/dotclaude/config`), passed in as env:
 
     DOTCLAUDE_LOCAL_CHATS   storage root: contains <host>/{readable,plans,<slug>}/, memory/

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Set up THIS machine (a client with NO local archive — snellius, a laptop) to query the dotclaude
+# Set up THIS machine (a client with NO local archive — a laptop or HPC login node) to query the dotclaude
 # archive over SSH: the Phase-2 remote path. Idempotent — safe to re-run to enable or repair. It:
 #   - derives the connection to the archive host from the working `claude-receiver` relay alias
 #     (host, port, ProxyJump) — so MCP rides the exact same hops as the transcript relay;

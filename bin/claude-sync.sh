@@ -95,7 +95,7 @@ link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
 
 # Register the dcmcp read-archive MCP server (the /dcrecall, /dcfind, /dcbrowse engine) at USER
 # scope, so it's available in every project on this machine. TWO modes, chosen by what this box has:
-#   • LOCAL  (henpi): the archive is mounted (DOTCLAUDE_LOCAL_CHATS) → a stdio server reads it here.
+#   • LOCAL  (the archive host): the archive is mounted (DOTCLAUDE_LOCAL_CHATS) → a stdio server reads it here.
 #   • REMOTE (clients): no local archive but DOTCLAUDE_MCP_REMOTE points at the archive host → register
 #                       `ssh <target>`; a forced command (bin/dcmcp-serve.sh) runs the server THERE
 #                       and pipes MCP stdio back. Set up by bin/onboard-mcp-client.sh.
@@ -147,7 +147,7 @@ register_mcp() {
   dc_load_config
   local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py" remote="${DOTCLAUDE_MCP_REMOTE:-}"
   if [ -n "$chats" ] && [ -d "$chats" ]; then
-    # LOCAL: the archive lives here (henpi). The stdio server runs in-process via uv.
+    # LOCAL: the archive lives here (the archive host). The stdio server runs in-process via uv.
     command -v uv >/dev/null 2>&1 || { skip_mcp "no 'uv' runtime on PATH — install uv (curl -LsSf https://astral.sh/uv/install.sh | sh), reopen shell, rerun bin/claude-sync.sh"; return 0; }
     [ -f "$server" ] || { skip_mcp "server file missing: $server"; return 0; }
     _mcp_add_local "$chats" "$server"

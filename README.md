@@ -288,15 +288,17 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 | **commands** | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]` — thin wrappers that drive the tools |
 
 **Registration is automatic, two ways**, both done by `claude-sync.sh` at **user scope**:
-- **On the archive host** (henpi — `DOTCLAUDE_LOCAL_CHATS` → the NAS): a local stdio server reads
-  the mounted archive directly. Nothing to do beyond onboarding.
-- **On a client with no local archive** (snellius, laptops): run `bin/onboard-mcp-client.sh` (offered
-  by `onboard.sh`). It points `DOTCLAUDE_MCP_REMOTE` at the archive host and registers an `ssh`
-  entry; on connect, a forced command (`bin/dcmcp-serve.sh`) runs the server **on the archive host**
-  and pipes MCP stdio back over the same SSH/ProxyJump path the relay uses. The server side stays a
-  manual `authorized_keys` authorize (printed by the script), like the relay + memory keys. One
-  mechanism covers both WG peers and UDP-disabled HPC nodes. If neither path applies, `claude-sync.sh`
-  prints a loud, actionable skip rather than silently doing nothing.
+- **On the archive host** (the always-on home server where `DOTCLAUDE_LOCAL_CHATS` → the NAS is
+  mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.
+- **On a client with no local archive** (a laptop, or an **HPC login node**): run
+  `bin/onboard-mcp-client.sh` (offered by `onboard.sh`). It points `DOTCLAUDE_MCP_REMOTE` at the
+  archive host and registers an `ssh` entry; on connect, a forced command (`bin/dcmcp-serve.sh`) runs
+  the server **on the archive host** and pipes MCP stdio back over the same SSH/ProxyJump path the
+  relay uses. The server side stays a manual `authorized_keys` authorize (printed by the script),
+  like the relay + memory keys. **One mechanism covers both kinds of client:** a laptop on the
+  WireGuard mesh, *and* an HPC login node that can't join it — clusters typically block the outbound
+  UDP that WireGuard needs, so those nodes fall back to plain SSH/ProxyJump instead. If neither path
+  applies, `claude-sync.sh` prints a loud, actionable skip rather than silently doing nothing.
 
 **The remote transport (SSH-stdio).** A client with no local archive registers `dcmcp` as a *stdio*
 server whose command is `ssh <alias>`. That SSH **jumps the edge/bastion** (ProxyJump) to reach the
