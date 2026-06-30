@@ -298,6 +298,19 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
   mechanism covers both WG peers and UDP-disabled HPC nodes. If neither path applies, `claude-sync.sh`
   prints a loud, actionable skip rather than silently doing nothing.
 
+**The remote transport (SSH-stdio).** A client with no local archive registers `dcmcp` as a *stdio*
+server whose command is `ssh <alias>`. That SSH **jumps the edge/bastion** (ProxyJump) to reach the
+archive host on the home LAN, where a forced command launches the read-only server; MCP JSON-RPC
+rides the pipe. The clever bit is the **two nested SSH sessions**: an *outer* one authenticates to
+the edge (whose key is restricted to forwarding a single port — no shell), and an *inner*,
+**end-to-end** session runs through that tunnel to the archive host. So the edge only ever relays
+opaque ciphertext — it can't read or tamper with the MCP traffic. Auth is asymmetric (an `ed25519`
+key, verified at both hops); the tunnel itself is the usual symmetric SSH channel.
+
+![Query the archive (MCP) over SSH-stdio, jumping the edge](docs/transport-mcp.svg)
+
+<sub>Diagram source: [`docs/transport-mcp.dot`](docs/transport-mcp.dot) — `dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg`. Placeholder DDNS name + default ports; substitute your own.</sub>
+
 **The one manual step — authorize the client on the archive host.** `onboard-mcp-client.sh` does
 everything on the client, then prints the exact line(s) to install by hand (the server side is
 never automated — same rule as the relay + memory keys). Each key is pinned to the read-only

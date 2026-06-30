@@ -1,0 +1,40 @@
+// Source for docs/transport-mcp.svg — render: dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg
+// Placeholder addresses/ports only — substitute your own DDNS name and forwarded ports.
+digraph transport_mcp {
+  rankdir=LR; bgcolor="white";
+  fontname="Helvetica"; fontsize=12;
+  label="Query the archive (MCP) — client → archive host over SSH-stdio, jumping the edge (ProxyJump)";
+  labelloc=t; labeljust=l; fontcolor="#0f172a";
+  node [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+        fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
+  edge [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
+
+  CLIENT [label="client\nno local archive (HPC node · laptop)\nregisters dcmcp as a stdio server:\ncommand = ssh <alias>"];
+
+  subgraph cluster_home {
+    label="home (always-on)"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+
+    RT   [label="home router\nforwards ONE public port (DNAT)"];
+    BAST [fillcolor="#fef3c7", color="#d97706", fontcolor="#92400e",
+          label="edge / bastion\nonly internet-facing box, holds no data\nkey: permitopen=archive host only, no shell\nrelays ciphertext — can't read MCP traffic"];
+
+    subgraph cluster_internal {
+      label="internal — never internet-facing"; style="rounded,dashed"; color="#16a34a"; fontcolor="#166534"; fontsize=10;
+      ARCH [label="archive host\nowner account · read-only dcmcp server\nkey pinned to: command=\"dcmcp-serve.sh\""];
+      NAS  [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+            label="NAS\ndotclaude-storage/\ntranscripts · plans · memory"];
+      ARCH -> NAS [label="reads (never writes)"];
+    }
+
+    RT   -> BAST [label="DNAT public port\nto edge SSH (:22)"];
+    BAST -> ARCH [color="#16a34a", fontcolor="#166534", penwidth=1.6,
+                  label="ProxyJump tunnel (LAN)\nraw TCP to archive host only (:22)"];
+  }
+
+  CLIENT -> RT [color="#d97706", fontcolor="#92400e", penwidth=1.6,
+                label="outer SSH via DDNS\nhome.ddns.example:22\nauth: MCP ed25519 key"];
+
+  // the inner, end-to-end SSH session the edge merely relays as opaque bytes
+  CLIENT -> ARCH [style=dashed, constraint=false, penwidth=1.4, color="#0f172a", fontcolor="#0f172a",
+                  label="inner SSH — END-TO-END through the tunnel\nsame MCP key · MCP JSON-RPC over stdio\nedge sees only ciphertext"];
+}
