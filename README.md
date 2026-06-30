@@ -298,6 +298,30 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
   mechanism covers both WG peers and UDP-disabled HPC nodes. If neither path applies, `claude-sync.sh`
   prints a loud, actionable skip rather than silently doing nothing.
 
+**The one manual step — authorize the client on the archive host.** `onboard-mcp-client.sh` does
+everything on the client, then prints the exact line(s) to install by hand (the server side is
+never automated — same rule as the relay + memory keys). Each key is pinned to the read-only
+server and nothing else:
+
+- **On the archive host**, add to the **owner account**'s `~/.ssh/authorized_keys` (the account with
+  `uv` + the dotclaude clone + archive read — *not* the write-only relay account). The forced command
+  confines the key to the one server, so a leaked key can only run read-only archive queries:
+
+  ```
+  command="<abs-path-to-clone>/bin/dcmcp-serve.sh",restrict <the printed public key>
+  ```
+
+- **If the path crosses a ProxyJump edge/bastion** (e.g. an HPC client), also add to the jump user's
+  `~/.ssh/authorized_keys` **on the edge** — letting the key tunnel only to the archive host's port,
+  run nothing:
+
+  ```
+  restrict,port-forwarding,permitopen="<archive-host>:<port>",command="/bin/false" <the printed public key>
+  ```
+
+Then verify from the client — `ssh <mcp-alias> </dev/null && echo OK` (first run is slow once while
+`uv` resolves deps on the archive host, then caches). dcmcp activates on the next Claude session.
+
 Design + the (now-built) remote-over-SSH path and the deferred local-embedding-rerank phase:
 [`docs/dcmcp-plan.md`](docs/dcmcp-plan.md), [`docs/dcmcp-embedding-rerank.md`](docs/dcmcp-embedding-rerank.md).
 
