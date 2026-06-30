@@ -1,12 +1,12 @@
-# Raspberry Pi: mirror chat transcripts to the NAS
+# Mirror host: mirror chat transcripts to the NAS
 
-The always-on Pi is the bridge between GitHub (which remote machines can reach) and your
-home NAS (which they can't). It pulls the `claude-chats` relay every 30 min and mirrors
-it into `$NAS1/dotclaude-storage`.
+The always-on **mirror host** (any small home server — make/model doesn't matter) is the bridge
+between GitHub (which remote machines can reach) and your home NAS (which they can't). It pulls the
+`claude-chats` relay every 30 min and mirrors it into `$NAS1/dotclaude-storage`.
 
 ## One-time setup
 
-1. SSH key on the Pi added to GitHub (read access to `claude-chats`).
+1. SSH key on the mirror host added to GitHub (read access to `claude-chats`).
 2. Clone the app for the script:
    ```sh
    git clone git@github.com:<your-gh-user>/dotclaude.git ~/dotclaude
@@ -23,7 +23,7 @@ it into `$NAS1/dotclaude-storage`.
 `crontab -e`:
 
 ```cron
-*/30 * * * * NAS_DIR=/mnt/nas1/dotclaude-storage CHATS_REPO=/home/pi/claude-chats /home/pi/dotclaude/bin/pull-and-mirror.sh >> /home/pi/claude-mirror.log 2>&1
+*/30 * * * * NAS_DIR=/mnt/nas1/dotclaude-storage CHATS_REPO=$HOME/claude-chats $HOME/dotclaude/bin/pull-and-mirror.sh >> $HOME/claude-mirror.log 2>&1
 ```
 
 Result: every machine's transcripts land on the NAS at
@@ -32,6 +32,6 @@ ending. The NAS copy is the canonical archive; the GitHub relay can be pruned/ro
 
 ## When you switch to the WireGuard transport
 
-Once machines push peer-to-peer to the home node (see `transcript-transport.md`), the Pi
-no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
+Once machines push peer-to-peer to the home node (see `transcript-transport.md`), the mirror
+host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
 cron job is retired (or repurposed to rsync from the receiver to the NAS).

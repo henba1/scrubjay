@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run on the always-on box (Raspberry Pi). Pull the claude-chats relay and mirror it
+# Run on the always-on mirror host (any small home server). Pull the claude-chats relay and mirror it
 # into the NAS archive. Designed for cron (every 30 min). Idempotent.
 #   env: CHATS_REPO      clone of claude-chats    (default ~/claude-chats)
 #        CHATS_REPO_URL  git remote to clone on first run, e.g.

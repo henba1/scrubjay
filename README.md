@@ -144,7 +144,7 @@ bin/
   memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
   render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
   backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
-  pull-and-mirror.sh     # (Pi) pull claude-chats -> NAS
+  pull-and-mirror.sh     # (mirror host) pull claude-chats -> NAS
   onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
   onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
   onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + DOTCLAUDE_MCP_REMOTE to query the archive host over SSH
@@ -159,7 +159,7 @@ hooks/
 mcp/
   dcmcp_server.py        # read-only MCP server over the archive (the /dcrecall|/dcfind|/dcbrowse engine; `uv run --script`)
 skeleton/host/           # template copied when registering a new machine
-docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg), raspberry-pi.md, transcript-transport.md
+docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg), mirror-host.md, transcript-transport.md
 ```
 
 ## Pointers (machine-local)
@@ -439,8 +439,8 @@ configure both ends; the private `runbooks/wireguard-transcripts.md` is the full
   `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
 - **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set
   `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
-- **`git`** — stopgap: push to `claude-chats`, a Pi mirrors to the NAS
-  ([`docs/raspberry-pi.md`](docs/raspberry-pi.md)).
+- **`git`** — stopgap: push to `claude-chats`, a mirror host mirrors to the NAS
+  ([`docs/mirror-host.md`](docs/mirror-host.md)).
 
 **P2P requirements** (the `rsync-wg` path):
 - the sender can reach the receiver (the NAS box) over WireGuard;

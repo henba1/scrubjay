@@ -33,7 +33,7 @@ A backend is one file defining `transport_ship <src> <relpath>`.
 ## Current backend: `git`  (stopgap)
 
 Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes
-it. A Raspberry Pi pulls and mirrors to the NAS (`raspberry-pi.md`).
+it. A mirror host pulls and mirrors to the NAS (`mirror-host.md`).
 
 ⚠️ Tradeoff: transcripts transit GitHub's servers. The repo is private and treated as a
 *relay* (NAS is canonical), but this is why it's a stopgap.
