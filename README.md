@@ -285,7 +285,7 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 |---|---|
 | **tools** | `dc_list` (browse w/ filters, incl. `type=log` for the catalogue), `dc_recall` (topic → ranked candidates + anchors), `dc_search_within` (a topic *inside* one session → turn/line anchors), `dc_get` (fetch an artifact or a `turns=`/`lines=` slice), `dc_status` |
 | **resources** | every transcript/plan/memory as an `@`-pickable resource (`dc://transcript/…`, `dc://plan/…`, `dc://memory/…`) with a human, date-sorted title |
-| **commands** | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]` — thin wrappers that drive the tools |
+| **commands** | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]`, `/dcget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](#slash-commands)) |
 
 **Registration is automatic, two ways**, both done by `claude-sync.sh` at **user scope**:
 - **On the archive host** (the always-on home server where `DOTCLAUDE_LOCAL_CHATS` → the NAS is
@@ -339,6 +339,35 @@ Then verify from the client — `ssh <mcp-alias> </dev/null && echo OK` (first r
 
 The deferred local-embedding-rerank phase (only if lexical recall proves too blunt) is sketched in
 [`docs/dcmcp-embedding-rerank.md`](docs/dcmcp-embedding-rerank.md).
+
+## Slash commands
+
+All dotclaude commands live in `commands/*.md` and are symlinked into `~/.claude/commands/` by
+`claude-sync.sh`, so they're available in every session as `/<name>`. They fall into two groups:
+**archive/recall** commands are thin wrappers that drive the read-only `dcmcp` MCP tools (above);
+**lifecycle** commands just run the same scripts the `SessionStart`/`SessionEnd` hooks do, on demand.
+
+### Archive & recall (drive the `dcmcp` tools)
+
+| Command | Calls under the hood | Typically useful for |
+|---|---|---|
+| `/dcrecall <topic> [host= project= since=]` | `dc_recall` → `dc_get` | *"I discussed X somewhere, ages ago — which machine even?"* Semantic recall across **all** machines: ranks candidates by topic, then pulls the one you pick (or a slice) into context. Start here when you remember the gist but not the where/when. |
+| `/dcbrowse [transcript\|plan\|memory] [host= project= since=]` | `dc_list` → `dc_get` | Eyeballing a **date-sorted list** and grabbing one, when you have no search term in mind — "show me the last few plans on `henpi`." |
+| `/dcfind <topic> in <session-id\|topic-words> [context=N]` | `dc_search_within` (+ `dc_recall`/`dc_get`) | You know **which** session and want the **exact spot** a subject came up — returns turn/line anchors inside that one transcript instead of the whole thing. |
+| `/dcget <sid8 \| path \| dc://uri> [turns=A-B \| lines=A-B]` | `dc_get` (one call, no search) | You **already know the item** and just want it pulled in — cheapest way, no recall/ranking. Its edge is **slicing**: fetch only `lines=1200-1300` or `turns=5-10` of a huge transcript to keep tokens down. |
+
+> For pulling a *whole small* doc with even less overhead than `/dcget`, `@`-mention it from the
+> `dcmcp` resource picker (match on the title, e.g. `plan: … — <date> · <host>`) — the harness
+> injects it directly with no tool call at all.
+
+### Lifecycle & sync (run the hook scripts on demand)
+
+| Command | Does | Typically useful for |
+|---|---|---|
+| `/dclog` | Runs the `SessionEnd` work **now**: publish memory + config + this session's transcript to the NAS/data repo. | Shipping the current session immediately **without ending it** — e.g. so another machine (or `/dcrecall`) can see it right away. |
+| `/dcsync` | Runs the `SessionStart` work **now**: pull config + cross-machine memory and apply. | Grabbing changes another machine just pushed, mid-session, instead of waiting for the next start. |
+| `/dcmemory` | Enable/repair cross-machine memory on **this** machine (idempotent). | First-time memory setup, or when memory sync looks broken — safe to re-run anytime. |
+| `/dconboard [hint]` | Guided wrapper around `bin/onboard.sh`. | Onboarding a new machine, or reconfiguring one (e.g. *"switch backend to rsync-wg"*). |
 
 ## Transcripts: relay + NAS
 
