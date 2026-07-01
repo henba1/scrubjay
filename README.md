@@ -427,7 +427,7 @@ the archive back, or reach anything but the receiver.
 - an **edge/bastion** machine (always-on, internet-facing, holds no NAS) whose jump key is
   restricted to *port-forwarding to the receiver only*, no shell;
 - the **receiver** (the NAS box) authorizes that same key as a write-only
-  `command="rrsync -wo …",restrict` line;
+  `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` + group-normalizes perms);
 - `rsync ≥ 3.2.3` on both ends.
 
 `bin/onboard-hpc-client.sh` (on the sender) and `bin/onboard-edge-node.sh` (on the bastion)
@@ -445,8 +445,8 @@ configure both ends; the private `runbooks/wireguard-transcripts.md` is the full
 **P2P requirements** (the `rsync-wg` path):
 - the sender can reach the receiver (the NAS box) over WireGuard;
 - a **per-machine** SSH key (`DOTCLAUDE_WG_SSHKEY`), authorized on the receiver as a
-  **write-only** `command="rrsync -wo …",restrict` line — a leaked key can't read the archive
-  back, get a shell, or forward;
+  **write-only** `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` and
+  chmods each push group-readable) — a leaked key can't read the archive back, get a shell, or forward;
 - `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
 
 Full design + the WireGuard activation runbook:

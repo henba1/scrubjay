@@ -52,14 +52,18 @@ DOTCLAUDE_WG_SSHKEY="$HOME/.ssh/claude_transcripts_ed25519"
 ```
 
 ⚠️ **No remote path in `DOTCLAUDE_WG_TARGET`.** The receiver authorizes the key with a forced
-`command="rrsync -wo <root>"`, which pins the destination root; everything the client sends is
+`command="<APP>/bin/dc-receive.sh <root>"` (which runs `rrsync -wo <root>` then chmods the
+landed files group-readable — see below), which pins the destination root; everything the client sends is
 taken **relative** to it. Including `:/srv/claude-chats` would make `rrsync` re-root it *under*
 itself (`/srv/claude-chats/srv/claude-chats/…`). Per-machine reachability — `HostName`, the
 (often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `claude-receiver`
 alias, so this config line is identical on every machine. `bin/onboard.sh` writes both.
 
 Receiver requirements (see the private `runbooks/wireguard-transcripts.md`):
-- a restricted `command="rrsync -wo <root>",restrict` line per machine key (write-only, no shell);
+- a restricted `command="<APP>/bin/dc-receive.sh <root>",restrict` line per machine key —
+  `dc-receive.sh` wraps `rrsync -wo <root>` (write-only, no shell) and, after each push, chmods
+  the new files group-readable so the archive owner (human + MCP server) can read what the relay
+  account wrote (the relay writes `0600`; setgid stamps the shared group, this adds group-read);
 - the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:claude-rx:x`
   on a `0750` parent like `/media/<user>`);
 - `rsync ≥ 3.2.3` on both ends (for `--mkpath`).

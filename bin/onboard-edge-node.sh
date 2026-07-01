@@ -106,8 +106,9 @@ cat <<EOF
 
 ──────────────────────────────────────────────────────────────────────────────
  Edge node configured. Remaining:
- 1. RECEIVER ($RECEIVER): add to ~claude-rx/.ssh/authorized_keys —
-      restrict,command="rrsync -wo /srv/claude-chats" $HPC_PUBKEY
+ 1. RECEIVER ($RECEIVER): add to ~claude-rx/.ssh/authorized_keys
+    (<APP> = receiver's dotclaude checkout; wrapper widens the archive to group-read per push) —
+      restrict,command="<APP>/bin/dc-receive.sh /srv/claude-chats" $HPC_PUBKEY
  2. Router: forward public TCP <port> -> THIS host:$SSH_PORT.
  3. From the HPC node:  ssh $([ "$SSH_PORT" = 22 ] || echo "-p$SSH_PORT ")claude-receiver true
 ──────────────────────────────────────────────────────────────────────────────

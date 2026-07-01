@@ -582,6 +582,31 @@ def core_status(r=None):
 # ── MCP server ─────────────────────────────────────────────────────────────────────────────
 
 
+def _with_timeout(fn, seconds: int = 45):
+    """Run fn() under a wall-clock budget so a stalled archive read can't hang the stdio
+    response (a stuck read once silently wedged a remote dc_recall/dc_get — no repro, so this
+    is a safety net, not a targeted fix). Returns fn()'s dict, or an error dict on timeout.
+    A daemon thread is used because a blocking filesystem syscall can't be interrupted; on
+    timeout we abandon the thread and return so the client isn't left waiting forever."""
+    import threading
+    box: dict = {}
+
+    def _run():
+        try:
+            box["v"] = fn()
+        except Exception as e:  # propagate real errors to the caller, don't mask as a timeout
+            box["err"] = e
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        return {"error": f"timed out after {seconds}s (archive read stalled)"}
+    if "err" in box:
+        raise box["err"]
+    return box["v"]
+
+
 def build_server():
     from mcp.server.fastmcp import FastMCP
 
@@ -596,7 +621,7 @@ def build_server():
         Filters: type (transcript|plan|memory|log), host, project (substring), since/until
         (YYYY-MM-DD). Newest first. Use this to browse, then dc_get to pull one in.
         type=log browses the cross-machine session catalogue (one row per session, all hosts)."""
-        return core_list(type, host, project, since, until, limit)
+        return _with_timeout(lambda: core_list(type, host, project, since, until, limit))
 
     @mcp.tool()
     def dc_get(ref: str, format: str = "readable", turns: str | None = None,
@@ -605,7 +630,7 @@ def build_server():
 
         ref: a dc:// URI, a session id (8 hex), or a path. format: 'readable' (default) or
         'raw' (the .jsonl). Slice with turns='5-10' or lines='1200-1300'."""
-        return core_get(ref, format, turns, lines)
+        return _with_timeout(lambda: core_get(ref, format, turns, lines))
 
     @mcp.tool()
     def dc_recall(query: str, host: str | None = None, project: str | None = None,
@@ -614,14 +639,14 @@ def build_server():
 
         Runs a lexical prefilter and returns candidate files with matched snippets + line
         anchors; YOU rank them by reading the snippets, then dc_get the best match."""
-        return core_recall(query, host, project, since, k)
+        return _with_timeout(lambda: core_recall(query, host, project, since, k))
 
     @mcp.tool()
     def dc_search_within(ref: str, query: str, context: int = 2) -> dict:
         """Find where a topic appears *within* one session/plan/memory.
 
         Returns matching passages with line anchors and the enclosing turn number."""
-        return core_search_within(ref, query, context)
+        return _with_timeout(lambda: core_search_within(ref, query, context))
 
     @mcp.tool()
     def dc_status() -> dict:

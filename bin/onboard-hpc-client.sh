@@ -119,8 +119,10 @@ A) on the EDGE node — run onboard-edge-node.sh with:
    --hpc-pubkey "$PUB"
    --hpc-allow-cidr <that /24>   --receiver $RECEIVER_HOST:22
 
-B) on the RECEIVER ($RECEIVER_HOST) — add to ~$RECEIVER_USER/.ssh/authorized_keys:
-   restrict,command="rrsync -wo $RECEIVER_PATH" $PUB
+B) on the RECEIVER ($RECEIVER_HOST) — add to ~$RECEIVER_USER/.ssh/authorized_keys
+   (<APP> = the receiver's dotclaude checkout; the wrapper chmods the archive group-readable
+   after each push so the human + MCP server can read what the relay writes):
+   restrict,command="<APP>/bin/dc-receive.sh $RECEIVER_PATH" $PUB
 
 VERIFY (after the home side + router port-forward are up):
    ssh $ALIAS true                                  # silent success via ProxyJump

@@ -193,9 +193,10 @@ echo; ok "onboarding complete for '$HOST' (backend: $BACKEND)"
 if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
   echo
   info "Final step — authorize this machine on the receiver. Add this ONE line to the"
-  info "receiver's ~claude-rx/.ssh/authorized_keys:"
+  info "receiver's ~claude-rx/.ssh/authorized_keys (replace <APP> with the receiver's"
+  info "dotclaude checkout path — the wrapper widens the archive to group-read after each push):"
   echo
-  echo "    command=\"rrsync -wo $RECV_PATH\",restrict $(cat "$WG_KEY.pub")"
+  echo "    command=\"<APP>/bin/dc-receive.sh $RECV_PATH\",restrict $(cat "$WG_KEY.pub")"
   echo
   info "Then verify from here:  ssh claude-receiver true   (should succeed silently),"
   info "and a session-end will rsync transcripts/subagents/plans to the NAS."

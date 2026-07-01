@@ -20,8 +20,10 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   #   rides the rrsync protocol so it works even with the write-only receiver; if rrsync refuses
   #   the option the whole rsync is a no-op (|| true), degrading to the old additive behaviour.
   local del=""; [ "$mode" = mirror ] && del="--delete"
-  # --no-perms: don't clone the source's 0600 transcript mode; let the receiver's umask apply
-  #   (→ group-readable on the NAS, so the human can browse the archive). relpath is relative
+  # --no-perms: don't clone the source's restrictive transcript mode onto the receiver. It does
+  #   NOT widen perms (rsync stamps the dest at the source mode; a umask can only remove bits) —
+  #   the receiver's dc-receive.sh forced-command wrapper is what chmods the archive
+  #   group-readable after each push, so the human + MCP server can read it. relpath is relative
   #   to the receiver's rrsync root; --mkpath creates it.
   if [ -d "$src" ]; then                       # directory: trailing slashes mirror contents into <relpath>/
     rsync -a --no-perms --mkpath $del -e "$ssh" "$src/" "$DOTCLAUDE_WG_TARGET:$relpath/" 2>/dev/null || true
