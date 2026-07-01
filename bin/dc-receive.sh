@@ -29,7 +29,11 @@ rrsync -wo "$root"; st=$?
 # Widen perms so the shared group can read what the relay just wrote. Best-effort: chmod only
 # succeeds on files this account owns (others error out and are ignored); never fail the push.
 # setgid on dirs keeps the owner's group flowing to files created later.
-find "$root" -type d -exec chmod g+rxs {} + 2>/dev/null || true
-find "$root" -type f -exec chmod g+r   {} + 2>/dev/null || true
+#   Resolve the root first: it may be a symlink (e.g. /srv/claude-chats -> the NAS storage), and
+#   `find` in its default -P mode won't descend into a symlink given as the starting point — it
+#   would silently chmod nothing. realpath gives find a real directory to walk.
+scan="$(realpath -e "$root" 2>/dev/null || printf '%s' "$root")"
+find "$scan" -type d -exec chmod g+rxs {} + 2>/dev/null || true
+find "$scan" -type f -exec chmod g+r   {} + 2>/dev/null || true
 
 exit $st
