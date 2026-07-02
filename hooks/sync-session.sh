@@ -34,4 +34,14 @@ fi
 # 2) apply into ~/.claude (idempotent; mostly a no-op thanks to symlinks)
 "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 
+# 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
+#    primary push fails; the relay swallows its own errors (best-effort, must never block a
+#    session), so without this a dead/unauthorized relay key eats transcripts unnoticed. Printing
+#    to stdout adds it to the session's context, so the assistant flags it. Clears itself once a
+#    later ship succeeds (the breadcrumb is rewritten to result=ok).
+sfile="$(dc_ship_status_file 2>/dev/null || echo "$HOME/.config/dotclaude/last-ship")"
+if [ -s "$sfile" ] && grep -q '^result=fail' "$sfile" 2>/dev/null; then
+  printf 'dotclaude: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. Check the relay SSH key / authorized_keys on the receiver, then re-ship. Breadcrumb: %s\n' "$(cat "$sfile")"
+fi
+
 exit 0

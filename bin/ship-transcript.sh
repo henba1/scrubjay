@@ -27,8 +27,12 @@ impl="$APP/hooks/transports/$backend.sh"
 [ -f "$impl" ] || { echo "ship-transcript: unknown backend '$backend'" >&2; exit 0; }
 . "$impl"
 
-# 1) the transcript itself: <host>/<project-slug>/<session>.jsonl
-transport_ship "$src" "$host/$slug/$sid.jsonl"
+# 1) the transcript itself: <host>/<project-slug>/<session>.jsonl. This push is the canonical
+#    "is the relay working?" signal — record its outcome as a machine-local breadcrumb so a silent
+#    failure (e.g. an unauthorized relay key) is flagged at the next SessionStart, not days later.
+transport_ship "$src" "$host/$slug/$sid.jsonl"; ship_rc=$?
+if [ "$ship_rc" -eq 0 ]; then dc_record_ship ok "$sid" "$backend"
+else dc_record_ship fail "$sid" "$backend" "$ship_rc"; fi
 
 # 2) this session's subagent artifacts (subagent transcripts, tool-results), if present.
 #    They sit in a sibling dir named after the session id, next to <session>.jsonl.

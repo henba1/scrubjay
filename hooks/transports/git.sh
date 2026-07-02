@@ -18,15 +18,18 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   else
     mkdir -p "$(dirname "$dst")"; cp -f "$src" "$dst"
   fi
+  # Return the commit+push result (0 = relayed or already up to date) so a broken relay surfaces
+  # via ship-transcript.sh's breadcrumb. Never aborts the caller — it's not `set -e`.
   (
     cd "$chats" || exit 0
     git add "$relpath" 2>/dev/null
     git diff --cached --quiet -- "$relpath" 2>/dev/null && exit 0   # unchanged -> no commit
-    git commit -q -m "relay: $relpath" -- "$relpath" 2>/dev/null || exit 0
+    git commit -q -m "relay: $relpath" -- "$relpath" 2>/dev/null || exit 1
     if ! timeout 30 git push -q 2>/dev/null; then
       if [ -z "$(git status --porcelain 2>/dev/null | grep -v "$relpath")" ]; then
-        timeout 30 git pull --rebase -q 2>/dev/null && timeout 30 git push -q 2>/dev/null
+        timeout 30 git pull --rebase -q 2>/dev/null && timeout 30 git push -q 2>/dev/null && exit 0
       fi
+      exit 1
     fi
-  ) >/dev/null 2>&1 || true
+  ) >/dev/null 2>&1
 }

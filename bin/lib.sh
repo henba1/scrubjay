@@ -82,3 +82,15 @@ dc_normalize_plans() {  # dc_normalize_plans <plans_dir>
     [ "$target" = "$f" ] || mv -- "$f" "$target" 2>/dev/null || true
   done
 }
+
+# Machine-local breadcrumb of the last transcript-relay outcome. It lives beside the pointer
+# files (NOT in any synced repo) so a *silent* ship failure — e.g. an unauthorized/absent relay
+# key on the receiver — surfaces at the next SessionStart instead of going unnoticed for days.
+# Written by bin/ship-transcript.sh after the primary transcript push; read by hooks/sync-session.sh.
+dc_ship_status_file() { printf '%s' "$HOME/.config/dotclaude/last-ship"; }
+dc_record_ship() {  # dc_record_ship <ok|fail> <session_id> <backend> [rc]
+  local result="$1" sid="$2" backend="$3" rc="${4:-0}" f
+  f="$(dc_ship_status_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
+  printf 'result=%s ts=%s host=%s backend=%s sid=%s rc=%s\n' \
+    "$result" "$(date +%FT%T)" "$(dc_host)" "$backend" "${sid:0:8}" "$rc" > "$f" 2>/dev/null || true
+}

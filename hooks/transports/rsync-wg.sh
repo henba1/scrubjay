@@ -25,9 +25,16 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   #   the receiver's dc-receive.sh forced-command wrapper is what chmods the archive
   #   group-readable after each push, so the human + MCP server can read it. relpath is relative
   #   to the receiver's rrsync root; --mkpath creates it.
+  # Return the real rsync exit code so a broken relay (e.g. an unauthorized key on the receiver)
+  # is detectable by the caller — ship-transcript.sh records it as a breadcrumb. Still never
+  # aborts the caller (it's not `set -e`). Mirror mode is the one exception: it rides rrsync's
+  # OPTIONAL --delete, so a refusal there must degrade silently, not read as a relay failure.
+  local rc=0
   if [ -d "$src" ]; then                       # directory: trailing slashes mirror contents into <relpath>/
-    rsync -a --no-perms --mkpath $del -e "$ssh" "$src/" "$DOTCLAUDE_WG_TARGET:$relpath/" 2>/dev/null || true
+    rsync -a --no-perms --mkpath $del -e "$ssh" "$src/" "$DOTCLAUDE_WG_TARGET:$relpath/" 2>/dev/null || rc=$?
   else
-    rsync -a --no-perms --mkpath -e "$ssh" "$src" "$DOTCLAUDE_WG_TARGET:$relpath" 2>/dev/null || true
+    rsync -a --no-perms --mkpath -e "$ssh" "$src" "$DOTCLAUDE_WG_TARGET:$relpath" 2>/dev/null || rc=$?
   fi
+  [ "$mode" = mirror ] && rc=0
+  return $rc
 }
