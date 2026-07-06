@@ -18,7 +18,7 @@
 #   command="<APP>/bin/dc-receive.sh <root>",restrict <relay-pubkey>
 #
 # where <root> is the rrsync root (the storage dir clients push into, e.g.
-# /media/hendrik/NAS1/dotclaude-storage).
+# /srv/claude-chats).
 set -uo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"   # forced commands get a minimal PATH
 
