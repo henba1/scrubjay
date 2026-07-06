@@ -1,0 +1,641 @@
+# dotclaude
+
+> The app/logic for syncing Claude Code across machines — config-sync + transcript relay.
+
+dotclaude is the app/logic for syncing Claude Code across machines: a git-based config sync plus a pluggable, peer-to-peer transcript relay to your own NAS. Personal content lives in separate private repos so this one is publishable.
+
+# Overview
+
+# dotclaude
+
+The **app/logic** for syncing [Claude Code](https://claude.ai/code) across machines. Your personal content is kept in *separate* repos so this one can be shared/public without leaking anything:
+
+| Repo                 | Role                                                                  | Visibility  |
+| -------------------- | --------------------------------------------------------------------- | ----------- |
+| **dotclaude** (this) | scripts, hooks, docs — the logic                                      | public-able |
+| **dotclaude-data**   | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private     |
+| **claude-chats**     | full chat transcripts (`.jsonl`), relayed off each machine            | private     |
+
+Diagram source: [`overview.dot`](https://henba1.github.io/dotclaude/overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.
+
+> **Flow:** `dotclaude` (logic) + `dotclaude-data` (your config) → applied into each machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents, plans) to the NAS via a pluggable backend — peer-to-peer over WireGuard, or `claude-chats` on GitHub as a stopgap. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one host's rules for another.
+
+## Where to go
+
+- **[Concepts](https://henba1.github.io/dotclaude/concepts/index.md)** — the two-kinds-of-sync model, what dotclaude is, and what lives in the database. Start here to understand *why* the system is shaped this way.
+- **[Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md)** — install on a new machine (interactive script or Claude-assisted), the repo layout, and the machine-local pointers.
+- **[Day-to-day](https://henba1.github.io/dotclaude/day-to-day/index.md)** — the hooks that keep it hands-off, finding a past chat, and troubleshooting.
+- **[Query the archive (MCP)](https://henba1.github.io/dotclaude/archive-mcp/index.md)** — recall a past session by *topic* from inside a live Claude session via the read-only `dcmcp` server.
+- **[Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md)** — the `/dc*` command reference.
+- **[Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md)** — how sessions ride peer-to-peer to your own NAS, and the two P2P paths (WireGuard / SSH).
+- **[Reference](https://henba1.github.io/dotclaude/reference/index.md)** — the by-hand command cheatsheet and environment toggles.
+
+# Concepts
+
+## The core idea: two kinds of sync
+
+Everything dotclaude moves is one of two things — and which one it is decides the *mechanism*. Get this distinction and the rest of the system follows:
+
+| Semantic                                     | Meaning                                                 | Mechanism                  | What it fits                                                                              |
+| -------------------------------------------- | ------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
+| **Shared / bidirectional** ("cross-machine") | Same content on every machine; edits *merge*            | **git** (pull + push)      | things you *author*: `CLAUDE.md`, `commands`, `agents`, `settings`, `plugins`, **memory** |
+| **Archive / one-way**                        | machine → NAS; never edited in two places, no read-back | **rsync** (the P2P "cart") | *records*: transcripts, subagents, plans, `readable/`, `history.jsonl`, `tasks`           |
+
+The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`dotclaude-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
+
+## What is dotclaude?
+
+[Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/` directory on whatever machine you run it on: which rules it must follow, which custom commands and sub-agents exist, what it's allowed to do, and so on. If you work on several machines (a laptop, a desktop, an HPC cluster) you'd normally set all of that up by hand, separately, on each one — and they'd drift apart over time.
+
+dotclaude keeps that configuration in **git** instead, and makes it apply itself. This repo (`dotclaude`) holds only the *machinery* — the shell scripts and hooks. Your actual content lives in a second, private repo (`dotclaude-data`) that we call **the database**. A small sync step turns the database into a working `~/.claude/` on each machine, and a pair of hooks keep it current automatically. The result: you configure Claude once, and every machine stays in step.
+
+## What's in the database (`dotclaude-data`) and how Claude uses it
+
+The database is just plain Markdown and JSON files, organised into a handful of directories. Each one feeds Claude in a specific way:
+
+- **`claude-md/`** — the configuration shared by *all* your machines. `CLAUDE.md` is the always-on instruction file Claude reads at the top of every session (e.g. *"never add a `Co-Authored-By` trailer to commits"*). `commands/` holds custom slash-commands you can invoke by name — `commands/explain-diff.md` becomes `/explain-diff`, which might tell Claude to summarise your staged git changes. (The generic `/dc*` commands aren't here — they ship with the app; `claude-sync.sh` merges both into `~/.claude/commands/`.) `agents/` holds sub-agents Claude can delegate to — `agents/test-runner.md` defines a focused helper that runs your test suite and reports back. `CLAUDE.md` and `agents/` are symlinked straight into `~/.claude/`, so editing a file here changes Claude's behaviour everywhere on the next pull.
+- **`hosts/<machine>/`** — the part that is *different* per machine. `env.md` describes that box in prose (its OS, where Python lives, cluster quirks) so Claude knows the lay of the land; `claude/settings.json` holds machine-specific overrides (for example, this HPC node auto-accepts edits); `chats.index.json` is an auto-generated catalogue of which chats live on that machine. Because hosts sit at the top level, one machine's setup never leaks into another's — and you can ask Claude to *"read `hosts/laptop/` and adapt it for this HPC box"*.
+- **`settings/`** — `settings.base.json` is the baseline `~/.claude/settings.json` that applies everywhere: the permission allow/deny lists (which shell commands Claude may run without asking), the default model, and which hooks fire. The sync step merges this baseline with the per-host overrides from `hosts/<machine>/` into the final settings file.
+- **`memory/`** — durable facts Claude has learned and should remember across sessions, one fact per file. Claude Code's built-in auto-memory lives per-project at `~/.claude/projects/<project>/memory/`; `claude-sync.sh` symlinks each of those into this repo under `memory/<host>/<project>/`, so auto-saved memories are synced and sorted by the machine they were created on, then by project (mirroring Claude's native layout).
+- **`templates/`** — reusable starting points for *project-level* config, kept out of the always-on path. A file like `templates/<project>/CLAUDE.local.md` is a ready-made rules file you can drop into a specific project so Claude picks up that project's conventions.
+- **`logs/`** — a human-readable history of every session, one file per machine (`<host>.log`). Each line records the time, machine, working directory, and your first prompt, so you can later `grep` for *"that chat about the auth refactor"* across all machines.
+- **`runbooks/`** — operational notes for *you* (not Claude), like the plan for moving chat transcripts off GitHub onto a private WireGuard link.
+
+## How the system works, and what you set up once
+
+The moving parts fit together like this:
+
+1. **Two repos, one machine-local pointer.** You clone `dotclaude` (this machinery) and `dotclaude-data` (your content) onto each machine. A tiny file at `~/.config/dotclaude/config` tells the scripts where those clones live, and `~/.config/dotclaude/host` pins a stable name for the machine (handy on clusters whose hostnames change between logins).
+1. **Sync turns the database into `~/.claude/`.** Running `bin/claude-sync.sh` symlinks the shared `claude-md/` scopes into `~/.claude/`, points each project's auto-memory dir at the synced `memory/<host>/<project>/`, and merges `settings/` + the host overrides into `~/.claude/settings.json`. It's safe to re-run; it only changes what actually differs.
+1. **Two hooks keep it hands-off.** When a session *starts*, a hook pulls the latest `dotclaude-data` and re-runs sync, so config you edited on another machine is already in effect. When a session *ends*, a hook appends the log line, refreshes that machine's chat index, and commits both back. You don't run these — they run themselves.
+
+**What you actually do once per machine:** clone the two repos, write the little config pointer, run `claude-register-host.sh` to scaffold a `hosts/<machine>/` entry, then `claude-sync.sh` to apply it. After that, you only ever *edit files in `dotclaude-data` and push* — every machine converges on its own. The concrete commands are in [Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md).
+
+## Cross-machine tailoring with Claude
+
+Everything is plain Markdown/JSON, so from any project you can ask Claude: *"read `dotclaude-data/hosts/<other>/` and adapt its rules for this box"* — it reads one host's config and writes another's.
+# Setup & operation
+
+# Onboarding
+
+## Install with Claude Code (agent-assisted)
+
+The fastest path if you already run Claude Code: clone this repo, open Claude *inside* the clone, and ask it to set the machine up.
+
+```
+git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
+cd ~/.dotclaude/dotclaude
+claude
+```
+
+Then, in the session:
+
+> **set up dotclaude on this machine**
+
+Claude reads [`AGENTS.md`](https://github.com/henba1/dotclaude/blob/main/AGENTS.md) at the repo root, gathers your relay-backend choice and receiver details in chat, and drives `bin/onboard.sh` for you — then surfaces the one manual step it deliberately can't do: pasting the printed `authorized_keys` line on the receiver (see the warning below).
+
+## Fast path — interactive script
+
+Clone this repo, then run `bin/onboard.sh`. It checks deps (and offers to install Claude Code if missing), clones the sibling data repos, writes the machine-local pointer, registers the host and applies config, and — for the `rsync-wg` backend — optionally generates the dedicated relay SSH key, adds the `claude-receiver` ssh-alias, and prints the exact `authorized_keys` line to paste on the receiver. It's re-runnable and every prompt has a default (or preset it via env, e.g. `DOTCLAUDE_BACKEND`):
+
+```
+git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
+~/.dotclaude/dotclaude/bin/onboard.sh
+```
+
+One manual step the script can't do for you — authorize the new host on the receiver.
+
+For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each **print an `authorized_keys` line**; you must paste it into the receiver account's `~/.ssh/authorized_keys` (e.g. `claude-rx` on the NAS box, needs sudo). This is deliberate — a new machine must not be able to self-authorize; granting it access requires a human with root on the receiver. Each line is locked to one forced command (`rrsync -wo` for transcripts, `git-shell` for memory), so a leaked key can't get a shell or read the archive back. Until you add the line, that host's sync silently no-ops. (Receiver also needs a one-time `safe.directory` trust for the memory repo — see [memory-sync.md](https://henba1.github.io/dotclaude/memory-sync/index.md).)
+
+Manual steps (what the script automates)
+
+```
+git clone git@github.com:<your-gh-user>/dotclaude.git      ~/.dotclaude/dotclaude
+git clone git@github.com:<your-gh-user>/dotclaude-data.git ~/.dotclaude/dotclaude-data
+git clone git@github.com:<your-gh-user>/claude-chats.git   ~/.dotclaude/claude-chats   # if syncing transcripts
+
+mkdir -p ~/.config/dotclaude && cat > ~/.config/dotclaude/config <<'EOF'
+: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
+: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
+: "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+EOF
+
+~/.dotclaude/dotclaude/bin/claude-register-host.sh --host <name>   # scaffold + pin + index
+# review ~/.dotclaude/dotclaude-data/hosts/<name>/
+~/.dotclaude/dotclaude/bin/claude-sync.sh                          # apply into ~/.claude
+git -C ~/.dotclaude/dotclaude-data add -A && git -C ~/.dotclaude/dotclaude-data commit -m "host <name>" && git -C ~/.dotclaude/dotclaude-data push
+```
+
+`~/.dotclaude/` keeps the machinery out of your project workspace; the clone location is otherwise arbitrary (it's only referenced via the pointer file below).
+
+Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub. No root.
+
+## Pointers (machine-local)
+
+The app finds your data/transcript repos via `~/.config/dotclaude/config` (env overrides):
+
+```
+: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
+: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
+: "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+```
+
+Host identity is pinned separately in `~/.config/dotclaude/host` (because `hostname -s` is transient on HPC login nodes).
+
+## Layout (this repo — app only)
+
+```
+bin/
+  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /dconboard command
+  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /dcmemory command)
+  lib.sh                 # shared helpers: host + data/chats pointers
+  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
+  claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
+  claude-register-host.sh# scaffold a new host into the data repo
+  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
+  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
+  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
+  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
+  pull-and-mirror.sh     # (mirror host) pull claude-chats -> NAS
+  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
+  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
+  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + DOTCLAUDE_MCP_REMOTE to query the archive host over SSH
+  dcmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
+hooks/
+  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
+  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
+  publish-now.sh         # manual SessionEnd-on-demand (the /dclog command); reconstructs the hook payload
+  transports/git.sh      # backend: git stopgap (-> claude-chats, Pi mirrors to NAS)
+  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
+  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
+mcp/
+  dcmcp_server.py        # read-only MCP server over the archive (the /dcrecall|/dcfind|/dcbrowse engine; `uv run --script`)
+skeleton/host/           # template copied when registering a new machine
+docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
+```
+
+## Re-home the dotclaude clones
+
+Moving the machinery (e.g. out of `~/code` into `~/.dotclaude`) is machine-local — nothing to commit. See the [Reference cheatsheet](https://henba1.github.io/dotclaude/reference/#re-home-the-dotclaude-clones).
+
+# Day-to-day
+
+## Nothing to run by hand
+
+Both housekeeping scripts run automatically via hooks, so you never update anything manually:
+
+| When              | Hook              | Does                                                                                                                                                                                    |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| session **start** | `sync-session.sh` | `git pull --ff-only` **both** repos (data *and* app, so hook/script fixes propagate too), then `claude-sync.sh` — config edited on another machine arrives and applies itself.          |
+| session **end**   | `log-session.sh`  | append the log line, refresh `chats.index.json`, then `git add -A` + commit + push the **whole** data repo — `memory/`, `templates/`, host config and all. Nothing needs a manual sync. |
+
+`git add -A` is safe because the data repo's `.gitignore` blocks secrets and transcripts (`*.credentials*`, `*.jsonl`, `.claude.json`), so those can never be staged.
+
+Symlinked scopes (`CLAUDE.md`, `agents/`, `hooks/`, and the per-file links in `commands/`) go live on the pull alone — `claude-sync.sh` only has real work when `settings.json` changed or a *new* command/agent file appeared (it relinks `commands/` from the app + data sources). You can still run either by hand (both idempotent); the hooks just mean you don't have to:
+
+```
+bin/claude-sync.sh         # re-apply config (auto-runs at SessionStart)
+bin/claude-index-chats.sh  # refresh this host's chats.index.json (auto-runs at SessionEnd)
+```
+
+Escape hatches (env, in `~/.config/dotclaude/config` or inline): `DOTCLAUDE_NOSYNC=1` (skip the start-of-session pull+sync), `DOTCLAUDE_SYNC_NOPULL=1` (sync without pulling). The full toggle list is in the [Reference cheatsheet](https://henba1.github.io/dotclaude/reference/#toggle-behaviour).
+
+## Find a past chat
+
+Every session is logged by the `SessionEnd` hook to `dotclaude-data/logs/<host>.log` (one line: `time | host | cwd | "first prompt" | session=id`) and pushed, so all machines' histories are searchable from any clone of the data repo:
+
+```
+git -C ~/.dotclaude/dotclaude-data pull
+grep -i refactor ~/.dotclaude/dotclaude-data/logs/*.log
+```
+
+The full transcript (the `.jsonl`) lives in `claude-chats` / on the NAS under `<host>/<slug>/<session>.jsonl`.
+
+For recall by *topic* (rather than an exact word you remember typing) from inside a live session, use the [`dcmcp` MCP server](https://henba1.github.io/dotclaude/archive-mcp/index.md).
+
+## Troubleshooting
+
+**Hooks only activate on the *next* session.** `claude-sync.sh` (and `onboard.sh`, which runs it) install the hooks — symlinking `~/.claude/hooks` and registering them in `~/.claude/settings.json`. But Claude reads its hooks **at session start**, so a `claude` instance that was *already running* when you onboarded won't see them: its `SessionStart` already fired, with no hooks to load. **Quit and reopen `claude`** after onboarding — only sessions started afterwards run `SessionEnd` (the transcript/subagents/plans relay + log/index push). This is the usual reason a freshly-onboarded machine "ships nothing".
+
+- **`SessionEnd` triggers on both `/exit` and `/clear`** (the latter then starts a fresh session). Either way, a session that began *before* the hooks were active won't ship.
+- **"SessionEnd hook … Hook cancelled":** Claude cancels hooks that haven't returned by the time the session process exits. `log-session.sh` detaches its network work (git push + relay) so shutdown can't interrupt it — just ensure the machine has pulled the app repo (`git -C <app-clone> pull`; `SessionStart` does this automatically next time).
+- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `dotclaude-data` git sync, not the session relay (see [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md)).
+
+# Reference — useful commands
+
+Day-to-day this all runs from hooks; reach for these when you want to do something by hand. Paths assume the default `~/.dotclaude/` layout from [Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md) (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/dc*` commands, see [Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md).
+
+## Apply / refresh config now
+
+Normally automatic at session start/end:
+
+```
+~/.dotclaude/dotclaude/bin/claude-sync.sh           # re-apply data-repo config into ~/.claude
+~/.dotclaude/dotclaude/bin/claude-sync.sh --force   # also back up + replace real (non-symlink) files
+~/.dotclaude/dotclaude/bin/claude-index-chats.sh    # rebuild this host's chats.index.json
+```
+
+## Pull the latest from your other machines
+
+The SessionStart hook does both for you:
+
+```
+git -C ~/.dotclaude/dotclaude-data pull             # config, rules, memory, templates, logs
+git -C ~/.dotclaude/dotclaude      pull             # the scripts & hooks themselves
+```
+
+## Find a past chat across every machine
+
+```
+git -C ~/.dotclaude/dotclaude-data pull
+grep -i <keyword> ~/.dotclaude/dotclaude-data/logs/*.log
+```
+
+## Register the current machine (first-time onboarding)
+
+```
+~/.dotclaude/dotclaude/bin/claude-register-host.sh --host <name>
+```
+
+## Toggle behaviour
+
+Set in `~/.config/dotclaude/config` (persistent) or inline before a command (one-off) — no file editing needed:
+
+| Env var                            | Effect                                                            |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `DOTCLAUDE_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`) |
+| `DOTCLAUDE_NOSYNC=1`               | skip the start-of-session pull + sync entirely                    |
+| `DOTCLAUDE_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                          |
+| `DOTCLAUDE_NOSHIP=1`               | end the session without shipping its transcript                   |
+| `DOTCLAUDE_LOG_NOGIT=1`            | append the log line but don't commit/push it                      |
+
+## Re-home the dotclaude clones
+
+Move the machinery (e.g. out of `~/code` into `~/.dotclaude`):
+
+```
+mkdir -p ~/.dotclaude
+mv ~/code/dotclaude ~/code/dotclaude-data ~/code/claude-chats ~/.dotclaude/
+
+# repoint the machine-local pointer at the new location
+cat > ~/.config/dotclaude/config <<'EOF'
+: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
+: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
+: "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+EOF
+
+~/.dotclaude/dotclaude/bin/claude-sync.sh   # rebuild the ~/.claude symlinks at the new path
+```
+
+`claude-sync.sh` recomputes the app location from its own path and re-links every scope, so nothing else needs touching. Confirm with `readlink -e ~/.claude/{CLAUDE.md,commands,agents,hooks}` (no dangling links). The pinned host name in `~/.config/dotclaude/host` is unaffected. This is machine-local — nothing to commit.
+# Archive & recall
+
+# Query the archive (MCP)
+
+`grep`-ing the logs finds a chat by a word you remember typing. The harder case — *"I discussed X* *somewhere* *a while ago, which machine was it even on?"* — is what the **`dcmcp`** MCP server solves: a **read** path back into a live session over everything the relay already wrote (transcripts, plans, cross-machine memory), so you can recall a past session by *topic* and pull it — or just the relevant slice — straight into context without leaving Claude.
+
+It's a single-file, **read-only** server (`mcp/dcmcp_server.py`, run via `uv run --script`) that reads the same storage pointers as the rest of dotclaude (`DOTCLAUDE_LOCAL_CHATS`, `DOTCLAUDE_MEMORY`, `DOTCLAUDE_DATA`). Recall is deliberately **embedding-free** — a fast ripgrep prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic ranking — so there's no index to build and nothing sensitive ever leaves the NAS. It also folds the `logs/<host>.log` **session catalogue** into recall: a topic match there links to the transcript when present, or stands alone as a "you had this on `<host>`" pointer — so recall spans even sessions whose full transcript isn't on the machine you're asking from. It exposes:
+
+| Surface       | What                                                                                                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **tools**     | `dc_list` (browse w/ filters, incl. `type=log` for the catalogue), `dc_recall` (topic → ranked candidates + anchors), `dc_search_within` (a topic *inside* one session → turn/line anchors), `dc_get` (fetch an artifact or a `turns=`/`lines=` slice), `dc_status` |
+| **resources** | every transcript/plan/memory as an `@`-pickable resource (`dc://transcript/…`, `dc://plan/…`, `dc://memory/…`) with a human, date-sorted title                                                                                                                      |
+| **commands**  | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]`, `/dcget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md))                                         |
+
+## Registration is automatic, two ways
+
+Both done by `claude-sync.sh` at **user scope**:
+
+- **On the archive host** (the always-on home server where `DOTCLAUDE_LOCAL_CHATS` → the NAS is mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.
+- **On a client with no local archive** (a laptop, or an **HPC login node**): run `bin/onboard-mcp-client.sh` (offered by `onboard.sh`). It points `DOTCLAUDE_MCP_REMOTE` at the archive host and registers an `ssh` entry; on connect, a forced command (`bin/dcmcp-serve.sh`) runs the server **on the archive host** and pipes MCP stdio back over the same SSH/ProxyJump path the relay uses. The server side stays a manual `authorized_keys` authorize (printed by the script), like the relay + memory keys. **One mechanism covers both kinds of client:** a laptop on the WireGuard mesh, *and* an HPC login node that can't join it — clusters typically block the outbound UDP that WireGuard needs, so those nodes fall back to plain SSH/ProxyJump instead. If neither path applies, `claude-sync.sh` prints a loud, actionable skip rather than silently doing nothing.
+
+## The remote transport (SSH-stdio)
+
+A client with no local archive registers `dcmcp` as a *stdio* server whose command is `ssh <alias>`. That SSH **jumps the edge/bastion** (ProxyJump) to reach the archive host on the home LAN, where a forced command launches the read-only server; MCP JSON-RPC rides the pipe. The clever bit is the **two nested SSH sessions**: an *outer* one authenticates to the edge (whose key is restricted to forwarding a single port — no shell), and an *inner*, **end-to-end** session runs through that tunnel to the archive host. So the edge only ever relays opaque ciphertext — it can't read or tamper with the MCP traffic. Auth is asymmetric (an `ed25519` key, verified at both hops); the tunnel itself is the usual symmetric SSH channel.
+
+Diagram source: [`transport-mcp.dot`](https://henba1.github.io/dotclaude/transport-mcp.dot) — `dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg`. Placeholder DDNS name + default ports; substitute your own.
+
+## The one manual step — authorize the client on the archive host
+
+`onboard-mcp-client.sh` does everything on the client, then prints the exact line(s) to install by hand (the server side is never automated — same rule as the relay + memory keys). Each key is pinned to the read-only server and nothing else:
+
+- **On the archive host**, add to the **owner account**'s `~/.ssh/authorized_keys` (the account with `uv` + the dotclaude clone + archive read — *not* the write-only relay account). The forced command confines the key to the one server, so a leaked key can only run read-only archive queries:
+
+```
+command="<abs-path-to-clone>/bin/dcmcp-serve.sh",restrict <the printed public key>
+```
+
+- **If the path crosses a ProxyJump edge/bastion** (e.g. an HPC client), also add to the jump user's `~/.ssh/authorized_keys` **on the edge** — letting the key tunnel only to the archive host's port, run nothing:
+
+```
+restrict,port-forwarding,permitopen="<archive-host>:<port>",command="/bin/false" <the printed public key>
+```
+
+Then verify from the client — \`ssh
+
+# Slash commands
+
+All dotclaude commands live in `commands/*.md` and are symlinked into `~/.claude/commands/` by `claude-sync.sh`, so they're available in every session as `/<name>`. Because they ship with the **app** (not your private data repo), every machine that installs dotclaude gets them out of the box. They fall into two groups: **archive/recall** commands are thin wrappers that drive the read-only [`dcmcp` MCP tools](https://henba1.github.io/dotclaude/archive-mcp/index.md); **lifecycle** commands just run the same scripts the `SessionStart`/`SessionEnd` hooks do, on demand.
+
+## Archive & recall (drive the `dcmcp` tools)
+
+| Command                                                        | Calls under the hood                        | Typically useful for                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/dcrecall <topic> [host= project= since=]`                    | `dc_recall` → `dc_get`                      | *"I discussed X somewhere, ages ago — which machine even?"* Semantic recall across **all** machines: ranks candidates by topic, then pulls the one you pick (or a slice) into context. Start here when you remember the gist but not the where/when. |
+| `/dcbrowse [transcript\|plan\|memory] [host= project= since=]` | `dc_list` → `dc_get`                        | Eyeballing a **date-sorted list** and grabbing one, when you have no search term in mind — "show me the last few plans on `laptop`."                                                                                                                 |
+| `/dcfind <topic> in <session-id\|topic-words> [context=N]`     | `dc_search_within` (+ `dc_recall`/`dc_get`) | You know **which** session and want the **exact spot** a subject came up — returns turn/line anchors inside that one transcript instead of the whole thing.                                                                                          |
+| `/dcget <sid8 \| path \| dc://uri> [turns=A-B \| lines=A-B]`   | `dc_get` (one call, no search)              | You **already know the item** and just want it pulled in — cheapest way, no recall/ranking. Its edge is **slicing**: fetch only `lines=1200-1300` or `turns=5-10` of a huge transcript to keep tokens down.                                          |
+
+> For pulling a *whole small* doc with even less overhead than `/dcget`, `@`-mention it from the `dcmcp` resource picker (match on the title, e.g. `plan: … — <date> · <host>`) — the harness injects it directly with no tool call at all.
+
+## Lifecycle & sync (run the hook scripts on demand)
+
+| Command             | Mirrors      | Does                                                                                                                                                                                                                                                           |
+| ------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/dcsync`           | SessionStart | Pull the data repo + cross-machine memory, then re-apply config into `~/.claude`. Grab changes another machine just pushed, mid-session, instead of waiting for the next start.                                                                                |
+| `/dclog`            | SessionEnd   | Publish *now* without ending the session: log line + chats index + push data repo + push memory + relay this session's transcript/plans/history/tasks to the NAS. Handy so another machine (or `/dcrecall`) can see it right away.                             |
+| `/dconboard [hint]` | —            | Guided wrapper around `bin/onboard.sh` (gathers choices in chat, then runs it unattended). For onboarding or reconfiguring (e.g. *"switch backend to rsync-wg"*). For a *brand-new* machine without dotclaude yet, run `bin/onboard.sh` in a terminal instead. |
+| `/dcmemory`         | —            | Enable/repair cross-machine memory on **this** machine (idempotent — runs `bin/onboard-memory.sh`). First-time memory setup, or when memory sync looks broken.                                                                                                 |
+# Transcript relay
+
+# Transcripts: relay + NAS
+
+`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND`). What rides which path is split by **privacy**:
+
+**Sensitive → peer-to-peer, never a third party.** Full conversation content stays off GitHub and goes straight to your NAS over your own WireGuard link:
+
+| Artifact                                 | Lands at                                                     |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| full transcript (machine-readable)       | `<host>/<slug>/<session>.jsonl`                              |
+| subagent transcripts + tool-results      | `<host>/<slug>/<session>/`                                   |
+| this session's task list (TaskCreate)    | `<host>/<slug>/<session>/tasks/`                             |
+| plans                                    | `<host>/plans/<date>_<topic>.md`                             |
+| clean Markdown render (human-readable)   | `<host>/readable/<project>/<date>_<topic>__<sid8>.md`        |
+| prompt history (all projects, this host) | `<host>/history.jsonl`                                       |
+| auto-memory (cross-machine)              | its **own** git repo on the NAS, *not* this tree — see below |
+
+The NAS holds **two parallel trees per host**. The `.jsonl` tree above is canonical — exact, machine-readable, the thing you'd resume or feed to a tool. Alongside it, a `readable/` tree holds the same sessions rendered as Markdown session logs (user + assistant text plus the full tool stream — each call shows its input, Bash commands verbatim, and the tool's output inline; only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by **project** (the session's working dir), each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified. Rendering happens automatically on every ship (`bin/render-transcript.sh`, additive — it never touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS.
+
+Plans get the same human-friendly treatment: Claude Code saves each plan under three random words (`rippling-sprouting-whisper.md`), so on every ship `dc_normalize_plans` (in `bin/lib.sh`) renames them *in place* to `<date>_<topic>.md` — date from the file's mtime, topic from the plan's first heading (a leading `Plan:` stripped) — before the `plans/` dir is mirrored. It's idempotent (already-dated names are left alone), so each machine self-normalizes its own plans going forward. Unlike the always-additive transcript/`readable/` trees, the `plans/` mirror is **authoritative** (`transport_ship … mirror`): the relay copy is made an exact copy of the local `plans/`, so a plan that was already shipped under its old random-word name doesn't linger as a stale duplicate after the rename.
+
+**Memory → its own git repo, self-hosted on the NAS (never GitHub).** Auto-memory needs git's *bidirectional merge + history* (so the same project recalls memory written on any machine), but it also holds **sensitive paths** — so it can't ride GitHub like the rest of the config. The answer is a dedicated **bare git repo on the NAS, reached over WireGuard** (`DOTCLAUDE_MEMORY_REMOTE` — a local path on the NAS box, `ssh://…` over WG on clients). `claude-sync.sh` symlinks each project's native `~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines — *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`) publishes it on session end. No third party ever sees it. The pull and the publish also run on demand mid-session via the **`/dcsync`** and **`/dclog`** slash commands (shipped with the app, wrapping `sync-session.sh` and `hooks/publish-now.sh`). (Older versions kept memory per-host in `dotclaude-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.) See [memory-sync.md](https://henba1.github.io/dotclaude/memory-sync/index.md) for the bare-repo setup and per-client WG onboarding.
+
+**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, *personal* `commands`, `agents`, the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal git. (The generic `/dc*` slash commands instead ship with the **app** in `dotclaude/commands/`, so a fresh install has them immediately; `claude-sync.sh` merges both sources into `~/.claude/commands/`. Memory used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
+
+## The two peer-to-peer paths to your NAS
+
+However a machine reaches home, the sensitive content goes **straight to your NAS and never touches a third party**. There are two paths; which one a machine uses depends only on whether it can run WireGuard.
+
+**1. Over WireGuard — the default.** Most machines (laptops, desktops) join your WireGuard network and rsync the session straight to the receiver:
+
+**2. Without WireGuard — over SSH (e.g. an HPC login node).** Some machines can't use WireGuard: an HPC cluster typically blocks the outbound UDP it needs. They reach the NAS over plain SSH instead, hopping through a small internet-facing **edge/bastion** that holds no data and can only forward to the receiver:
+
+The bastion is the *only* box exposed to the internet; the receiver and NAS stay on the home network, reachable solely through that one jump. A leaked key still can't get a shell, read the archive back, or reach anything but the receiver.
+
+**What the no-WireGuard path needs** (the diagram shows placeholders — substitute your own):
+
+- a **DDNS** name (e.g. `home.ddns.example`) so the sender always finds your home even when the ISP rotates your public IP;
+- **one public TCP port** forwarded on your router to the bastion — the single inbound hole;
+- an **edge/bastion** machine (always-on, internet-facing, holds no NAS) whose jump key is restricted to *port-forwarding to the receiver only*, no shell;
+- the **receiver** (the NAS box) authorizes that same key as a write-only `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` + group-normalizes perms);
+- `rsync ≥ 3.2.3` on both ends.
+
+`bin/onboard-hpc-client.sh` (on the sender) and `bin/onboard-edge-node.sh` (on the bastion) configure both ends; the private `runbooks/wireguard-transcripts.md` is the full walk-through.
+
+## Backends
+
+One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *or* a directory):
+
+- **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
+- **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
+- **`git`** — stopgap: push to `claude-chats`, a mirror host mirrors to the NAS ([mirror-host.md](https://henba1.github.io/dotclaude/mirror-host/index.md)).
+
+**P2P requirements** (the `rsync-wg` path):
+
+- the sender can reach the receiver (the NAS box) over WireGuard;
+- a **per-machine** SSH key (`DOTCLAUDE_WG_SSHKEY`), authorized on the receiver as a **write-only** `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` and chmods each push group-readable) — a leaked key can't read the archive back, get a shell, or forward;
+- `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
+
+Full design + the WireGuard activation runbook: [transcript-transport.md](https://henba1.github.io/dotclaude/transcript-transport/index.md) and (private) `dotclaude-data/runbooks/wireguard-transcripts.md`.
+
+# Transcript transport (pluggable)
+
+The `SessionEnd` hook relays a session's artifacts off each machine. The *how* is abstracted so the backend can change without touching the hook. Three things are shipped, all via the same backend (so sensitive content never takes a separate third-party path):
+
+| Artifact                                                  | Source                                      | Lands at                         |
+| --------------------------------------------------------- | ------------------------------------------- | -------------------------------- |
+| transcript                                                | `~/.claude/projects/<slug>/<session>.jsonl` | `<host>/<slug>/<session>.jsonl`  |
+| subagents (subagent transcripts, tool-results)            | `~/.claude/projects/<slug>/<session>/`      | `<host>/<slug>/<session>/`       |
+| plans (sensitive; not session-keyed)                      | `~/.claude/plans/`                          | `<host>/plans/<date>_<topic>.md` |
+| `CLAUDE.local.md` (personal project rules; host-specific) | `<project working tree>/CLAUDE.local.md`    | `<host>/<slug>/CLAUDE.local.md`  |
+
+The layout is uniform: **`<host>/` + the same path Claude uses locally.** (Memory is the one exception — it drops the host prefix because it's *shared* across machines, not archived per-host; see `memory-sync.md`.) `CLAUDE.local.md` is host-specific, so it's a one-way per-host archive, not merged like memory.
+
+`transport_ship <src> <relpath>` accepts a file *or* a directory. (Memory is **not** shipped here — it rides the `dotclaude-data` git sync.)
+
+## How it's wired
+
+```
+SessionEnd hook (hooks/log-session.sh)
+   └─ bin/ship-transcript.sh <transcript> <slug> <session> <host>
+         └─ hooks/transports/<backend>.sh   ::  transport_ship <src> <host/slug/session.jsonl>
+```
+
+Backend is chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND` in `~/.config/dotclaude/config`. A backend is one file defining `transport_ship <src> <relpath>`.
+
+## Current backend: `git` (stopgap)
+
+Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes it. A mirror host pulls and mirrors to the NAS (`mirror-host.md`).
+
+⚠️ Tradeoff: transcripts transit GitHub's servers. The repo is private and treated as a *relay* (NAS is canonical), but this is why it's a stopgap.
+
+## Backend: `rsync-wg` (peer-to-peer, no third party)
+
+Each machine holds a per-machine SSH key and rsyncs **over a WireGuard/SSH tunnel** directly to the NAS receiver. No data on any third-party server.
+
+Set in `~/.config/dotclaude/config`:
+
+```
+DOTCLAUDE_TRANSCRIPT_BACKEND="rsync-wg"
+DOTCLAUDE_WG_TARGET="claude-rx@claude-receiver"            # ssh destination ONLY — no remote path
+DOTCLAUDE_WG_SSHKEY="$HOME/.ssh/claude_transcripts_ed25519"
+```
+
+⚠️ **No remote path in `DOTCLAUDE_WG_TARGET`.** The receiver authorizes the key with a forced `command="<APP>/bin/dc-receive.sh <root>"` (which runs `rrsync -wo <root>` then chmods the landed files group-readable — see below), which pins the destination root; everything the client sends is taken **relative** to it. Including `:/srv/claude-chats` would make `rrsync` re-root it *under* itself (`/srv/claude-chats/srv/claude-chats/…`). Per-machine reachability — `HostName`, the (often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `claude-receiver` alias, so this config line is identical on every machine. `bin/onboard.sh` writes both.
+
+Receiver requirements (see the private `runbooks/wireguard-transcripts.md`):
+
+- a restricted `command="<APP>/bin/dc-receive.sh <root>",restrict` line per machine key — `dc-receive.sh` wraps `rrsync -wo <root>` (write-only, no shell) and, after each push, chmods the new files group-readable so the archive owner (human + MCP server) can read what the relay account wrote (the relay writes `0600`; setgid stamps the shared group, this adds group-read);
+- the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:claude-rx:x` on a `0750` parent like `/media/<user>`);
+- `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
+
+## Backend: `local` (the box that *is* the NAS)
+
+The receiver itself (the machine with the NAS mounted) shouldn't rsync to itself over WG. The `local` backend just copies the transcript straight into the NAS chats root:
+
+```
+DOTCLAUDE_TRANSCRIPT_BACKEND="local"
+DOTCLAUDE_LOCAL_CHATS="/mnt/nas1/dotclaude-storage"   # the NAS storage root
+```
+
+Layout matches every other backend (`<host>/<slug>/<session>.jsonl`), so a `local` sender and the WG receivers all write into one tree. Lives in `hooks/transports/local.sh`.
+
+Adding any other transport (e.g. S3, syncthing) is just another `hooks/transports/<name>.sh` defining `transport_ship`.
+
+# Cross-machine memory over a self-hosted NAS git repo
+
+Auto-memory (`~/.claude/projects/<project>/memory/`) holds **sensitive paths**, so it must not ride GitHub like the rest of the config — but it still wants git's **bidirectional merge + history** so the same project recalls memory written on any machine. The solution: a dedicated **bare git repo on the NAS**, reached over the existing WireGuard tunnel. No third party ever sees it.
+
+```
+~/.claude/projects/<project>/memory/   ──symlink──►   $DOTCLAUDE_MEMORY/<project>/   (local clone)
+                                                              │  git pull --rebase  (SessionStart)
+                                                              │  git push           (SessionEnd)
+                                                              ▼
+                                          $DOTCLAUDE_MEMORY_REMOTE  =  bare repo on the NAS
+                                          (local path on the NAS box · ssh://…over-WG on clients)
+```
+
+- `bin/memory-sync.sh pull|push` — clones on first use, then pulls/pushes. Best-effort, never blocks.
+- `bin/claude-sync.sh` — symlinks each project's memory dir into the clone (**shared**, not per-host), and on first run migrates any legacy `dotclaude-data/memory/<host>/` content into it.
+- Hooks: `sync-session.sh` pulls before linking; `log-session.sh` pushes at session end.
+
+## Config keys (`~/.config/dotclaude/config`)
+
+```
+: "${DOTCLAUDE_MEMORY:=$HOME/.dotclaude/claude-memory}"          # local working clone
+: "${DOTCLAUDE_MEMORY_REMOTE:=...}"                              # the bare repo (see below)
+```
+
+If `DOTCLAUDE_MEMORY_REMOTE` is unset, memory sync is **off** — the dir is just machine-local.
+
+## Setup — automated
+
+`bin/onboard-memory.sh` does all of the below, idempotently, on any machine — it's also run by `bin/onboard.sh` and exposed as the **`/dcmemory`** slash command. Run it once; re-running on an already-configured machine is a safe no-op:
+
+```
+bin/onboard-memory.sh        # or: /dcmemory   (from inside a session)
+```
+
+- **NAS box** (`local` backend): derives the bare-repo path from the NAS root, `git init --bare`s it if absent, sets the config keys, then clones + migrates legacy memory in + links the memory dirs.
+- **WG client** (`rsync-wg` backend): generates a dedicated `claude_memory_ed25519` key + a `claude-memory` ssh alias (cribbing host/port from the `claude-receiver` alias), sets the config keys, and **prints the one `authorized_keys` line** to add on the receiver (the server-side step stays manual — see below). Override anything via `MEM_BARE`, `MEM_GIT_USER`, `MEM_RECV_HOST`, etc.
+
+## Setup — what it does by hand (reference)
+
+NAS box (the bare repo lives **inside** the NAS storage folder, next to the transcript trees):
+
+```
+git init --bare /mnt/nas1/dotclaude-storage/memory.git          # the bare repo
+# DOTCLAUDE_MEMORY_REMOTE=/mnt/nas1/dotclaude-storage/memory.git     (a LOCAL path; no SSH hop here)
+bin/memory-sync.sh pull && bin/claude-sync.sh && bin/memory-sync.sh push
+```
+
+`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`dotclaude-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push).
+
+WG client — git needs **full git-over-SSH**, and the transcript relay key can't be reused (its forced `rrsync -wo` command blocks git). `onboard-memory.sh` makes the key + alias; you add its public key on the receiver, restricted to git:
+
+```
+# on the receiver, in the git user's ~/.ssh/authorized_keys (printed for you by onboard-memory.sh):
+command="git-shell -c \"$SSH_ORIGINAL_COMMAND\"",restrict ssh-ed25519 AAAA... <host> memory-git
+# then on the client:  DOTCLAUDE_MEMORY_REMOTE=claude-memory:/srv/claude-chats/memory.git
+#   (/srv/claude-chats is the receiver's symlink to the dotclaude-storage folder)
+bin/memory-sync.sh pull && bin/claude-sync.sh
+```
+
+From then on the client pulls others' memory at session start and publishes its own at session end. Concurrent edits merge via `git pull --rebase --autostash`; a genuine conflict is left for you to resolve in the clone (memory files are small Markdown, so this is rare).
+
+## Receiver one-time admin (per box, NOT per client)
+
+The memory ride reuses the transcript relay's *connection* (same host, port, account, jump host) — the only thing that differs is the **key** (the receiver pins each key to one forced command: `rrsync -wo` for transcripts, `git-shell` for memory). So `onboard-memory.sh` on a WG client just generates a second key and an alias that inherits the relay's connection. Three things on the **receiver** are inherently manual (they need root and/or a *different* user than the one running onboard) and aren't auto-applied — do them once when you first enable client memory:
+
+1. **The bare repo must be group-shared.** It's multi-writer: the NAS box pushes locally as its owner, WG clients push as the relay account. `onboard-memory.sh` now creates it with `git init --bare --shared=group`; for a repo that predates that, fix it in place:
+
+   ```
+   git --git-dir=<repo> config core.sharedRepository group
+   find <repo> -type d -exec chmod g+rwxs {} + ; find <repo> -type f -exec chmod g+rw {} +
+   ```
+
+   The relay account must be in the repo owner's group (it already is, for the relay to traverse).
+
+1. **Trust the repo for the git-shell account** (git's "dubious ownership" guard fires because the repo is owned by the NAS user, not the relay account):
+
+   ```
+   sudo -u <relay-account> git config --global --add safe.directory <repo>          # real path
+   sudo -u <relay-account> git config --global --add safe.directory <symlink-path>  # e.g. /srv/claude-chats/memory.git
+   ```
+
+1. **Authorize each client key** with the `git-shell` forced-command line from step above, and make sure `git-shell` is installed on the receiver.
+
+After these, every new client is fully covered by `onboard-memory.sh` + adding its one printed key.
+
+# Mirror host: mirror chat transcripts to the NAS
+
+The always-on **mirror host** (any small home server — make/model doesn't matter) is the bridge between GitHub (which remote machines can reach) and your home NAS (which they can't). It pulls the `claude-chats` relay every 30 min and mirrors it into `$NAS1/dotclaude-storage`.
+
+## One-time setup
+
+1. SSH key on the mirror host added to GitHub (read access to `claude-chats`).
+
+1. Clone the app for the script:
+
+   ```
+   git clone git@github.com:<your-gh-user>/dotclaude.git ~/dotclaude
+   ```
+
+1. Make sure the NAS is mounted (e.g. `/mnt/nas1/dotclaude-storage`).
+
+1. Test once (`CHATS_REPO_URL` is only needed the first run, to clone `claude-chats`):
+
+   ```
+   CHATS_REPO_URL=git@github.com:<your-gh-user>/claude-chats.git \
+   NAS_DIR=/mnt/nas1/dotclaude-storage ~/dotclaude/bin/pull-and-mirror.sh
+   ```
+
+## Cron (every 30 min)
+
+`crontab -e`:
+
+```
+*/30 * * * * NAS_DIR=/mnt/nas1/dotclaude-storage CHATS_REPO=$HOME/claude-chats $HOME/dotclaude/bin/pull-and-mirror.sh >> $HOME/claude-mirror.log 2>&1
+```
+
+Result: every machine's transcripts land on the NAS at `dotclaude-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session ending. The NAS copy is the canonical archive; the GitHub relay can be pruned/rotated.
+
+## When you switch to the WireGuard transport
+
+Once machines push peer-to-peer to the home node (see `transcript-transport.md`), the mirror host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this cron job is retired (or repurposed to rsync from the receiver to the NAS).
+
+# Side-note: optional local-embedding rerank for `dc_recall` (Phase 3)
+
+> **Deferred.** The shipped `dc_recall` uses a ripgrep lexical prefilter and lets the in-session model rank candidates — zero dependencies, fully local. This note records *if/when lexical proves too blunt* how a local-embedding rerank would be added, what hardware it needs, and a coarse plan. Nothing here is built yet.
+
+## When this becomes worth it
+
+The lexical path misses **pure-synonym / conceptual** matches — a query for "swap the relay to a pull model" won't hit a chat that only ever said "receiver-initiated mirror." If, in practice, recalls keep missing because the words differ from the query, add a semantic rerank. Until that actually bites, don't — the corpus is ~100 files and lexical + a frontier model reranking snippets covers most cases.
+
+## Hard constraint: stays local (no third party)
+
+Same rule as the rest of dotclaude — transcripts/memory carry sensitive paths, so **no hosted embedding API** (Voyage/OpenAI/etc.). The embedder must run on the NAS box. That rules the hardware question.
+
+## Hardware reality on the archive host
+
+- assume the archive host is a **modest always-on box — CPU-only, a few GB RAM, no usable GPU/NPU** (a small ARM64 or x86 home server). The plan below holds for any such box; it does not assume a particular make or model.
+- Corpus is tiny: **~39 readables + 9 plans + 12 memories ≈ 60–100 docs**, chunked maybe ~1–3k chunks. Embedding that **once** is seconds-to-minutes on CPU; re-embedding only the *new* session on each relay is trivial. Query-time is one embedding + a brute-force cosine over a few thousand vectors — **milliseconds, no vector DB needed** (a NumPy array + `argpartition`, or `sqlite-vec` if you want it on disk).
+- Model options (all CPU-friendly, ARM64):
+- **Ollama `nomic-embed-text`** (768-dim, ~274 MB) — simplest to operate; `ollama serve` already a tidy local daemon, one HTTP call to embed. Recommended if Ollama is acceptable on the host.
+- **`sentence-transformers` `all-MiniLM-L6-v2`** (384-dim, ~90 MB) — lighter, pure-Python via `uv`, no separate daemon; slightly weaker but more than enough at this scale.
+- **`bge-small-en-v1.5`** (384-dim) — a notch better than MiniLM, similar footprint.
+- RAM/throughput: any of these fit comfortably in \<1 GB resident on such a box; the bottleneck is first-run model download, not inference at this corpus size.
+
+## Coarse plan (Phase 3, slab H)
+
+1. **Index sidecar.** Store vectors next to the archive, e.g. `dotclaude-storage/.dcmcp/embeddings.sqlite` (or `.npz` + a json manifest). Never inside the `readable/`/`.jsonl` trees, never committed — it's a derived cache.
+1. **Chunking.** Split each readable transcript into turn-aligned chunks (reuse the turn anchors `dc_search_within` already computes) so a hit maps back to a turn/line. Memories/plans = one chunk each (they're small).
+1. **Incremental build.** A hook on relay (or a `dcmcp --reindex`) embeds only files whose mtime is newer than the manifest. Full rebuild is cheap enough to be a fallback.
+1. **Rerank, don't replace.** Keep ripgrep as the recall **prefilter**; embeddings only **reorder** the candidate set (hybrid: lexical recall ∪ top-k cosine, then merge scores). This keeps exact keyword matches reliable and adds semantic reach, and means the embedder being down degrades to today's behaviour rather than breaking recall.
+1. **Gate it.** Behind `DOTCLAUDE_MCP_EMBED=1` (or auto-on if the model/daemon is present), so the zero-dependency lexical path stays the default and a fresh machine needs nothing extra.
+1. **Runtime.** Embedder runs on the archive host only (where the archive + the server live); remote machines get reranked results for free once Phase 2's HTTP-over-WG endpoint exists — they never run the model themselves.
+
+## Rough effort / risk
+
+- Effort: small — the search plumbing (`dc_recall`, anchors, candidate set) already exists from Phase 1; this adds an embed step + a cosine sort + an incremental cache. ~Half a day.
+- Risk: low and **contained** — it's a rerank over an existing candidate list, fully local, gated, and falls back cleanly. Main cost is operational (a model/daemon to keep alive on the host), which is exactly why it's deferred until lexical recall demonstrably falls short.

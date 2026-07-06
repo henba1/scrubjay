@@ -1,0 +1,30 @@
+# dotclaude
+
+> The app/logic for syncing Claude Code across machines — config-sync + transcript relay.
+
+dotclaude is the app/logic for syncing Claude Code across machines: a git-based config sync plus a pluggable, peer-to-peer transcript relay to your own NAS. Personal content lives in separate private repos so this one is publishable.
+
+## Overview
+
+- [Home](https://henba1.github.io/dotclaude/index.md)
+- [Concepts](https://henba1.github.io/dotclaude/concepts/index.md)
+
+## Setup & operation
+
+- [Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md)
+- [Day-to-day](https://henba1.github.io/dotclaude/day-to-day/index.md)
+- [Reference](https://henba1.github.io/dotclaude/reference/index.md)
+
+## Archive & recall
+
+- [Query the archive (MCP)](https://henba1.github.io/dotclaude/archive-mcp/index.md)
+- [Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md)
+
+## Transcript relay
+
+- [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md)
+- [Transcript transport](https://henba1.github.io/dotclaude/transcript-transport/index.md)
+- [Memory sync](https://henba1.github.io/dotclaude/memory-sync/index.md)
+- [Mirror host (git backend)](https://henba1.github.io/dotclaude/mirror-host/index.md)
+- [MCP embedding rerank](https://henba1.github.io/dotclaude/dcmcp-embedding-rerank/index.md)
+

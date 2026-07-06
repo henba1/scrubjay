@@ -1,0 +1,45 @@
+// Source for docs/overview.svg — render: dot -Tsvg docs/overview.dot -o docs/overview.svg
+digraph dotclaude {
+  rankdir=LR; bgcolor="white";
+  fontname="Helvetica"; fontsize=11;
+  node [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+        fillcolor="#f8fafc", color="#475569", fontcolor="#0f172a"];
+  edge [fontname="Helvetica", fontsize=9, color="#475569", fontcolor="#334155"];
+
+  subgraph cluster_gh {
+    label="GitHub"; style="rounded"; color="#cbd5e1"; fontcolor="#334155"; fontsize=11;
+    APP  [shape=cylinder, fillcolor="#dbeafe", color="#2563eb", fontcolor="#1e3a8a",
+          label="dotclaude\napp · logic (public-able)"];
+    DATA [shape=cylinder, fillcolor="#ede9fe", color="#7c3aed", fontcolor="#5b21b6",
+          label="dotclaude-data\nprivate · config + logs"];
+    CH   [shape=cylinder, fillcolor="#fef3c7", color="#d97706", fontcolor="#92400e",
+          label="claude-chats\nprivate · transcripts"];
+  }
+
+  subgraph cluster_m {
+    label="any machine"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+    CFG [label="~/.claude\nconfig + hooks"];
+    TX  [label="~/.claude/projects/**\ntranscripts",
+         fillcolor="#fef3c7", color="#d97706", fontcolor="#92400e"];
+  }
+
+  subgraph cluster_home {
+    label="home (always-on)"; style="rounded"; color="#94a3b8"; fontcolor="#334155"; fontsize=11;
+    PI  [label="mirror host\npull every 30 min"];
+    NAS [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+         label="NAS\ndotclaude-storage/"];
+  }
+
+  APP  -> CFG  [label="sync: link hooks +\nmerge settings"];
+  DATA -> CFG  [label="pull: rules, commands, agents"];
+  CFG  -> DATA [style=dashed, label="push: logs + chat index"];
+  TX   -> NAS  [color="#16a34a", fontcolor="#166534", penwidth=1.6,
+                label="SessionEnd: peer-to-peer relay\n(default → NAS; see transport diagrams)"];
+  TX   -> CH   [style=dashed, label="GitHub stopgap: ship .jsonl"];
+  CH   -> PI   [style=dashed, label="git pull / 30 min"];
+  PI   -> NAS  [style=dashed, label="rsync --delete"];
+
+  FIND [shape=note, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
+        label="find a past chat\ngrep logs/*.log"];
+  DATA -> FIND [style=dashed, label="search history"];
+}
