@@ -1,0 +1,85 @@
+site_name: dotclaude
+site_description: The app/logic for syncing Claude Code across machines — config-sync + transcript relay.
+site_url: https://henba1.github.io/dotclaude/
+repo_url: https://github.com/henba1/dotclaude
+repo_name: henba1/dotclaude
+copyright: Copyright &copy; 2026 Hendrik
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.sections
+    - content.code.copy
+    - toc.follow
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+plugins:
+  - search
+  - llmstxt:
+      markdown_description: >-
+        dotclaude is the app/logic for syncing Claude Code across machines: a git-based
+        config sync plus a pluggable, peer-to-peer transcript relay to your own NAS.
+        Personal content lives in separate private repos so this one is publishable.
+      full_output: llms-full.txt
+      sections:
+        Overview:
+          - index.md
+          - concepts.md
+        Setup & operation:
+          - onboarding.md
+          - day-to-day.md
+          - reference.md
+        Archive & recall:
+          - archive-mcp.md
+          - slash-commands.md
+        Transcript relay:
+          - transports.md
+          - transcript-transport.md
+          - memory-sync.md
+          - mirror-host.md
+          - dcmcp-embedding-rerank.md
+
+nav:
+  - Home: index.md
+  - Concepts: concepts.md
+  - Onboarding: onboarding.md
+  - Day-to-day: day-to-day.md
+  - Query the archive (MCP): archive-mcp.md
+  - Slash commands: slash-commands.md
+  - "Transcripts: relay + NAS": transports.md
+  - Reference: reference.md
+  - Deep dives:
+      - Transcript transport: transcript-transport.md
+      - Memory sync: memory-sync.md
+      - Mirror host (git backend): mirror-host.md
+      - MCP embedding rerank: dcmcp-embedding-rerank.md
