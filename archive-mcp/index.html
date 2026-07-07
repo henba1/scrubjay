@@ -430,10 +430,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#registration-is-automatic-two-ways" class="md-nav__link">
+  <a href="#registration-is-automatic-three-ways" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Registration is automatic, two ways
+        Registration is automatic, three ways
       
     </span>
   </a>
@@ -749,10 +749,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#registration-is-automatic-two-ways" class="md-nav__link">
+  <a href="#registration-is-automatic-three-ways" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Registration is automatic, two ways
+        Registration is automatic, three ways
       
     </span>
   </a>
@@ -837,9 +837,15 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 </tr>
 </tbody>
 </table>
-<h2 id="registration-is-automatic-two-ways">Registration is automatic, two ways<a class="headerlink" href="#registration-is-automatic-two-ways" title="Permanent link">&para;</a></h2>
-<p>Both done by <code>claude-sync.sh</code> at <strong>user scope</strong>:</p>
+<h2 id="registration-is-automatic-three-ways">Registration is automatic, three ways<a class="headerlink" href="#registration-is-automatic-three-ways" title="Permanent link">&para;</a></h2>
+<p>All done by <code>claude-sync.sh</code> at <strong>user scope</strong>, picked by what this machine has:</p>
 <ul>
+<li><strong>On a GitHub (<code>git</code> backend) machine</strong> — the <code>claude-chats</code> clone <em>is</em> the archive: the relay
+  writes the same <code>&lt;host&gt;/{readable,plans,…}</code> tree into it that a NAS holds, so <code>claude-sync.sh</code>
+  registers a local stdio server pointed straight at the clone. <code>sync-session.sh</code> <code>git pull</code>s the
+  clone at the start of each session, so recall spans <strong>every</strong> machine's sessions, not just this
+  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine <em>memory</em> recall still
+  needs memory sync wired separately; transcripts, plans, and the logs catalogue work out of the box.)</li>
 <li><strong>On the archive host</strong> (the always-on home server where <code>DOTCLAUDE_LOCAL_CHATS</code> → the NAS is
   mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.</li>
 <li><strong>On a client with no local archive</strong> (a laptop, or an <strong>HPC login node</strong>): run
