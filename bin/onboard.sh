@@ -166,8 +166,14 @@ info "registering host '$HOST' and applying config…"
 "$APP/bin/claude-register-host.sh" --host "$HOST" || die "host registration failed"
 "$APP/bin/claude-sync.sh"          --host "$HOST" || die "claude-sync failed"
 
-# ---- 7b) cross-machine memory (self-hosted NAS git repo) ------------------------------
-if confirm "set up cross-machine memory (its own self-hosted NAS git repo)?" Y; then
+# ---- 7b) cross-machine memory ---------------------------------------------------------
+# Its own git repo, hosted the same way you host transcripts: self-hosted on the NAS for the
+# local/rsync-wg backends (never leaves your hardware); a private GitHub repo for the git backend
+# (simpler wiring, but stores your memory's real filesystem paths off your hardware). onboard-memory.sh
+# surfaces that trade-off and derives the GitHub repo from your owner for the git backend.
+if [ "$BACKEND" = git ]; then mem_where="a private GitHub repo (holds real filesystem paths — see the privacy note)"
+else mem_where="its own self-hosted NAS git repo"; fi
+if confirm "set up cross-machine memory ($mem_where)?" Y; then
   MEM_RECV_HOST="${RECV_HOST:-}" MEM_RECV_PORT="${RECV_PORT:-22}" \
     "$APP/bin/onboard-memory.sh" || warn "memory onboarding had issues — see docs/memory-sync.md"
 fi

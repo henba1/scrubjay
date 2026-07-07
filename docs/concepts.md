@@ -31,10 +31,11 @@ you onboard:
   third-party repo rather than only on your own hardware.
 
 Same records, two destinations — choose by whether you'd rather manage your own storage or
-none. (Config always rides GitHub either way. Cross-machine *memory* sync is set up
-separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local
-until you point it at a git remote of your own — see
-[Transcripts: relay + NAS](transports.md).)
+none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and
+follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only
+setup puts it in a separate private `claude-memory` repo — wired for you by `/dcmemory`, with
+the same "your file paths now sit with a third party" trade-off you accepted for transcripts.
+See [memory](memory-sync.md).)
 
 ## What is dotclaude?
 

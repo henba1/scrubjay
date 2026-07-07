@@ -13,3 +13,6 @@ projects/
 # python (the mcp/ server runs via `uv run --script`; no build artifacts belong here)
 __pycache__/
 *.pyc
+
+# mkdocs build output (CI builds + gh-deploys; the local `site/` is a throwaway artifact)
+site/

@@ -29,8 +29,10 @@ All done by `claude-sync.sh` at **user scope**, picked by what this machine has:
   writes the same `<host>/{readable,plans,…}` tree into it that a NAS holds, so `claude-sync.sh`
   registers a local stdio server pointed straight at the clone. `sync-session.sh` `git pull`s the
   clone at the start of each session, so recall spans **every** machine's sessions, not just this
-  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine *memory* recall still
-  needs memory sync wired separately; transcripts, plans, and the logs catalogue work out of the box.)
+  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine *memory* recall rides its
+  own repo, not `claude-chats` — enable it with `/dcmemory`, which points it at a separate private
+  `claude-memory` GitHub repo for this backend; transcripts, plans, and the logs catalogue work out of
+  the box. See [memory](memory-sync.md) for the custody trade-off.)
 - **On the archive host** (the always-on home server where `DOTCLAUDE_LOCAL_CHATS` → the NAS is
   mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.
 - **On a client with no local archive** (a laptop, or an **HPC login node**): run

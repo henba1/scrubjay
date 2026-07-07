@@ -51,11 +51,14 @@ Unlike the always-additive transcript/`readable/` trees, the `plans/` mirror is 
 that was already shipped under its old random-word name doesn't linger as a stale duplicate after
 the rename.
 
-**Memory → its own git repo, self-hosted on the NAS (never GitHub).** Auto-memory needs git's
-*bidirectional merge + history* (so the same project recalls memory written on any machine), but it
-also holds **sensitive paths** — so it can't ride GitHub like the rest of the config. The answer is
-a dedicated **bare git repo on the NAS, reached over WireGuard** (`DOTCLAUDE_MEMORY_REMOTE` — a local
-path on the NAS box, `ssh://…` over WG on clients). `claude-sync.sh` symlinks each project's native
+**Memory → its own git repo.** Auto-memory needs git's *bidirectional merge + history* (so the same
+project recalls memory written on any machine), so it rides a dedicated repo separate from everything
+else. Because it holds **sensitive paths**, *where* that repo lives is a custody choice that follows
+your backend: a **bare git repo on the NAS, reached over WireGuard** (`local`/`rsync-wg` — sensitive
+paths never leave your hardware; the default), or a **separate private GitHub repo** (`git` backend —
+simpler wiring, but stores those paths in a third party's private repo). `DOTCLAUDE_MEMORY_REMOTE`
+holds whichever — a local path on the NAS box, `ssh://…` over WG on clients, or a `git@github.com:…`
+repo. See [memory](memory-sync.md) for the trade-off in full. `claude-sync.sh` symlinks each project's native
 `~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines —
 *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`)
 publishes it on session end. No third party ever sees it. The pull and the publish also run on

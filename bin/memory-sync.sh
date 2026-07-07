@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Sync the cross-machine memory repo (self-hosted on the NAS over WireGuard — never GitHub).
+# Sync the cross-machine memory repo (its own git repo — self-hosted on the NAS for local/rsync-wg,
+# a private GitHub repo for the git backend; remote-agnostic, so it just clones/pulls/pushes).
 # Claude's per-project memory dirs are symlinked into this clone by claude-sync.sh, so a
 # pull brings other machines' memories in and a push publishes this machine's.
 #   usage: memory-sync.sh [pull|push]   (default: pull)
@@ -7,7 +8,8 @@
 #
 # Config (~/.config/dotclaude/config):
 #   DOTCLAUDE_MEMORY         local clone (default ~/.dotclaude/claude-memory)
-#   DOTCLAUDE_MEMORY_REMOTE  bare repo — local path on the NAS box, ssh://…over-WG on clients.
+#   DOTCLAUDE_MEMORY_REMOTE  the memory repo — a local path on the NAS box, ssh://…over-WG on
+#                            clients, or a git@github.com:…private repo (git backend).
 #                            Unset -> sync is off (this script no-ops).
 set -uo pipefail
 

@@ -22,6 +22,8 @@ backend="${DOTCLAUDE_TRANSCRIPT_BACKEND:-off}"
 mem="$(dc_memory)"
 remote="$(dc_memory_remote)"
 guser=""; authorize_key=""
+# comment written above the keys in the config — backend picks the custody story (NAS vs GitHub)
+mem_note="its own git repo, self-hosted on the NAS (never GitHub)."
 
 if [ -n "$remote" ]; then
   ok "memory remote already configured: $remote"
@@ -65,6 +67,41 @@ else
       remote="claude-memory:$gbare"
       authorize_key="$gkey.pub"
       ;;
+    git)
+      # GitHub-only path: memory rides its OWN private repo (SEPARATE from claude-chats), pushed with
+      # your normal GitHub SSH credentials — NO dedicated key and NO receiver authorized_keys step
+      # (unlike the NAS/WG path, so this is actually the simpler wiring). Default the repo to a
+      # `claude-memory` sibling of your other private repos, derived from the claude-chats (or app)
+      # clone's origin owner. Override with MEM_GIT_REMOTE=git@github.com:<owner>/<repo>.git.
+      #
+      # ⚠ PRIVACY TRADE-OFF — the whole reason this isn't the default. Memory files carry real
+      # filesystem paths, so this stores those paths in a private GitHub repo: a THIRD PARTY holds
+      # them (private + encrypted at rest, but off your hardware). The self-hosted alternative
+      # (local / rsync-wg) keeps memory on gear you own and never lets it reach GitHub — but you pay
+      # for that in setup: a NAS box to host the bare repo, WireGuard tunnels between machines, and
+      # DDNS so clients can find home. This git path trades that standing infrastructure for
+      # third-party custody. Pick by how sensitive the paths in your memory actually are.
+      remote="${MEM_GIT_REMOTE:-}"
+      if [ -z "$remote" ]; then
+        base="${MEM_GIT_BASE:-}"
+        if [ -z "$base" ]; then
+          # derive the owner base (e.g. git@github.com:owner) from the chats clone's origin, else the app's
+          for repo in "$(dc_chats)" "$APP"; do
+            [ -n "$repo" ] && [ -d "$repo/.git" ] || continue
+            o="$(git -C "$repo" remote get-url origin 2>/dev/null)" || continue
+            case "$o" in https://github.com/*) o="git@github.com:${o#https://github.com/}";; esac
+            base="${o%/*}"; [ -n "$base" ] && break
+          done
+        fi
+        [ -n "$base" ] && remote="$base/claude-memory.git"
+      fi
+      [ -n "$remote" ] || { warn "git backend: set MEM_GIT_REMOTE=git@github.com:<owner>/claude-memory.git (a SEPARATE private repo) and re-run"; exit 0; }
+      mem_note="its own PRIVATE GitHub repo — holds real filesystem paths, so it's third-party custody (private, but off your hardware)."
+      info "git backend → private GitHub memory repo: $remote"
+      warn "PRIVACY: this stores your memory's real filesystem paths in a PRIVATE GitHub repo (a third party holds them)."
+      warn "For zero third-party custody, self-host on a NAS instead — costs more wiring (a NAS box + WireGuard + DDNS)."
+      warn "Create the EMPTY private repo on GitHub FIRST (GitHub won't auto-create it): $remote — the first push populates it."
+      ;;
     *)
       warn "backend '$backend' has no NAS path — set DOTCLAUDE_MEMORY_REMOTE manually to enable memory"
       exit 0
@@ -74,7 +111,7 @@ else
   # persist the keys (idempotent: append only if absent; back up first)
   if ! grep -q DOTCLAUDE_MEMORY_REMOTE "$CFG"; then
     cp "$CFG" "$CFG.bak.$(date +%s)"
-    { echo "# Cross-machine memory: its own git repo, self-hosted on the NAS (never GitHub)."
+    { echo "# Cross-machine memory: $mem_note"
       echo ": \"\${DOTCLAUDE_MEMORY:=$mem}\""
       echo ": \"\${DOTCLAUDE_MEMORY_REMOTE:=$remote}\""; } >> "$CFG"
     ok "wrote memory keys to $CFG"
