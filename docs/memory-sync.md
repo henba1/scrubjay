@@ -92,6 +92,23 @@ From then on the client pulls others' memory at session start and publishes its 
 Concurrent edits merge via `git pull --rebase --autostash`; a genuine conflict is left for you to
 resolve in the clone (memory files are small Markdown, so this is rare).
 
+GitHub-only (`git` backend) — the simplest of the three: no bare repo, no key, no receiver admin. The
+**one prerequisite is yours to do first**, because GitHub won't create the repo for you:
+
+```sh
+# 1) create an EMPTY private repo on GitHub — a SEPARATE one, not claude-chats. Name it claude-memory
+#    (that's the default onboard-memory.sh derives). e.g. with the gh CLI:
+gh repo create <owner>/claude-memory --private
+# 2) then run the onboarder (or /dcmemory) on this machine — it derives the remote, sets the config
+#    keys, and the first push populates the empty repo. Override the derived name with MEM_GIT_REMOTE.
+MEM_GIT_REMOTE=git@github.com:<owner>/claude-memory.git bin/onboard-memory.sh
+```
+
+Skip step 1 and the first push has nowhere to land — sync silently no-ops until the repo exists. Every
+other machine on the `git` backend just runs the onboarder and clones the same repo; no per-machine
+authorization (it rides your normal GitHub SSH credentials). Remember this repo now holds your memory's
+real filesystem paths — keep it **private**.
+
 ## Receiver one-time admin (per box, NOT per client)
 
 The memory ride reuses the transcript relay's *connection* (same host, port, account, jump host) —
