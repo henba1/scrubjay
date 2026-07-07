@@ -64,12 +64,36 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   if [ "${DOTCLAUDE_LOG_NOGIT:-0}" != "1" ]; then
     (
       cd "$DATA" || exit 0
+
+      # Self-heal before touching anything. A previous session's push fallback may have
+      # left an interrupted rebase/merge (a conflict, or — more insidiously — a commit
+      # that went empty and made rebase pause). If we don't clear it, `git add -A` below
+      # commits onto the DETACHED rebase HEAD (even baking conflict markers into files),
+      # every push silently no-ops, and the wedge compounds one commit per session. This
+      # is exactly the July-2026 henpi failure. Aborting is safe: it just drops the
+      # partial replay; our content lives in the working tree and re-commits cleanly.
+      if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+        git rebase --abort 2>/dev/null || true
+      elif [ -f .git/MERGE_HEAD ]; then
+        git merge --abort 2>/dev/null || true
+      fi
+      # Commits on a detached HEAD can never push — bail rather than orphan work.
+      git symbolic-ref -q HEAD >/dev/null 2>&1 || exit 0
+
       git add -A 2>/dev/null
       git diff --cached --quiet 2>/dev/null && exit 0   # nothing to commit
+      # Never commit a tree carrying conflict markers (unambiguous start/end lines).
+      git diff --cached | grep -qE '^\+(<{7} |>{7} )' && exit 0
       git commit -q -m "auto-sync (session end): $host $ts" 2>/dev/null || exit 0
       if ! timeout 20 git push -q 2>/dev/null; then
-        # remote moved on: the tree is clean after commit, so rebase+retry is safe
-        timeout 20 git pull --rebase -q 2>/dev/null && timeout 20 git push -q 2>/dev/null
+        # remote moved on: rebase onto it and retry. On ANY rebase trouble, abort so we
+        # never hand the next session a wedged repo. Append-only logs use a union merge
+        # driver (.gitattributes: logs/*.log merge=union), so they won't conflict here.
+        if timeout 20 git pull --rebase -q 2>/dev/null; then
+          timeout 20 git push -q 2>/dev/null || true
+        else
+          git rebase --abort 2>/dev/null || true
+        fi
       fi
     ) >/dev/null 2>&1 || true
   fi
