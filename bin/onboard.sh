@@ -84,9 +84,9 @@ CHATS_DIR="$BASE/claude-chats"
 # ---- 3) backend choice ----------------------------------------------------------------
 if [ -z "${DOTCLAUDE_BACKEND:-}" ]; then
   echo; info "Session-relay backend:"
-  echo "    1) rsync-wg  peer-to-peer over WireGuard to the NAS receiver  (recommended for clients)"
+  echo "    1) rsync-wg  peer-to-peer over WireGuard to your own NAS  (max privacy; needs a NAS)"
   echo "    2) local     this box HAS the NAS mounted (copy straight in)"
-  echo "    3) git       GitHub stopgap via the claude-chats repo"
+  echo "    3) git       push to a private claude-chats repo on GitHub  (zero infra; no NAS to run)"
   echo "    4) off       don't ship sessions"
   ask BACKEND_CHOICE "choose 1-4" "1"
   case "$BACKEND_CHOICE" in

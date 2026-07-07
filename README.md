@@ -29,9 +29,10 @@ shared/public without leaking anything:
 > **Flow:** `dotclaude` (logic) + `dotclaude-data` (your config) → applied into each
 > machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line
 > entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents,
-> plans) to the NAS via a pluggable backend — peer-to-peer over WireGuard, or `claude-chats`
-> on GitHub as a stopgap. Top-level is keyed by machine so envs stay distinct and Claude can
-> re-tailor one host's rules for another.
+> plans) off the machine via a pluggable backend — either peer-to-peer to your own NAS (over
+> WireGuard), or to a private `claude-chats` repo on GitHub if you'd rather not run storage of
+> your own. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one
+> host's rules for another.
 
 ## The core idea: two kinds of sync
 

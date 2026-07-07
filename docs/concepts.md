@@ -18,6 +18,24 @@ over WireGuard** rather than GitHub. Only the non-sensitive authored config ride
 (`dotclaude-data`). That's the whole design in one sentence: **author-vs-record picks
 git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
 
+### NAS or GitHub — your choice of shared store
+
+The *record* half above is where a NAS shines, but a NAS isn't required. The transcript
+transport is **pluggable**, and the two backends are genuinely parallel — you pick one when
+you onboard:
+
+- **Your own NAS** (`rsync-wg` / `local`) — records ride peer-to-peer to it over
+  WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.
+- **GitHub** (`git`) — each session is pushed to a private `claude-chats` repo. Zero
+  infrastructure to run; the tradeoff is that your transcripts live in a (private)
+  third-party repo rather than only on your own hardware.
+
+Same records, two destinations — choose by whether you'd rather manage your own storage or
+none. (Config always rides GitHub either way. Cross-machine *memory* sync is set up
+separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local
+until you point it at a git remote of your own — see
+[Transcripts: relay + NAS](transports.md).)
+
 ## What is dotclaude?
 
 [Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/`

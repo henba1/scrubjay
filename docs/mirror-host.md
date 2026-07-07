@@ -1,8 +1,11 @@
-# Mirror host: mirror chat transcripts to the NAS
+# Mirror host (optional): also keep a NAS copy of the `git` backend
 
-The always-on **mirror host** (any small home server — make/model doesn't matter) is the bridge
-between GitHub (which remote machines can reach) and your home NAS (which they can't). It pulls the
-`claude-chats` relay every 30 min and mirrors it into `$NAS1/dotclaude-storage`.
+**Optional add-on for the `git` backend.** If you use GitHub as your shared store, the private
+`claude-chats` repo is already a complete, permanent home for your transcripts — you don't need
+this page. But if you *also* want a copy on your home NAS (extra durability, or to feed the local
+MCP archive), an always-on **mirror host** (any small home server — make/model doesn't matter)
+bridges the two: it pulls the `claude-chats` repo every 30 min and mirrors it into
+`$NAS1/dotclaude-storage`.
 
 ## One-time setup
 
@@ -28,10 +31,11 @@ between GitHub (which remote machines can reach) and your home NAS (which they c
 
 Result: every machine's transcripts land on the NAS at
 `dotclaude-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session
-ending. The NAS copy is the canonical archive; the GitHub relay can be pruned/rotated.
+ending. With the mirror running, the NAS copy doubles your archive; you can then prune/rotate
+the GitHub repo if you like. Without it, the GitHub repo *is* your archive.
 
-## When you switch to the WireGuard transport
+## If you later move to the WireGuard transport
 
-Once machines push peer-to-peer to the home node (see `transcript-transport.md`), the mirror
-host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
+If you switch machines to push peer-to-peer to the home node (see `transcript-transport.md`), the
+mirror host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
 cron job is retired (or repurposed to rsync from the receiver to the NAS).
