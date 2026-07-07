@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cross-machine-memory-over-a-self-hosted-nas-git-repo" class="md-skip">
+        <a href="#cross-machine-memory-over-its-own-git-repo" class="md-skip">
           Skip to content
         </a>
       
@@ -825,11 +825,23 @@
   
 
 
-<h1 id="cross-machine-memory-over-a-self-hosted-nas-git-repo">Cross-machine memory over a self-hosted NAS git repo<a class="headerlink" href="#cross-machine-memory-over-a-self-hosted-nas-git-repo" title="Permanent link">&para;</a></h1>
-<p>Auto-memory (<code>~/.claude/projects/&lt;project&gt;/memory/</code>) holds <strong>sensitive paths</strong>, so it must not ride
-GitHub like the rest of the config — but it still wants git's <strong>bidirectional merge + history</strong> so the
-same project recalls memory written on any machine. The solution: a dedicated <strong>bare git repo on the
-NAS</strong>, reached over the existing WireGuard tunnel. No third party ever sees it.</p>
+<h1 id="cross-machine-memory-over-its-own-git-repo">Cross-machine memory over its own git repo<a class="headerlink" href="#cross-machine-memory-over-its-own-git-repo" title="Permanent link">&para;</a></h1>
+<p>Auto-memory (<code>~/.claude/projects/&lt;project&gt;/memory/</code>) wants git's <strong>bidirectional merge + history</strong> so
+the same project recalls memory written on any machine — so it rides its <strong>own dedicated git repo</strong>,
+separate from everything else. Where that repo lives mirrors your transcript backend, and the choice is
+a <strong>custody trade-off</strong> because memory holds <strong>real filesystem paths</strong>:</p>
+<ul>
+<li><strong>Self-hosted on the NAS</strong> (<code>local</code> / <code>rsync-wg</code> backends) — a bare repo on your own hardware, reached
+  over the existing WireGuard tunnel. <strong>No third party ever sees it.</strong> This is the default and the
+  reason the setup exists: sensitive paths stay on gear you own. The cost is standing infrastructure —
+  a NAS box, WireGuard, DDNS.</li>
+<li><strong>A private GitHub repo</strong> (<code>git</code> backend) — a separate private <code>claude-memory</code> repo, pushed with your
+  normal GitHub SSH credentials (no dedicated key, no receiver step — simpler than the NAS path). The
+  trade-off: your memory's real filesystem paths now sit in a <strong>third party's</strong> private repo (encrypted
+  at rest, private, but off your hardware). Choose this if that's acceptable and you'd rather skip the
+  NAS/WireGuard/DDNS wiring.</li>
+</ul>
+<p>Either way it's the <em>same</em> mechanism below — only <code>DOTCLAUDE_MEMORY_REMOTE</code> differs.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>~/.claude/projects/&lt;project&gt;/memory/   ──symlink──►   $DOTCLAUDE_MEMORY/&lt;project&gt;/   (local clone)
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                                                              │  git pull --rebase  (SessionStart)
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                                                              │  git push           (SessionEnd)
@@ -861,6 +873,11 @@ already-configured machine is a safe no-op:</p>
   <code>claude-memory</code> ssh alias (cribbing host/port from the <code>claude-receiver</code> alias), sets the config
   keys, and <strong>prints the one <code>authorized_keys</code> line</strong> to add on the receiver (the server-side step
   stays manual — see below). Override anything via <code>MEM_BARE</code>, <code>MEM_GIT_USER</code>, <code>MEM_RECV_HOST</code>, etc.</li>
+<li><strong>GitHub-only</strong> (<code>git</code> backend): points <code>DOTCLAUDE_MEMORY_REMOTE</code> at a <strong>separate private GitHub repo</strong>,
+  defaulting to a <code>claude-memory</code> sibling of your other repos (derived from the <code>claude-chats</code>/app clone's
+  owner; override with <code>MEM_GIT_REMOTE</code>). No key or receiver step — it uses your normal GitHub SSH
+  credentials. <strong>You must create that empty private repo on GitHub first</strong> (GitHub won't auto-create it);
+  the first push populates it. <code>onboard-memory.sh</code> prints the privacy trade-off before wiring it.</li>
 </ul>
 <h2 id="setup-what-it-does-by-hand-reference">Setup — what it does by hand (reference)<a class="headerlink" href="#setup-what-it-does-by-hand-reference" title="Permanent link">&para;</a></h2>
 <p>NAS box (the bare repo lives <strong>inside</strong> the NAS storage folder, next to the transcript trees):

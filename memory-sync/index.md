@@ -1,6 +1,11 @@
-# Cross-machine memory over a self-hosted NAS git repo
+# Cross-machine memory over its own git repo
 
-Auto-memory (`~/.claude/projects/<project>/memory/`) holds **sensitive paths**, so it must not ride GitHub like the rest of the config — but it still wants git's **bidirectional merge + history** so the same project recalls memory written on any machine. The solution: a dedicated **bare git repo on the NAS**, reached over the existing WireGuard tunnel. No third party ever sees it.
+Auto-memory (`~/.claude/projects/<project>/memory/`) wants git's **bidirectional merge + history** so the same project recalls memory written on any machine — so it rides its **own dedicated git repo**, separate from everything else. Where that repo lives mirrors your transcript backend, and the choice is a **custody trade-off** because memory holds **real filesystem paths**:
+
+- **Self-hosted on the NAS** (`local` / `rsync-wg` backends) — a bare repo on your own hardware, reached over the existing WireGuard tunnel. **No third party ever sees it.** This is the default and the reason the setup exists: sensitive paths stay on gear you own. The cost is standing infrastructure — a NAS box, WireGuard, DDNS.
+- **A private GitHub repo** (`git` backend) — a separate private `claude-memory` repo, pushed with your normal GitHub SSH credentials (no dedicated key, no receiver step — simpler than the NAS path). The trade-off: your memory's real filesystem paths now sit in a **third party's** private repo (encrypted at rest, private, but off your hardware). Choose this if that's acceptable and you'd rather skip the NAS/WireGuard/DDNS wiring.
+
+Either way it's the *same* mechanism below — only `DOTCLAUDE_MEMORY_REMOTE` differs.
 
 ```
 ~/.claude/projects/<project>/memory/   ──symlink──►   $DOTCLAUDE_MEMORY/<project>/   (local clone)
@@ -34,6 +39,7 @@ bin/onboard-memory.sh        # or: /dcmemory   (from inside a session)
 
 - **NAS box** (`local` backend): derives the bare-repo path from the NAS root, `git init --bare`s it if absent, sets the config keys, then clones + migrates legacy memory in + links the memory dirs.
 - **WG client** (`rsync-wg` backend): generates a dedicated `claude_memory_ed25519` key + a `claude-memory` ssh alias (cribbing host/port from the `claude-receiver` alias), sets the config keys, and **prints the one `authorized_keys` line** to add on the receiver (the server-side step stays manual — see below). Override anything via `MEM_BARE`, `MEM_GIT_USER`, `MEM_RECV_HOST`, etc.
+- **GitHub-only** (`git` backend): points `DOTCLAUDE_MEMORY_REMOTE` at a **separate private GitHub repo**, defaulting to a `claude-memory` sibling of your other repos (derived from the `claude-chats`/app clone's owner; override with `MEM_GIT_REMOTE`). No key or receiver step — it uses your normal GitHub SSH credentials. **You must create that empty private repo on GitHub first** (GitHub won't auto-create it); the first push populates it. `onboard-memory.sh` prints the privacy trade-off before wiring it.
 
 ## Setup — what it does by hand (reference)
 

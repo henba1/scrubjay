@@ -844,8 +844,10 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
   writes the same <code>&lt;host&gt;/{readable,plans,…}</code> tree into it that a NAS holds, so <code>claude-sync.sh</code>
   registers a local stdio server pointed straight at the clone. <code>sync-session.sh</code> <code>git pull</code>s the
   clone at the start of each session, so recall spans <strong>every</strong> machine's sessions, not just this
-  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine <em>memory</em> recall still
-  needs memory sync wired separately; transcripts, plans, and the logs catalogue work out of the box.)</li>
+  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine <em>memory</em> recall rides its
+  own repo, not <code>claude-chats</code> — enable it with <code>/dcmemory</code>, which points it at a separate private
+  <code>claude-memory</code> GitHub repo for this backend; transcripts, plans, and the logs catalogue work out of
+  the box. See <a href="../memory-sync/">memory</a> for the custody trade-off.)</li>
 <li><strong>On the archive host</strong> (the always-on home server where <code>DOTCLAUDE_LOCAL_CHATS</code> → the NAS is
   mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.</li>
 <li><strong>On a client with no local archive</strong> (a laptop, or an <strong>HPC login node</strong>): run

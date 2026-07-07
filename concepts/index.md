@@ -18,7 +18,7 @@ The *record* half above is where a NAS shines, but a NAS isn't required. The tra
 - **Your own NAS** (`rsync-wg` / `local`) — records ride peer-to-peer to it over WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.
 - **GitHub** (`git`) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
 
-Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* sync is set up separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local until you point it at a git remote of your own — see [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md).)
+Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only setup puts it in a separate private `claude-memory` repo — wired for you by `/dcmemory`, with the same "your file paths now sit with a third party" trade-off you accepted for transcripts. See [memory](https://henba1.github.io/dotclaude/memory-sync/index.md).)
 
 ## What is dotclaude?
 

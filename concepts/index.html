@@ -926,10 +926,11 @@ you onboard:</p>
   third-party repo rather than only on your own hardware.</li>
 </ul>
 <p>Same records, two destinations — choose by whether you'd rather manage your own storage or
-none. (Config always rides GitHub either way. Cross-machine <em>memory</em> sync is set up
-separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local
-until you point it at a git remote of your own — see
-<a href="../transports/">Transcripts: relay + NAS</a>.)</p>
+none. (Config always rides GitHub either way. Cross-machine <em>memory</em> rides its own repo and
+follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only
+setup puts it in a separate private <code>claude-memory</code> repo — wired for you by <code>/dcmemory</code>, with
+the same "your file paths now sit with a third party" trade-off you accepted for transcripts.
+See <a href="../memory-sync/">memory</a>.)</p>
 <h2 id="what-is-dotclaude">What is dotclaude?<a class="headerlink" href="#what-is-dotclaude" title="Permanent link">&para;</a></h2>
 <p><a href="https://claude.ai/code">Claude Code</a> reads its configuration from a <code>~/.claude/</code>
 directory on whatever machine you run it on: which rules it must follow, which custom
