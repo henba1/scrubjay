@@ -42,8 +42,8 @@ are the front-end.)
 
 Steps:
 
-1. **Gather choices in chat:** stable host name; relay backend (`rsync-wg` default / `local`
-   / `git` / `off`) and its settings — for `rsync-wg`/`git` the receiver `user` / `host` /
+1. **Gather choices in chat:** stable host name; relay backend (`rsync-wg` / `local` / `git`
+   / `off` — present them as peer options, no default) and its settings — for `rsync-wg`/`git` the receiver `user` / `host` /
    `port` / rrsync-`path`; for `local` the NAS mount path; and whether to enable
    cross-machine memory.
 2. **Confirm, then run non-interactively** from the clone, e.g.:
