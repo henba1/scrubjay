@@ -21,10 +21,16 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 | **resources** | every transcript/plan/memory as an `@`-pickable resource (`dc://transcript/…`, `dc://plan/…`, `dc://memory/…`) with a human, date-sorted title |
 | **commands** | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]`, `/dcget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](slash-commands.md)) |
 
-## Registration is automatic, two ways
+## Registration is automatic, three ways
 
-Both done by `claude-sync.sh` at **user scope**:
+All done by `claude-sync.sh` at **user scope**, picked by what this machine has:
 
+- **On a GitHub (`git` backend) machine** — the `claude-chats` clone *is* the archive: the relay
+  writes the same `<host>/{readable,plans,…}` tree into it that a NAS holds, so `claude-sync.sh`
+  registers a local stdio server pointed straight at the clone. `sync-session.sh` `git pull`s the
+  clone at the start of each session, so recall spans **every** machine's sessions, not just this
+  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine *memory* recall still
+  needs memory sync wired separately; transcripts, plans, and the logs catalogue work out of the box.)
 - **On the archive host** (the always-on home server where `DOTCLAUDE_LOCAL_CHATS` → the NAS is
   mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.
 - **On a client with no local archive** (a laptop, or an **HPC login node**): run

@@ -146,6 +146,14 @@ register_mcp() {
   command -v claude >/dev/null 2>&1 || { skip_mcp "no 'claude' CLI on PATH — install Claude Code, then rerun bin/claude-sync.sh"; return 0; }
   dc_load_config
   local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py" remote="${DOTCLAUDE_MCP_REMOTE:-}"
+  # git backend: the claude-chats clone IS the local archive — ship-transcript.sh writes the same
+  # <host>/{readable,plans,…} tree into it that a NAS archive holds. Point the local stdio server at
+  # the clone so the GitHub path gets in-session recall with no NAS or SSH. (sync-session.sh pulls
+  # the clone at SessionStart so it spans every machine's sessions, not just this one's.)
+  if [ -z "$chats" ] && [ -z "$remote" ] && [ "${DOTCLAUDE_TRANSCRIPT_BACKEND:-}" = git ]; then
+    local clone; clone="$(dc_chats)"
+    [ -n "$clone" ] && [ -d "$clone/.git" ] && chats="$clone"
+  fi
   if [ -n "$chats" ] && [ -d "$chats" ]; then
     # LOCAL: the archive lives here (the archive host). The stdio server runs in-process via uv.
     command -v uv >/dev/null 2>&1 || { skip_mcp "no 'uv' runtime on PATH — install uv (curl -LsSf https://astral.sh/uv/install.sh | sh), reopen shell, rerun bin/claude-sync.sh"; return 0; }

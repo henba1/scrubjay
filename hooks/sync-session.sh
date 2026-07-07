@@ -25,6 +25,14 @@ if [ "${DOTCLAUDE_SYNC_NOPULL:-0}" != "1" ]; then
     [ -n "$repo" ] && [ -d "$repo/.git" ] && \
       ( cd "$repo" && timeout 15 git pull --ff-only -q 2>/dev/null ) || true
   done
+  # git backend only: refresh the claude-chats clone so the local dcmcp archive spans every
+  # machine's sessions (not just this one's) before claude-sync registers/serves it. Best-effort;
+  # --ff-only just no-ops on a diverged tree (e.g. local ships that haven't pushed yet).
+  if [ "${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
+    chats="$(dc_chats 2>/dev/null || true)"
+    [ -n "$chats" ] && [ -d "$chats/.git" ] && \
+      ( cd "$chats" && timeout 20 git pull --ff-only -q 2>/dev/null ) || true
+  fi
 fi
 
 # 1b) pull cross-machine memory from its own NAS-hosted git repo (no-op if not configured),
