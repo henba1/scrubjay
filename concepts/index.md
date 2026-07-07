@@ -11,6 +11,15 @@ Everything dotclaude moves is one of two things — and which one it is decides 
 
 The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`dotclaude-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
 
+### NAS or GitHub — your choice of shared store
+
+The *record* half above is where a NAS shines, but a NAS isn't required. The transcript transport is **pluggable**, and the two backends are genuinely parallel — you pick one when you onboard:
+
+- **Your own NAS** (`rsync-wg` / `local`) — records ride peer-to-peer to it over WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.
+- **GitHub** (`git`) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
+
+Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* sync is set up separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local until you point it at a git remote of your own — see [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md).)
+
 ## What is dotclaude?
 
 [Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/` directory on whatever machine you run it on: which rules it must follow, which custom commands and sub-agents exist, what it's allowed to do, and so on. If you work on several machines (a laptop, a desktop, an HPC cluster) you'd normally set all of that up by hand, separately, on each one — and they'd drift apart over time.

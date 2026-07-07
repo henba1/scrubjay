@@ -791,9 +791,10 @@ without leaking anything:</p>
 <p><strong>Flow:</strong> <code>dotclaude</code> (logic) + <code>dotclaude-data</code> (your config) → applied into each
 machine's <code>~/.claude</code> by <code>claude-sync.sh</code>. On <code>SessionEnd</code> a hook appends a one-line
 entry to <code>dotclaude-data/logs/&lt;host&gt;.log</code> <em>and</em> relays the session (transcript,
-subagents, plans) to the NAS via a pluggable backend — peer-to-peer over WireGuard, or
-<code>claude-chats</code> on GitHub as a stopgap. Top-level is keyed by machine so envs stay
-distinct and Claude can re-tailor one host's rules for another.</p>
+subagents, plans) off the machine via a pluggable backend — either peer-to-peer to your
+own NAS (over WireGuard), or to a private <code>claude-chats</code> repo on GitHub if you'd rather
+not run storage of your own. Top-level is keyed by machine so envs stay distinct and
+Claude can re-tailor one host's rules for another.</p>
 </blockquote>
 <h2 id="where-to-go">Where to go<a class="headerlink" href="#where-to-go" title="Permanent link">&para;</a></h2>
 <ul>

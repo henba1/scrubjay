@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mirror-host-mirror-chat-transcripts-to-the-nas" class="md-skip">
+        <a href="#mirror-host-optional-also-keep-a-nas-copy-of-the-git-backend" class="md-skip">
           Skip to content
         </a>
       
@@ -670,10 +670,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#when-you-switch-to-the-wireguard-transport" class="md-nav__link">
+  <a href="#if-you-later-move-to-the-wireguard-transport" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When you switch to the WireGuard transport
+        If you later move to the WireGuard transport
       
     </span>
   </a>
@@ -773,10 +773,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#when-you-switch-to-the-wireguard-transport" class="md-nav__link">
+  <a href="#if-you-later-move-to-the-wireguard-transport" class="md-nav__link">
     <span class="md-ellipsis">
       
-        When you switch to the WireGuard transport
+        If you later move to the WireGuard transport
       
     </span>
   </a>
@@ -803,10 +803,13 @@
   
 
 
-<h1 id="mirror-host-mirror-chat-transcripts-to-the-nas">Mirror host: mirror chat transcripts to the NAS<a class="headerlink" href="#mirror-host-mirror-chat-transcripts-to-the-nas" title="Permanent link">&para;</a></h1>
-<p>The always-on <strong>mirror host</strong> (any small home server — make/model doesn't matter) is the bridge
-between GitHub (which remote machines can reach) and your home NAS (which they can't). It pulls the
-<code>claude-chats</code> relay every 30 min and mirrors it into <code>$NAS1/dotclaude-storage</code>.</p>
+<h1 id="mirror-host-optional-also-keep-a-nas-copy-of-the-git-backend">Mirror host (optional): also keep a NAS copy of the <code>git</code> backend<a class="headerlink" href="#mirror-host-optional-also-keep-a-nas-copy-of-the-git-backend" title="Permanent link">&para;</a></h1>
+<p><strong>Optional add-on for the <code>git</code> backend.</strong> If you use GitHub as your shared store, the private
+<code>claude-chats</code> repo is already a complete, permanent home for your transcripts — you don't need
+this page. But if you <em>also</em> want a copy on your home NAS (extra durability, or to feed the local
+MCP archive), an always-on <strong>mirror host</strong> (any small home server — make/model doesn't matter)
+bridges the two: it pulls the <code>claude-chats</code> repo every 30 min and mirrors it into
+<code>$NAS1/dotclaude-storage</code>.</p>
 <h2 id="one-time-setup">One-time setup<a class="headerlink" href="#one-time-setup" title="Permanent link">&para;</a></h2>
 <ol>
 <li>SSH key on the mirror host added to GitHub (read access to <code>claude-chats</code>).</li>
@@ -825,10 +828,11 @@ between GitHub (which remote machines can reach) and your home NAS (which they c
 </code></pre></div>
 <p>Result: every machine's transcripts land on the NAS at
 <code>dotclaude-storage/&lt;host&gt;/&lt;project-slug&gt;/&lt;session&gt;.jsonl</code> within 30 min of a session
-ending. The NAS copy is the canonical archive; the GitHub relay can be pruned/rotated.</p>
-<h2 id="when-you-switch-to-the-wireguard-transport">When you switch to the WireGuard transport<a class="headerlink" href="#when-you-switch-to-the-wireguard-transport" title="Permanent link">&para;</a></h2>
-<p>Once machines push peer-to-peer to the home node (see <code>transcript-transport.md</code>), the mirror
-host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
+ending. With the mirror running, the NAS copy doubles your archive; you can then prune/rotate
+the GitHub repo if you like. Without it, the GitHub repo <em>is</em> your archive.</p>
+<h2 id="if-you-later-move-to-the-wireguard-transport">If you later move to the WireGuard transport<a class="headerlink" href="#if-you-later-move-to-the-wireguard-transport" title="Permanent link">&para;</a></h2>
+<p>If you switch machines to push peer-to-peer to the home node (see <code>transcript-transport.md</code>), the
+mirror host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
 cron job is retired (or repurposed to rsync from the receiver to the NAS).</p>
 
 

@@ -932,7 +932,7 @@ is transient on HPC login nodes).</p>
 <a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
 <a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
 <a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /dclog command); reconstructs the hook payload
-<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>  transports/git.sh      # backend: git stopgap (-&gt; claude-chats, Pi mirrors to NAS)
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>  transports/git.sh      # backend: push to the private claude-chats repo on GitHub (zero-infra; optional NAS mirror)
 <a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
 <a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
 <a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>mcp/

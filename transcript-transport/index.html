@@ -603,10 +603,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-backend-git-stopgap" class="md-nav__link">
+  <a href="#backend-git-github-zero-infrastructure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current backend: git (stopgap)
+        Backend: git (GitHub — zero infrastructure)
       
     </span>
   </a>
@@ -773,10 +773,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-backend-git-stopgap" class="md-nav__link">
+  <a href="#backend-git-github-zero-infrastructure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current backend: git (stopgap)
+        Backend: git (GitHub — zero infrastructure)
       
     </span>
   </a>
@@ -873,11 +873,15 @@ here — it rides the <code>dotclaude-data</code> git sync.)</p>
 </code></pre></div>
 <p>Backend is chosen by <code>DOTCLAUDE_TRANSCRIPT_BACKEND</code> in <code>~/.config/dotclaude/config</code>.
 A backend is one file defining <code>transport_ship &lt;src&gt; &lt;relpath&gt;</code>.</p>
-<h2 id="current-backend-git-stopgap">Current backend: <code>git</code>  (stopgap)<a class="headerlink" href="#current-backend-git-stopgap" title="Permanent link">&para;</a></h2>
+<h2 id="backend-git-github-zero-infrastructure">Backend: <code>git</code>  (GitHub — zero infrastructure)<a class="headerlink" href="#backend-git-github-zero-infrastructure" title="Permanent link">&para;</a></h2>
 <p>Copies the transcript into the <code>claude-chats</code> private repo (<code>DOTCLAUDE_CHATS</code>) and pushes
-it. A mirror host pulls and mirrors to the NAS (<code>mirror-host.md</code>).</p>
-<p>⚠️ Tradeoff: transcripts transit GitHub's servers. The repo is private and treated as a
-<em>relay</em> (NAS is canonical), but this is why it's a stopgap.</p>
+it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS:
+GitHub <em>is</em> the shared store, and no WireGuard or receiver is involved. Optionally, a
+mirror host can <em>also</em> pull the repo down to a NAS (<code>mirror-host.md</code>), but that's an add-on
+— the private repo is a fine permanent home on its own.</p>
+<p>⚠️ Tradeoff: transcripts transit and live on GitHub's servers. The repo is private, but
+it's still a third party — that's the price of not running your own storage. If that
+matters to you, use <code>rsync-wg</code>/<code>local</code> instead.</p>
 <h2 id="backend-rsync-wg-peer-to-peer-no-third-party">Backend: <code>rsync-wg</code>  (peer-to-peer, no third party)<a class="headerlink" href="#backend-rsync-wg-peer-to-peer-no-third-party" title="Permanent link">&para;</a></h2>
 <p>Each machine holds a per-machine SSH key and rsyncs <strong>over a WireGuard/SSH tunnel</strong> directly
 to the NAS receiver. No data on any third-party server.</p>

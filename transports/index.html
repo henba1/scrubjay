@@ -782,7 +782,20 @@
 <h1 id="transcripts-relay-nas">Transcripts: relay + NAS<a class="headerlink" href="#transcripts-relay-nas" title="Permanent link">&para;</a></h1>
 <p><code>SessionEnd</code> ships a session's artifacts off the machine via a <strong>pluggable backend</strong>
 (<code>ship-transcript.sh</code> → <code>hooks/transports/&lt;backend&gt;.sh</code>, chosen by
-<code>DOTCLAUDE_TRANSCRIPT_BACKEND</code>). What rides which path is split by <strong>privacy</strong>:</p>
+<code>DOTCLAUDE_TRANSCRIPT_BACKEND</code>).</p>
+<p>There are two parallel places those artifacts can land, chosen once at onboard time:</p>
+<ul>
+<li><strong>Your own NAS</strong> (<code>rsync-wg</code> / <code>local</code> backends) — peer-to-peer over WireGuard/SSH;
+  nothing ever touches a third party. Needs a NAS + WireGuard, and is what most of this
+  page describes.</li>
+<li><strong>GitHub</strong> (<code>git</code> backend) — each session is pushed to a private <code>claude-chats</code> repo.
+  Zero infrastructure to run; the tradeoff is that transcripts live in a (private)
+  third-party repo. See <a href="#backends">Backends</a> below.</li>
+</ul>
+<p>The layout and artifacts are identical either way — with the <code>git</code> backend they just land
+in the <code>claude-chats</code> repo instead of on the NAS. The rest of this page walks the NAS
+design in full.</p>
+<p>On the NAS path, what rides which route is split by <strong>privacy</strong>:</p>
 <p><strong>Sensitive → peer-to-peer, never a third party.</strong> Full conversation content stays off
 GitHub and goes straight to your NAS over your own WireGuard link:</p>
 <table>
@@ -893,8 +906,12 @@ configure both ends; the private <code>runbooks/wireguard-transcripts.md</code> 
   <code>DOTCLAUDE_LOCAL_CHATS</code> to the NAS chats root.</li>
 <li><strong><code>rsync-wg</code></strong> — every other machine rsyncs over WireGuard to the receiver. Set
   <code>DOTCLAUDE_WG_TARGET</code> + <code>DOTCLAUDE_WG_SSHKEY</code>.</li>
-<li><strong><code>git</code></strong> — stopgap: push to <code>claude-chats</code>, a mirror host mirrors to the NAS
-  (<a href="../mirror-host/">mirror-host.md</a>).</li>
+<li><strong><code>git</code></strong> — the zero-infrastructure option: push each session to the private
+  <code>claude-chats</code> repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that
+  transcripts live in a (private) third-party repo rather than only on your own hardware.
+  Optionally, a mirror host can <em>also</em> pull them down to a NAS
+  (<a href="../mirror-host/">mirror-host.md</a>) — but the GitHub repo is a perfectly good permanent
+  home on its own.</li>
 </ul>
 <p><strong>P2P requirements</strong> (the <code>rsync-wg</code> path):</p>
 <ul>

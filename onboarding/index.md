@@ -87,7 +87,7 @@ hooks/
   sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
   log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
   publish-now.sh         # manual SessionEnd-on-demand (the /dclog command); reconstructs the hook payload
-  transports/git.sh      # backend: git stopgap (-> claude-chats, Pi mirrors to NAS)
+  transports/git.sh      # backend: push to the private claude-chats repo on GitHub (zero-infra; optional NAS mirror)
   transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
   transports/local.sh    # backend: local copy (the box that has the NAS mounted)
 mcp/

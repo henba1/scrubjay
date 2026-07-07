@@ -1,6 +1,15 @@
 # Transcripts: relay + NAS
 
-`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND`). What rides which path is split by **privacy**:
+`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND`).
+
+There are two parallel places those artifacts can land, chosen once at onboard time:
+
+- **Your own NAS** (`rsync-wg` / `local` backends) — peer-to-peer over WireGuard/SSH; nothing ever touches a third party. Needs a NAS + WireGuard, and is what most of this page describes.
+- **GitHub** (`git` backend) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that transcripts live in a (private) third-party repo. See [Backends](#backends) below.
+
+The layout and artifacts are identical either way — with the `git` backend they just land in the `claude-chats` repo instead of on the NAS. The rest of this page walks the NAS design in full.
+
+On the NAS path, what rides which route is split by **privacy**:
 
 **Sensitive → peer-to-peer, never a third party.** Full conversation content stays off GitHub and goes straight to your NAS over your own WireGuard link:
 
@@ -48,7 +57,7 @@ One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *o
 
 - **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
 - **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
-- **`git`** — stopgap: push to `claude-chats`, a mirror host mirrors to the NAS ([mirror-host.md](https://henba1.github.io/dotclaude/mirror-host/index.md)).
+- **`git`** — the zero-infrastructure option: push each session to the private `claude-chats` repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that transcripts live in a (private) third-party repo rather than only on your own hardware. Optionally, a mirror host can *also* pull them down to a NAS ([mirror-host.md](https://henba1.github.io/dotclaude/mirror-host/index.md)) — but the GitHub repo is a perfectly good permanent home on its own.
 
 **P2P requirements** (the `rsync-wg` path):
 

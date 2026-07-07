@@ -18,7 +18,7 @@ The **app/logic** for syncing [Claude Code](https://claude.ai/code) across machi
 
 Diagram source: [`overview.dot`](https://henba1.github.io/dotclaude/overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.
 
-> **Flow:** `dotclaude` (logic) + `dotclaude-data` (your config) → applied into each machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents, plans) to the NAS via a pluggable backend — peer-to-peer over WireGuard, or `claude-chats` on GitHub as a stopgap. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one host's rules for another.
+> **Flow:** `dotclaude` (logic) + `dotclaude-data` (your config) → applied into each machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents, plans) off the machine via a pluggable backend — either peer-to-peer to your own NAS (over WireGuard), or to a private `claude-chats` repo on GitHub if you'd rather not run storage of your own. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one host's rules for another.
 
 ## Where to go
 
@@ -42,6 +42,15 @@ Everything dotclaude moves is one of two things — and which one it is decides 
 | **Archive / one-way**                        | machine → NAS; never edited in two places, no read-back | **rsync** (the P2P "cart") | *records*: transcripts, subagents, plans, `readable/`, `history.jsonl`, `tasks`           |
 
 The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`dotclaude-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
+
+### NAS or GitHub — your choice of shared store
+
+The *record* half above is where a NAS shines, but a NAS isn't required. The transcript transport is **pluggable**, and the two backends are genuinely parallel — you pick one when you onboard:
+
+- **Your own NAS** (`rsync-wg` / `local`) — records ride peer-to-peer to it over WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.
+- **GitHub** (`git`) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
+
+Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* sync is set up separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local until you point it at a git remote of your own — see [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md).)
 
 ## What is dotclaude?
 
@@ -165,7 +174,7 @@ hooks/
   sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
   log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
   publish-now.sh         # manual SessionEnd-on-demand (the /dclog command); reconstructs the hook payload
-  transports/git.sh      # backend: git stopgap (-> claude-chats, Pi mirrors to NAS)
+  transports/git.sh      # backend: push to the private claude-chats repo on GitHub (zero-infra; optional NAS mirror)
   transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
   transports/local.sh    # backend: local copy (the box that has the NAS mounted)
 mcp/
@@ -360,7 +369,16 @@ All dotclaude commands live in `commands/*.md` and are symlinked into `~/.claude
 
 # Transcripts: relay + NAS
 
-`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND`). What rides which path is split by **privacy**:
+`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND`).
+
+There are two parallel places those artifacts can land, chosen once at onboard time:
+
+- **Your own NAS** (`rsync-wg` / `local` backends) — peer-to-peer over WireGuard/SSH; nothing ever touches a third party. Needs a NAS + WireGuard, and is what most of this page describes.
+- **GitHub** (`git` backend) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that transcripts live in a (private) third-party repo. See [Backends](#backends) below.
+
+The layout and artifacts are identical either way — with the `git` backend they just land in the `claude-chats` repo instead of on the NAS. The rest of this page walks the NAS design in full.
+
+On the NAS path, what rides which route is split by **privacy**:
 
 **Sensitive → peer-to-peer, never a third party.** Full conversation content stays off GitHub and goes straight to your NAS over your own WireGuard link:
 
@@ -408,7 +426,7 @@ One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *o
 
 - **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
 - **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
-- **`git`** — stopgap: push to `claude-chats`, a mirror host mirrors to the NAS ([mirror-host.md](https://henba1.github.io/dotclaude/mirror-host/index.md)).
+- **`git`** — the zero-infrastructure option: push each session to the private `claude-chats` repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that transcripts live in a (private) third-party repo rather than only on your own hardware. Optionally, a mirror host can *also* pull them down to a NAS ([mirror-host.md](https://henba1.github.io/dotclaude/mirror-host/index.md)) — but the GitHub repo is a perfectly good permanent home on its own.
 
 **P2P requirements** (the `rsync-wg` path):
 
@@ -443,11 +461,11 @@ SessionEnd hook (hooks/log-session.sh)
 
 Backend is chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND` in `~/.config/dotclaude/config`. A backend is one file defining `transport_ship <src> <relpath>`.
 
-## Current backend: `git` (stopgap)
+## Backend: `git` (GitHub — zero infrastructure)
 
-Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes it. A mirror host pulls and mirrors to the NAS (`mirror-host.md`).
+Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS: GitHub *is* the shared store, and no WireGuard or receiver is involved. Optionally, a mirror host can *also* pull the repo down to a NAS (`mirror-host.md`), but that's an add-on — the private repo is a fine permanent home on its own.
 
-⚠️ Tradeoff: transcripts transit GitHub's servers. The repo is private and treated as a *relay* (NAS is canonical), but this is why it's a stopgap.
+⚠️ Tradeoff: transcripts transit and live on GitHub's servers. The repo is private, but it's still a third party — that's the price of not running your own storage. If that matters to you, use `rsync-wg`/`local` instead.
 
 ## Backend: `rsync-wg` (peer-to-peer, no third party)
 
@@ -567,9 +585,9 @@ The memory ride reuses the transcript relay's *connection* (same host, port, acc
 
 After these, every new client is fully covered by `onboard-memory.sh` + adding its one printed key.
 
-# Mirror host: mirror chat transcripts to the NAS
+# Mirror host (optional): also keep a NAS copy of the `git` backend
 
-The always-on **mirror host** (any small home server — make/model doesn't matter) is the bridge between GitHub (which remote machines can reach) and your home NAS (which they can't). It pulls the `claude-chats` relay every 30 min and mirrors it into `$NAS1/dotclaude-storage`.
+**Optional add-on for the `git` backend.** If you use GitHub as your shared store, the private `claude-chats` repo is already a complete, permanent home for your transcripts — you don't need this page. But if you *also* want a copy on your home NAS (extra durability, or to feed the local MCP archive), an always-on **mirror host** (any small home server — make/model doesn't matter) bridges the two: it pulls the `claude-chats` repo every 30 min and mirrors it into `$NAS1/dotclaude-storage`.
 
 ## One-time setup
 
@@ -598,11 +616,11 @@ The always-on **mirror host** (any small home server — make/model doesn't matt
 */30 * * * * NAS_DIR=/mnt/nas1/dotclaude-storage CHATS_REPO=$HOME/claude-chats $HOME/dotclaude/bin/pull-and-mirror.sh >> $HOME/claude-mirror.log 2>&1
 ```
 
-Result: every machine's transcripts land on the NAS at `dotclaude-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session ending. The NAS copy is the canonical archive; the GitHub relay can be pruned/rotated.
+Result: every machine's transcripts land on the NAS at `dotclaude-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session ending. With the mirror running, the NAS copy doubles your archive; you can then prune/rotate the GitHub repo if you like. Without it, the GitHub repo *is* your archive.
 
-## When you switch to the WireGuard transport
+## If you later move to the WireGuard transport
 
-Once machines push peer-to-peer to the home node (see `transcript-transport.md`), the mirror host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this cron job is retired (or repurposed to rsync from the receiver to the NAS).
+If you switch machines to push peer-to-peer to the home node (see `transcript-transport.md`), the mirror host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this cron job is retired (or repurposed to rsync from the receiver to the NAS).
 
 # Side-note: optional local-embedding rerank for `dc_recall` (Phase 3)
 

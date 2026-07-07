@@ -357,6 +357,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The core idea: two kinds of sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nas-or-github-your-choice-of-shared-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NAS or GitHub — your choice of shared store
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -779,6 +796,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The core idea: two kinds of sync">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nas-or-github-your-choice-of-shared-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NAS or GitHub — your choice of shared store
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -880,6 +914,22 @@ real file paths) — still uses git for the merge, but a git repo <strong>self-h
 over WireGuard</strong> rather than GitHub. Only the non-sensitive authored config rides GitHub
 (<code>dotclaude-data</code>). That's the whole design in one sentence: <strong>author-vs-record picks
 git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.</strong></p>
+<h3 id="nas-or-github-your-choice-of-shared-store">NAS or GitHub — your choice of shared store<a class="headerlink" href="#nas-or-github-your-choice-of-shared-store" title="Permanent link">&para;</a></h3>
+<p>The <em>record</em> half above is where a NAS shines, but a NAS isn't required. The transcript
+transport is <strong>pluggable</strong>, and the two backends are genuinely parallel — you pick one when
+you onboard:</p>
+<ul>
+<li><strong>Your own NAS</strong> (<code>rsync-wg</code> / <code>local</code>) — records ride peer-to-peer to it over
+  WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.</li>
+<li><strong>GitHub</strong> (<code>git</code>) — each session is pushed to a private <code>claude-chats</code> repo. Zero
+  infrastructure to run; the tradeoff is that your transcripts live in a (private)
+  third-party repo rather than only on your own hardware.</li>
+</ul>
+<p>Same records, two destinations — choose by whether you'd rather manage your own storage or
+none. (Config always rides GitHub either way. Cross-machine <em>memory</em> sync is set up
+separately and is NAS-oriented; a GitHub-only setup typically keeps memory machine-local
+until you point it at a git remote of your own — see
+<a href="../transports/">Transcripts: relay + NAS</a>.)</p>
 <h2 id="what-is-dotclaude">What is dotclaude?<a class="headerlink" href="#what-is-dotclaude" title="Permanent link">&para;</a></h2>
 <p><a href="https://claude.ai/code">Claude Code</a> reads its configuration from a <code>~/.claude/</code>
 directory on whatever machine you run it on: which rules it must follow, which custom

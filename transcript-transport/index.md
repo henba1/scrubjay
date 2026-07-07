@@ -23,11 +23,11 @@ SessionEnd hook (hooks/log-session.sh)
 
 Backend is chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND` in `~/.config/dotclaude/config`. A backend is one file defining `transport_ship <src> <relpath>`.
 
-## Current backend: `git` (stopgap)
+## Backend: `git` (GitHub — zero infrastructure)
 
-Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes it. A mirror host pulls and mirrors to the NAS (`mirror-host.md`).
+Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS: GitHub *is* the shared store, and no WireGuard or receiver is involved. Optionally, a mirror host can *also* pull the repo down to a NAS (`mirror-host.md`), but that's an add-on — the private repo is a fine permanent home on its own.
 
-⚠️ Tradeoff: transcripts transit GitHub's servers. The repo is private and treated as a *relay* (NAS is canonical), but this is why it's a stopgap.
+⚠️ Tradeoff: transcripts transit and live on GitHub's servers. The repo is private, but it's still a third party — that's the price of not running your own storage. If that matters to you, use `rsync-wg`/`local` instead.
 
 ## Backend: `rsync-wg` (peer-to-peer, no third party)
 
