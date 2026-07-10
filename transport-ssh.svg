@@ -80,7 +80,7 @@
 <title>NAS</title>
 <polygon fill="#dcfce7" stroke="#16a34a" points="1306,-63 1303,-67 1282,-67 1279,-63 1194,-63 1194,-27 1306,-27 1306,-63"/>
 <text text-anchor="middle" x="1250" y="-48" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#166534">NAS</text>
-<text text-anchor="middle" x="1250" y="-37" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#166534">dotclaude&#45;storage/</text>
+<text text-anchor="middle" x="1250" y="-37" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#166534">scrubjay&#45;storage/</text>
 </g>
 <!-- RX&#45;&gt;NAS -->
 <g id="edge1" class="edge">

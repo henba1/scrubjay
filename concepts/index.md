@@ -2,31 +2,31 @@
 
 ## The core idea: two kinds of sync
 
-Everything dotclaude moves is one of two things — and which one it is decides the *mechanism*. Get this distinction and the rest of the system follows:
+Everything scrubjay moves is one of two things — and which one it is decides the *mechanism*. Get this distinction and the rest of the system follows:
 
 | Semantic                                     | Meaning                                                 | Mechanism                  | What it fits                                                                              |
 | -------------------------------------------- | ------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
 | **Shared / bidirectional** ("cross-machine") | Same content on every machine; edits *merge*            | **git** (pull + push)      | things you *author*: `CLAUDE.md`, `commands`, `agents`, `settings`, `plugins`, **memory** |
 | **Archive / one-way**                        | machine → NAS; never edited in two places, no read-back | **rsync** (the P2P "cart") | *records*: transcripts, subagents, plans, `readable/`, `history.jsonl`, `tasks`           |
 
-The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`dotclaude-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
+The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`scrubjay-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
 
 ### NAS or GitHub — your choice of shared store
 
 The *record* half above is where a NAS shines, but a NAS isn't required. The transcript transport is **pluggable**, and the two backends are genuinely parallel — you pick one when you onboard:
 
 - **Your own NAS** (`rsync-wg` / `local`) — records ride peer-to-peer to it over WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.
-- **GitHub** (`git`) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
+- **GitHub** (`git`) — each session is pushed to a private `scrubjay-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
 
-Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only setup puts it in a separate private `claude-memory` repo — wired for you by `/dcmemory`, with the same "your file paths now sit with a third party" trade-off you accepted for transcripts. See [memory](https://henba1.github.io/dotclaude/memory-sync/index.md).)
+Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only setup puts it in a separate private `scrubjay-memory` repo — wired for you by `/sjmemory`, with the same "your file paths now sit with a third party" trade-off you accepted for transcripts. See [memory](https://henba1.github.io/scrubjay/memory-sync/index.md).)
 
-## What is dotclaude?
+## What is scrubjay?
 
 [Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/` directory on whatever machine you run it on: which rules it must follow, which custom commands and sub-agents exist, what it's allowed to do, and so on. If you work on several machines (a laptop, a desktop, an HPC cluster) you'd normally set all of that up by hand, separately, on each one — and they'd drift apart over time.
 
-dotclaude keeps that configuration in **git** instead, and makes it apply itself. This repo (`dotclaude`) holds only the *machinery* — the shell scripts and hooks. Your actual content lives in a second, private repo (`dotclaude-data`) that we call **the database**. A small sync step turns the database into a working `~/.claude/` on each machine, and a pair of hooks keep it current automatically. The result: you configure Claude once, and every machine stays in step.
+scrubjay keeps that configuration in **git** instead, and makes it apply itself. This repo (`scrubjay`) holds only the *machinery* — the shell scripts and hooks. Your actual content lives in a second, private repo (`scrubjay-data`) that we call **the database**. A small sync step turns the database into a working `~/.claude/` on each machine, and a pair of hooks keep it current automatically. The result: you configure Claude once, and every machine stays in step.
 
-## What's in the database (`dotclaude-data`) and how Claude uses it
+## What's in the database (`scrubjay-data`) and how Claude uses it
 
 The database is just plain Markdown and JSON files, organised into a handful of directories. Each one feeds Claude in a specific way:
 
@@ -42,12 +42,12 @@ The database is just plain Markdown and JSON files, organised into a handful of 
 
 The moving parts fit together like this:
 
-1. **Two repos, one machine-local pointer.** You clone `dotclaude` (this machinery) and `dotclaude-data` (your content) onto each machine. A tiny file at `~/.config/dotclaude/config` tells the scripts where those clones live, and `~/.config/dotclaude/host` pins a stable name for the machine (handy on clusters whose hostnames change between logins).
+1. **Two repos, one machine-local pointer.** You clone `scrubjay` (this machinery) and `scrubjay-data` (your content) onto each machine. A tiny file at `~/.config/scrubjay/config` tells the scripts where those clones live, and `~/.config/scrubjay/host` pins a stable name for the machine (handy on clusters whose hostnames change between logins).
 1. **Sync turns the database into `~/.claude/`.** Running `bin/claude-sync.sh` symlinks the shared `claude-md/` scopes into `~/.claude/`, points each project's auto-memory dir at the synced `memory/<host>/<project>/`, and merges `settings/` + the host overrides into `~/.claude/settings.json`. It's safe to re-run; it only changes what actually differs.
-1. **Two hooks keep it hands-off.** When a session *starts*, a hook pulls the latest `dotclaude-data` and re-runs sync, so config you edited on another machine is already in effect. When a session *ends*, a hook appends the log line, refreshes that machine's chat index, and commits both back. You don't run these — they run themselves.
+1. **Two hooks keep it hands-off.** When a session *starts*, a hook pulls the latest `scrubjay-data` and re-runs sync, so config you edited on another machine is already in effect. When a session *ends*, a hook appends the log line, refreshes that machine's chat index, and commits both back. You don't run these — they run themselves.
 
-**What you actually do once per machine:** clone the two repos, write the little config pointer, run `claude-register-host.sh` to scaffold a `hosts/<machine>/` entry, then `claude-sync.sh` to apply it. After that, you only ever *edit files in `dotclaude-data` and push* — every machine converges on its own. The concrete commands are in [Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md).
+**What you actually do once per machine:** clone the two repos, write the little config pointer, run `claude-register-host.sh` to scaffold a `hosts/<machine>/` entry, then `claude-sync.sh` to apply it. After that, you only ever *edit files in `scrubjay-data` and push* — every machine converges on its own. The concrete commands are in [Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md).
 
 ## Cross-machine tailoring with Claude
 
-Everything is plain Markdown/JSON, so from any project you can ask Claude: *"read `dotclaude-data/hosts/<other>/` and adapt its rules for this box"* — it reads one host's config and writes another's.
+Everything is plain Markdown/JSON, so from any project you can ask Claude: *"read `scrubjay-data/hosts/<other>/` and adapt its rules for this box"* — it reads one host's config and writes another's.

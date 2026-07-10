@@ -1,64 +1,64 @@
-# dotclaude
+# scrubjay
 
 > The app/logic for syncing Claude Code across machines — config-sync + transcript relay.
 
-dotclaude is the app/logic for syncing Claude Code across machines: a git-based config sync plus a pluggable, peer-to-peer transcript relay to your own NAS. Personal content lives in separate private repos so this one is publishable.
+scrubjay is the app/logic for syncing Claude Code across machines: a git-based config sync plus a pluggable, peer-to-peer transcript relay to your own NAS. Personal content lives in separate private repos so this one is publishable.
 
 # Overview
 
-# dotclaude
+# scrubjay
 
 The **app/logic** for syncing [Claude Code](https://claude.ai/code) across machines. Your personal content is kept in *separate* repos so this one can be shared/public without leaking anything:
 
-| Repo                 | Role                                                                  | Visibility  |
-| -------------------- | --------------------------------------------------------------------- | ----------- |
-| **dotclaude** (this) | scripts, hooks, docs — the logic                                      | public-able |
-| **dotclaude-data**   | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private     |
-| **claude-chats**     | full chat transcripts (`.jsonl`), relayed off each machine            | private     |
+| Repo                | Role                                                                  | Visibility  |
+| ------------------- | --------------------------------------------------------------------- | ----------- |
+| **scrubjay** (this) | scripts, hooks, docs — the logic                                      | public-able |
+| **scrubjay-data**   | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private     |
+| **scrubjay-chats**  | full chat transcripts (`.jsonl`), relayed off each machine            | private     |
 
-Diagram source: [`overview.dot`](https://henba1.github.io/dotclaude/overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.
+Diagram source: [`overview.dot`](https://henba1.github.io/scrubjay/overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.
 
-> **Flow:** `dotclaude` (logic) + `dotclaude-data` (your config) → applied into each machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line entry to `dotclaude-data/logs/<host>.log` *and* relays the session (transcript, subagents, plans) off the machine via a pluggable backend — either peer-to-peer to your own NAS (over WireGuard), or to a private `claude-chats` repo on GitHub if you'd rather not run storage of your own. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one host's rules for another.
+> **Flow:** `scrubjay` (logic) + `scrubjay-data` (your config) → applied into each machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line entry to `scrubjay-data/logs/<host>.log` *and* relays the session (transcript, subagents, plans) off the machine via a pluggable backend — either peer-to-peer to your own NAS (over WireGuard), or to a private `scrubjay-chats` repo on GitHub if you'd rather not run storage of your own. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one host's rules for another.
 
 ## Where to go
 
-- **[Concepts](https://henba1.github.io/dotclaude/concepts/index.md)** — the two-kinds-of-sync model, what dotclaude is, and what lives in the database. Start here to understand *why* the system is shaped this way.
-- **[Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md)** — install on a new machine (interactive script or Claude-assisted), the repo layout, and the machine-local pointers.
-- **[Day-to-day](https://henba1.github.io/dotclaude/day-to-day/index.md)** — the hooks that keep it hands-off, finding a past chat, and troubleshooting.
-- **[Query the archive (MCP)](https://henba1.github.io/dotclaude/archive-mcp/index.md)** — recall a past session by *topic* from inside a live Claude session via the read-only `dcmcp` server.
-- **[Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md)** — the `/dc*` command reference.
-- **[Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md)** — how sessions ride peer-to-peer to your own NAS, and the two P2P paths (WireGuard / SSH).
-- **[Reference](https://henba1.github.io/dotclaude/reference/index.md)** — the by-hand command cheatsheet and environment toggles.
+- **[Concepts](https://henba1.github.io/scrubjay/concepts/index.md)** — the two-kinds-of-sync model, what scrubjay is, and what lives in the database. Start here to understand *why* the system is shaped this way.
+- **[Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md)** — install on a new machine (interactive script or Claude-assisted), the repo layout, and the machine-local pointers.
+- **[Day-to-day](https://henba1.github.io/scrubjay/day-to-day/index.md)** — the hooks that keep it hands-off, finding a past chat, and troubleshooting.
+- **[Query the archive (MCP)](https://henba1.github.io/scrubjay/archive-mcp/index.md)** — recall a past session by *topic* from inside a live Claude session via the read-only `sjmcp` server.
+- **[Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md)** — the `/dc*` command reference.
+- **[Transcripts: relay + NAS](https://henba1.github.io/scrubjay/transports/index.md)** — how sessions ride peer-to-peer to your own NAS, and the two P2P paths (WireGuard / SSH).
+- **[Reference](https://henba1.github.io/scrubjay/reference/index.md)** — the by-hand command cheatsheet and environment toggles.
 
 # Concepts
 
 ## The core idea: two kinds of sync
 
-Everything dotclaude moves is one of two things — and which one it is decides the *mechanism*. Get this distinction and the rest of the system follows:
+Everything scrubjay moves is one of two things — and which one it is decides the *mechanism*. Get this distinction and the rest of the system follows:
 
 | Semantic                                     | Meaning                                                 | Mechanism                  | What it fits                                                                              |
 | -------------------------------------------- | ------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
 | **Shared / bidirectional** ("cross-machine") | Same content on every machine; edits *merge*            | **git** (pull + push)      | things you *author*: `CLAUDE.md`, `commands`, `agents`, `settings`, `plugins`, **memory** |
 | **Archive / one-way**                        | machine → NAS; never edited in two places, no read-back | **rsync** (the P2P "cart") | *records*: transcripts, subagents, plans, `readable/`, `history.jsonl`, `tasks`           |
 
-The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`dotclaude-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
+The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`scrubjay-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
 
 ### NAS or GitHub — your choice of shared store
 
 The *record* half above is where a NAS shines, but a NAS isn't required. The transcript transport is **pluggable**, and the two backends are genuinely parallel — you pick one when you onboard:
 
 - **Your own NAS** (`rsync-wg` / `local`) — records ride peer-to-peer to it over WireGuard/SSH; nothing ever touches a third party. The tradeoff is standing up a NAS + WireGuard.
-- **GitHub** (`git`) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
+- **GitHub** (`git`) — each session is pushed to a private `scrubjay-chats` repo. Zero infrastructure to run; the tradeoff is that your transcripts live in a (private) third-party repo rather than only on your own hardware.
 
-Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only setup puts it in a separate private `claude-memory` repo — wired for you by `/dcmemory`, with the same "your file paths now sit with a third party" trade-off you accepted for transcripts. See [memory](https://henba1.github.io/dotclaude/memory-sync/index.md).)
+Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only setup puts it in a separate private `scrubjay-memory` repo — wired for you by `/sjmemory`, with the same "your file paths now sit with a third party" trade-off you accepted for transcripts. See [memory](https://henba1.github.io/scrubjay/memory-sync/index.md).)
 
-## What is dotclaude?
+## What is scrubjay?
 
 [Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/` directory on whatever machine you run it on: which rules it must follow, which custom commands and sub-agents exist, what it's allowed to do, and so on. If you work on several machines (a laptop, a desktop, an HPC cluster) you'd normally set all of that up by hand, separately, on each one — and they'd drift apart over time.
 
-dotclaude keeps that configuration in **git** instead, and makes it apply itself. This repo (`dotclaude`) holds only the *machinery* — the shell scripts and hooks. Your actual content lives in a second, private repo (`dotclaude-data`) that we call **the database**. A small sync step turns the database into a working `~/.claude/` on each machine, and a pair of hooks keep it current automatically. The result: you configure Claude once, and every machine stays in step.
+scrubjay keeps that configuration in **git** instead, and makes it apply itself. This repo (`scrubjay`) holds only the *machinery* — the shell scripts and hooks. Your actual content lives in a second, private repo (`scrubjay-data`) that we call **the database**. A small sync step turns the database into a working `~/.claude/` on each machine, and a pair of hooks keep it current automatically. The result: you configure Claude once, and every machine stays in step.
 
-## What's in the database (`dotclaude-data`) and how Claude uses it
+## What's in the database (`scrubjay-data`) and how Claude uses it
 
 The database is just plain Markdown and JSON files, organised into a handful of directories. Each one feeds Claude in a specific way:
 
@@ -74,138 +74,138 @@ The database is just plain Markdown and JSON files, organised into a handful of 
 
 The moving parts fit together like this:
 
-1. **Two repos, one machine-local pointer.** You clone `dotclaude` (this machinery) and `dotclaude-data` (your content) onto each machine. A tiny file at `~/.config/dotclaude/config` tells the scripts where those clones live, and `~/.config/dotclaude/host` pins a stable name for the machine (handy on clusters whose hostnames change between logins).
+1. **Two repos, one machine-local pointer.** You clone `scrubjay` (this machinery) and `scrubjay-data` (your content) onto each machine. A tiny file at `~/.config/scrubjay/config` tells the scripts where those clones live, and `~/.config/scrubjay/host` pins a stable name for the machine (handy on clusters whose hostnames change between logins).
 1. **Sync turns the database into `~/.claude/`.** Running `bin/claude-sync.sh` symlinks the shared `claude-md/` scopes into `~/.claude/`, points each project's auto-memory dir at the synced `memory/<host>/<project>/`, and merges `settings/` + the host overrides into `~/.claude/settings.json`. It's safe to re-run; it only changes what actually differs.
-1. **Two hooks keep it hands-off.** When a session *starts*, a hook pulls the latest `dotclaude-data` and re-runs sync, so config you edited on another machine is already in effect. When a session *ends*, a hook appends the log line, refreshes that machine's chat index, and commits both back. You don't run these — they run themselves.
+1. **Two hooks keep it hands-off.** When a session *starts*, a hook pulls the latest `scrubjay-data` and re-runs sync, so config you edited on another machine is already in effect. When a session *ends*, a hook appends the log line, refreshes that machine's chat index, and commits both back. You don't run these — they run themselves.
 
-**What you actually do once per machine:** clone the two repos, write the little config pointer, run `claude-register-host.sh` to scaffold a `hosts/<machine>/` entry, then `claude-sync.sh` to apply it. After that, you only ever *edit files in `dotclaude-data` and push* — every machine converges on its own. The concrete commands are in [Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md).
+**What you actually do once per machine:** clone the two repos, write the little config pointer, run `claude-register-host.sh` to scaffold a `hosts/<machine>/` entry, then `claude-sync.sh` to apply it. After that, you only ever *edit files in `scrubjay-data` and push* — every machine converges on its own. The concrete commands are in [Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md).
 
 ## Cross-machine tailoring with Claude
 
-Everything is plain Markdown/JSON, so from any project you can ask Claude: *"read `dotclaude-data/hosts/<other>/` and adapt its rules for this box"* — it reads one host's config and writes another's.
+Everything is plain Markdown/JSON, so from any project you can ask Claude: *"read `scrubjay-data/hosts/<other>/` and adapt its rules for this box"* — it reads one host's config and writes another's.
 # Setup & operation
 
 # Onboarding
 
 ## The three repos, and which ones are yours
 
-dotclaude is the **app** — public, and you run it straight from upstream. **You don't fork it.** It updates itself with `git pull`, which is why it must be a `git clone` and not an unpacked source tarball (an archive has no `.git`, so the self-update silently never runs; the app tells you so at session start if you get this wrong).
+scrubjay is the **app** — public, and you run it straight from upstream. **You don't fork it.** It updates itself with `git pull`, which is why it must be a `git clone` and not an unpacked source tarball (an archive has no `.git`, so the self-update silently never runs; the app tells you so at session start if you get this wrong).
 
 Your **content** lives in separate **private** repos under your own GitHub account:
 
-| Repo             | When                                      | Who creates it                                     |
-| ---------------- | ----------------------------------------- | -------------------------------------------------- |
-| `dotclaude-data` | always                                    | `bin/dc-bootstrap.sh`, seeded from `skeleton/data` |
-| `claude-chats`   | `git` backend                             | `bin/dc-bootstrap.sh`                              |
-| `claude-memory`  | cross-machine memory on the `git` backend | `bin/onboard-memory.sh`                            |
+| Repo              | When                                      | Who creates it                                     |
+| ----------------- | ----------------------------------------- | -------------------------------------------------- |
+| `scrubjay-data`   | always                                    | `bin/sj-bootstrap.sh`, seeded from `skeleton/data` |
+| `scrubjay-chats`  | `git` backend                             | `bin/sj-bootstrap.sh`                              |
+| `scrubjay-memory` | cross-machine memory on the `git` backend | `bin/onboard-memory.sh`                            |
 
-The onboarder asks which GitHub account owns them (preset it with `DOTCLAUDE_OWNER`) and creates any that are missing via the [`gh`](https://cli.github.com) CLI. Without `gh` it prints the exact `gh repo create` commands and stops — nothing is created behind your back.
+The onboarder asks which GitHub account owns them (preset it with `SCRUBJAY_OWNER`) and creates any that are missing via the [`gh`](https://cli.github.com) CLI. Without `gh` it prints the exact `gh repo create` commands and stops — nothing is created behind your back.
 
 Why the app's origin doesn't decide where your data lives
 
-They're deliberately decoupled. Otherwise cloning the public app repo would make the onboarder reach for the *maintainer's* private `dotclaude-data`. It refuses to treat the upstream account as yours, and says so.
+They're deliberately decoupled. Otherwise cloning the public app repo would make the onboarder reach for the *maintainer's* private `scrubjay-data`. It refuses to treat the upstream account as yours, and says so.
 
 ## Install with Claude Code (agent-assisted)
 
 The fastest path if you already run Claude Code: clone this repo, open Claude *inside* the clone, and ask it to set the machine up.
 
 ```
-git clone git@github.com:henba1/dotclaude.git ~/.dotclaude/dotclaude
-cd ~/.dotclaude/dotclaude
+git clone git@github.com:henba1/scrubjay.git ~/.scrubjay/scrubjay
+cd ~/.scrubjay/scrubjay
 claude
 ```
 
 Then, in the session:
 
-> **set up dotclaude on this machine**
+> **set up scrubjay on this machine**
 
-Claude reads [`AGENTS.md`](https://github.com/henba1/dotclaude/blob/main/AGENTS.md) at the repo root, gathers your relay-backend choice and receiver details in chat, and drives `bin/onboard.sh` for you — then surfaces the one manual step it deliberately can't do: pasting the printed `authorized_keys` line on the receiver (see the warning below).
+Claude reads [`AGENTS.md`](https://github.com/henba1/scrubjay/blob/main/AGENTS.md) at the repo root, gathers your relay-backend choice and receiver details in chat, and drives `bin/onboard.sh` for you — then surfaces the one manual step it deliberately can't do: pasting the printed `authorized_keys` line on the receiver (see the warning below).
 
 ## Fast path — interactive script
 
-Clone this repo, then run `bin/onboard.sh`. It checks deps (and offers to install Claude Code if missing), creates + seeds your private data repos, writes the machine-local pointer, registers the host and applies config, and — for the `rsync-wg` backend — optionally generates the dedicated relay SSH key, adds the `claude-receiver` ssh-alias, and prints the exact `authorized_keys` line to paste on the receiver. It's re-runnable and every prompt has a default (or preset it via env, e.g. `DOTCLAUDE_OWNER`, `DOTCLAUDE_BACKEND`):
+Clone this repo, then run `bin/onboard.sh`. It checks deps (and offers to install Claude Code if missing), creates + seeds your private data repos, writes the machine-local pointer, registers the host and applies config, and — for the `rsync-wg` backend — optionally generates the dedicated relay SSH key, adds the `scrubjay-receiver` ssh-alias, and prints the exact `authorized_keys` line to paste on the receiver. It's re-runnable and every prompt has a default (or preset it via env, e.g. `SCRUBJAY_OWNER`, `SCRUBJAY_BACKEND`):
 
 ```
-git clone git@github.com:henba1/dotclaude.git ~/.dotclaude/dotclaude
-~/.dotclaude/dotclaude/bin/onboard.sh
+git clone git@github.com:henba1/scrubjay.git ~/.scrubjay/scrubjay
+~/.scrubjay/scrubjay/bin/onboard.sh
 ```
 
-Run `bin/dc-bootstrap.sh` on its own to create/seed the private repos without onboarding, and `bin/onboard.sh --version` to see which commit you're on.
+Run `bin/sj-bootstrap.sh` on its own to create/seed the private repos without onboarding, and `bin/onboard.sh --version` to see which commit you're on.
 
 One manual step the script can't do for you — authorize the new host on the receiver.
 
-For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each **print an `authorized_keys` line**; you must paste it into the receiver account's `~/.ssh/authorized_keys` (e.g. `claude-rx` on the NAS box, needs sudo). This is deliberate — a new machine must not be able to self-authorize; granting it access requires a human with root on the receiver. Each line is locked to one forced command (`rrsync -wo` for transcripts, `git-shell` for memory), so a leaked key can't get a shell or read the archive back. Until you add the line, that host's sync silently no-ops. (Receiver also needs a one-time `safe.directory` trust for the memory repo — see [memory-sync.md](https://henba1.github.io/dotclaude/memory-sync/index.md).)
+For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each **print an `authorized_keys` line**; you must paste it into the receiver account's `~/.ssh/authorized_keys` (e.g. `scrubjay-rx` on the NAS box, needs sudo). This is deliberate — a new machine must not be able to self-authorize; granting it access requires a human with root on the receiver. Each line is locked to one forced command (`rrsync -wo` for transcripts, `git-shell` for memory), so a leaked key can't get a shell or read the archive back. Until you add the line, that host's sync silently no-ops. (Receiver also needs a one-time `safe.directory` trust for the memory repo — see [memory-sync.md](https://henba1.github.io/scrubjay/memory-sync/index.md).)
 
 Manual steps (what the script automates)
 
 ```
-git clone git@github.com:<your-gh-user>/dotclaude.git      ~/.dotclaude/dotclaude
-git clone git@github.com:<your-gh-user>/dotclaude-data.git ~/.dotclaude/dotclaude-data
-git clone git@github.com:<your-gh-user>/claude-chats.git   ~/.dotclaude/claude-chats   # if syncing transcripts
+git clone git@github.com:<your-gh-user>/scrubjay.git      ~/.scrubjay/scrubjay
+git clone git@github.com:<your-gh-user>/scrubjay-data.git ~/.scrubjay/scrubjay-data
+git clone git@github.com:<your-gh-user>/scrubjay-chats.git   ~/.scrubjay/scrubjay-chats   # if syncing transcripts
 
-mkdir -p ~/.config/dotclaude && cat > ~/.config/dotclaude/config <<'EOF'
-: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
-: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
-: "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+mkdir -p ~/.config/scrubjay && cat > ~/.config/scrubjay/config <<'EOF'
+: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"
+: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"
+: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"
 EOF
 
-~/.dotclaude/dotclaude/bin/claude-register-host.sh --host <name>   # scaffold + pin + index
-# review ~/.dotclaude/dotclaude-data/hosts/<name>/
-~/.dotclaude/dotclaude/bin/claude-sync.sh                          # apply into ~/.claude
-git -C ~/.dotclaude/dotclaude-data add -A && git -C ~/.dotclaude/dotclaude-data commit -m "host <name>" && git -C ~/.dotclaude/dotclaude-data push
+~/.scrubjay/scrubjay/bin/claude-register-host.sh --host <name>   # scaffold + pin + index
+# review ~/.scrubjay/scrubjay-data/hosts/<name>/
+~/.scrubjay/scrubjay/bin/claude-sync.sh                          # apply into ~/.claude
+git -C ~/.scrubjay/scrubjay-data add -A && git -C ~/.scrubjay/scrubjay-data commit -m "host <name>" && git -C ~/.scrubjay/scrubjay-data push
 ```
 
-`~/.dotclaude/` keeps the machinery out of your project workspace; the clone location is otherwise arbitrary (it's only referenced via the pointer file below).
+`~/.scrubjay/` keeps the machinery out of your project workspace; the clone location is otherwise arbitrary (it's only referenced via the pointer file below).
 
 Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub. No root.
 
 ## Pointers (machine-local)
 
-The app finds your data/transcript repos via `~/.config/dotclaude/config` (env overrides):
+The app finds your data/transcript repos via `~/.config/scrubjay/config` (env overrides):
 
 ```
-: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
-: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
-: "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"
+: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"
+: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"
 ```
 
-Host identity is pinned separately in `~/.config/dotclaude/host` (because `hostname -s` is transient on HPC login nodes).
+Host identity is pinned separately in `~/.config/scrubjay/host` (because `hostname -s` is transient on HPC login nodes).
 
 ## Layout (this repo — app only)
 
 ```
 bin/
-  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /dconboard command
-  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /dcmemory command)
+  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
+  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
   lib.sh                 # shared helpers: host + data/chats pointers
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
-  claude-index-chats.sh  # write dotclaude-data/hosts/<host>/chats.index.json
+  claude-index-chats.sh  # write scrubjay-data/hosts/<host>/chats.index.json
   claude-register-host.sh# scaffold a new host into the data repo
   ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
   memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
   render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
   backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
-  pull-and-mirror.sh     # (mirror host) pull claude-chats -> NAS
+  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -> NAS
   onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
   onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
-  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + DOTCLAUDE_MCP_REMOTE to query the archive host over SSH
-  dcmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
+  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
+  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
 hooks/
   sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
   log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
-  publish-now.sh         # manual SessionEnd-on-demand (the /dclog command); reconstructs the hook payload
-  transports/git.sh      # backend: push to the private claude-chats repo on GitHub (zero-infra; optional NAS mirror)
+  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
+  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
   transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
   transports/local.sh    # backend: local copy (the box that has the NAS mounted)
 mcp/
-  dcmcp_server.py        # read-only MCP server over the archive (the /dcrecall|/dcfind|/dcbrowse engine; `uv run --script`)
+  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
 skeleton/host/           # template copied when registering a new machine
 docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
 ```
 
-## Re-home the dotclaude clones
+## Re-home the scrubjay clones
 
-Moving the machinery (e.g. out of `~/code` into `~/.dotclaude`) is machine-local — nothing to commit. See the [Reference cheatsheet](https://henba1.github.io/dotclaude/reference/#re-home-the-dotclaude-clones).
+Moving the machinery (e.g. out of `~/code` into `~/.scrubjay`) is machine-local — nothing to commit. See the [Reference cheatsheet](https://henba1.github.io/scrubjay/reference/#re-home-the-scrubjay-clones).
 
 # Day-to-day
 
@@ -227,20 +227,20 @@ bin/claude-sync.sh         # re-apply config (auto-runs at SessionStart)
 bin/claude-index-chats.sh  # refresh this host's chats.index.json (auto-runs at SessionEnd)
 ```
 
-Escape hatches (env, in `~/.config/dotclaude/config` or inline): `DOTCLAUDE_NOSYNC=1` (skip the start-of-session pull+sync), `DOTCLAUDE_SYNC_NOPULL=1` (sync without pulling). The full toggle list is in the [Reference cheatsheet](https://henba1.github.io/dotclaude/reference/#toggle-behaviour).
+Escape hatches (env, in `~/.config/scrubjay/config` or inline): `SCRUBJAY_NOSYNC=1` (skip the start-of-session pull+sync), `SCRUBJAY_SYNC_NOPULL=1` (sync without pulling). The full toggle list is in the [Reference cheatsheet](https://henba1.github.io/scrubjay/reference/#toggle-behaviour).
 
 ## Find a past chat
 
-Every session is logged by the `SessionEnd` hook to `dotclaude-data/logs/<host>.log` (one line: `time | host | cwd | "first prompt" | session=id`) and pushed, so all machines' histories are searchable from any clone of the data repo:
+Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log` (one line: `time | host | cwd | "first prompt" | session=id`) and pushed, so all machines' histories are searchable from any clone of the data repo:
 
 ```
-git -C ~/.dotclaude/dotclaude-data pull
-grep -i refactor ~/.dotclaude/dotclaude-data/logs/*.log
+git -C ~/.scrubjay/scrubjay-data pull
+grep -i refactor ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
-The full transcript (the `.jsonl`) lives in `claude-chats` / on the NAS under `<host>/<slug>/<session>.jsonl`.
+The full transcript (the `.jsonl`) lives in `scrubjay-chats` / on the NAS under `<host>/<slug>/<session>.jsonl`.
 
-For recall by *topic* (rather than an exact word you remember typing) from inside a live session, use the [`dcmcp` MCP server](https://henba1.github.io/dotclaude/archive-mcp/index.md).
+For recall by *topic* (rather than an exact word you remember typing) from inside a live session, use the [`sjmcp` MCP server](https://henba1.github.io/scrubjay/archive-mcp/index.md).
 
 ## Troubleshooting
 
@@ -248,20 +248,20 @@ For recall by *topic* (rather than an exact word you remember typing) from insid
 
 - **`SessionEnd` triggers on both `/exit` and `/clear`** (the latter then starts a fresh session). Either way, a session that began *before* the hooks were active won't ship.
 - **"SessionEnd hook … Hook cancelled":** Claude cancels hooks that haven't returned by the time the session process exits. `log-session.sh` detaches its network work (git push + relay) so shutdown can't interrupt it — just ensure the machine has pulled the app repo (`git -C <app-clone> pull`; `SessionStart` does this automatically next time).
-- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `dotclaude-data` git sync, not the session relay (see [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md)).
+- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `scrubjay-data` git sync, not the session relay (see [Transcripts: relay + NAS](https://henba1.github.io/scrubjay/transports/index.md)).
 
 # Reference — useful commands
 
-Day-to-day this all runs from hooks; reach for these when you want to do something by hand. Paths assume the default `~/.dotclaude/` layout from [Onboarding](https://henba1.github.io/dotclaude/onboarding/index.md) (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/dc*` commands, see [Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md).
+Day-to-day this all runs from hooks; reach for these when you want to do something by hand. Paths assume the default `~/.scrubjay/` layout from [Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md) (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/dc*` commands, see [Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md).
 
 ## Apply / refresh config now
 
 Normally automatic at session start/end:
 
 ```
-~/.dotclaude/dotclaude/bin/claude-sync.sh           # re-apply data-repo config into ~/.claude
-~/.dotclaude/dotclaude/bin/claude-sync.sh --force   # also back up + replace real (non-symlink) files
-~/.dotclaude/dotclaude/bin/claude-index-chats.sh    # rebuild this host's chats.index.json
+~/.scrubjay/scrubjay/bin/claude-sync.sh           # re-apply data-repo config into ~/.claude
+~/.scrubjay/scrubjay/bin/claude-sync.sh --force   # also back up + replace real (non-symlink) files
+~/.scrubjay/scrubjay/bin/claude-index-chats.sh    # rebuild this host's chats.index.json
 ```
 
 ## Pull the latest from your other machines
@@ -269,90 +269,90 @@ Normally automatic at session start/end:
 The SessionStart hook does both for you:
 
 ```
-git -C ~/.dotclaude/dotclaude-data pull             # config, rules, memory, templates, logs
-git -C ~/.dotclaude/dotclaude      pull             # the scripts & hooks themselves
+git -C ~/.scrubjay/scrubjay-data pull             # config, rules, memory, templates, logs
+git -C ~/.scrubjay/scrubjay      pull             # the scripts & hooks themselves
 ```
 
 ## Find a past chat across every machine
 
 ```
-git -C ~/.dotclaude/dotclaude-data pull
-grep -i <keyword> ~/.dotclaude/dotclaude-data/logs/*.log
+git -C ~/.scrubjay/scrubjay-data pull
+grep -i <keyword> ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
 ## Register the current machine (first-time onboarding)
 
 ```
-~/.dotclaude/dotclaude/bin/claude-register-host.sh --host <name>
+~/.scrubjay/scrubjay/bin/claude-register-host.sh --host <name>
 ```
 
 ## Toggle behaviour
 
-Set in `~/.config/dotclaude/config` (persistent) or inline before a command (one-off) — no file editing needed:
+Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-off) — no file editing needed:
 
-| Env var                            | Effect                                                            |
-| ---------------------------------- | ----------------------------------------------------------------- |
-| `DOTCLAUDE_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`) |
-| `DOTCLAUDE_NOSYNC=1`               | skip the start-of-session pull + sync entirely                    |
-| `DOTCLAUDE_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                          |
-| `DOTCLAUDE_NOSHIP=1`               | end the session without shipping its transcript                   |
-| `DOTCLAUDE_LOG_NOGIT=1`            | append the log line but don't commit/push it                      |
+| Env var                           | Effect                                                            |
+| --------------------------------- | ----------------------------------------------------------------- |
+| `SCRUBJAY_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`) |
+| `SCRUBJAY_NOSYNC=1`               | skip the start-of-session pull + sync entirely                    |
+| `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                          |
+| `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                   |
+| `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                      |
 
-## Re-home the dotclaude clones
+## Re-home the scrubjay clones
 
-Move the machinery (e.g. out of `~/code` into `~/.dotclaude`):
+Move the machinery (e.g. out of `~/code` into `~/.scrubjay`):
 
 ```
-mkdir -p ~/.dotclaude
-mv ~/code/dotclaude ~/code/dotclaude-data ~/code/claude-chats ~/.dotclaude/
+mkdir -p ~/.scrubjay
+mv ~/code/scrubjay ~/code/scrubjay-data ~/code/scrubjay-chats ~/.scrubjay/
 
 # repoint the machine-local pointer at the new location
-cat > ~/.config/dotclaude/config <<'EOF'
-: "${DOTCLAUDE_DATA:=$HOME/.dotclaude/dotclaude-data}"
-: "${DOTCLAUDE_CHATS:=$HOME/.dotclaude/claude-chats}"
-: "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+cat > ~/.config/scrubjay/config <<'EOF'
+: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"
+: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"
+: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"
 EOF
 
-~/.dotclaude/dotclaude/bin/claude-sync.sh   # rebuild the ~/.claude symlinks at the new path
+~/.scrubjay/scrubjay/bin/claude-sync.sh   # rebuild the ~/.claude symlinks at the new path
 ```
 
-`claude-sync.sh` recomputes the app location from its own path and re-links every scope, so nothing else needs touching. Confirm with `readlink -e ~/.claude/{CLAUDE.md,commands,agents,hooks}` (no dangling links). The pinned host name in `~/.config/dotclaude/host` is unaffected. This is machine-local — nothing to commit.
+`claude-sync.sh` recomputes the app location from its own path and re-links every scope, so nothing else needs touching. Confirm with `readlink -e ~/.claude/{CLAUDE.md,commands,agents,hooks}` (no dangling links). The pinned host name in `~/.config/scrubjay/host` is unaffected. This is machine-local — nothing to commit.
 # Archive & recall
 
 # Query the archive (MCP)
 
-`grep`-ing the logs finds a chat by a word you remember typing. The harder case — *"I discussed X* *somewhere* *a while ago, which machine was it even on?"* — is what the **`dcmcp`** MCP server solves: a **read** path back into a live session over everything the relay already wrote (transcripts, plans, cross-machine memory), so you can recall a past session by *topic* and pull it — or just the relevant slice — straight into context without leaving Claude.
+`grep`-ing the logs finds a chat by a word you remember typing. The harder case — *"I discussed X* *somewhere* *a while ago, which machine was it even on?"* — is what the **`sjmcp`** MCP server solves: a **read** path back into a live session over everything the relay already wrote (transcripts, plans, cross-machine memory), so you can recall a past session by *topic* and pull it — or just the relevant slice — straight into context without leaving Claude.
 
-It's a single-file, **read-only** server (`mcp/dcmcp_server.py`, run via `uv run --script`) that reads the same storage pointers as the rest of dotclaude (`DOTCLAUDE_LOCAL_CHATS`, `DOTCLAUDE_MEMORY`, `DOTCLAUDE_DATA`). Recall is deliberately **embedding-free** — a fast ripgrep prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic ranking — so there's no index to build and nothing sensitive ever leaves the NAS. Each `dc_recall` enumerates the archive **once** and resolves every candidate's metadata from that single pass, so cost scales with the size of the archive rather than the number of matches — it stays snappy as the corpus grows (a NAS-mounted archive of ~100+ sessions recalls in tens of milliseconds). It also folds the `logs/<host>.log` **session catalogue** into recall: a topic match there links to the transcript when present, or stands alone as a "you had this on `<host>`" pointer — so recall spans even sessions whose full transcript isn't on the machine you're asking from. It exposes:
+It's a single-file, **read-only** server (`mcp/sjmcp_server.py`, run via `uv run --script`) that reads the same storage pointers as the rest of scrubjay (`SCRUBJAY_LOCAL_CHATS`, `SCRUBJAY_MEMORY`, `SCRUBJAY_DATA`). Recall is deliberately **embedding-free** — a fast ripgrep prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic ranking — so there's no index to build and nothing sensitive ever leaves the NAS. Each `sj_recall` enumerates the archive **once** and resolves every candidate's metadata from that single pass, so cost scales with the size of the archive rather than the number of matches — it stays snappy as the corpus grows (a NAS-mounted archive of ~100+ sessions recalls in tens of milliseconds). It also folds the `logs/<host>.log` **session catalogue** into recall: a topic match there links to the transcript when present, or stands alone as a "you had this on `<host>`" pointer — so recall spans even sessions whose full transcript isn't on the machine you're asking from. It exposes:
 
 | Surface       | What                                                                                                                                                                                                                                                                |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **tools**     | `dc_list` (browse w/ filters, incl. `type=log` for the catalogue), `dc_recall` (topic → ranked candidates + anchors), `dc_search_within` (a topic *inside* one session → turn/line anchors), `dc_get` (fetch an artifact or a `turns=`/`lines=` slice), `dc_status` |
-| **resources** | every transcript/plan/memory as an `@`-pickable resource (`dc://transcript/…`, `dc://plan/…`, `dc://memory/…`) with a human, date-sorted title                                                                                                                      |
-| **commands**  | `/dcrecall <topic>`, `/dcfind <topic> in <session>`, `/dcbrowse [type]`, `/dcget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](https://henba1.github.io/dotclaude/slash-commands/index.md))                                         |
+| **tools**     | `sj_list` (browse w/ filters, incl. `type=log` for the catalogue), `sj_recall` (topic → ranked candidates + anchors), `sj_search_within` (a topic *inside* one session → turn/line anchors), `sj_get` (fetch an artifact or a `turns=`/`lines=` slice), `sj_status` |
+| **resources** | every transcript/plan/memory as an `@`-pickable resource (`sj://transcript/…`, `sj://plan/…`, `sj://memory/…`) with a human, date-sorted title                                                                                                                      |
+| **commands**  | `/sjrecall <topic>`, `/sjfind <topic> in <session>`, `/sjbrowse [type]`, `/sjget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md))                                          |
 
 ## Registration is automatic, three ways
 
 All done by `claude-sync.sh` at **user scope**, picked by what this machine has:
 
-- **On a GitHub (`git` backend) machine** — the `claude-chats` clone *is* the archive: the relay writes the same `<host>/{readable,plans,…}` tree into it that a NAS holds, so `claude-sync.sh` registers a local stdio server pointed straight at the clone. `sync-session.sh` `git pull`s the clone at the start of each session, so recall spans **every** machine's sessions, not just this one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine *memory* recall rides its own repo, not `claude-chats` — enable it with `/dcmemory`, which points it at a separate private `claude-memory` GitHub repo for this backend; transcripts, plans, and the logs catalogue work out of the box. See [memory](https://henba1.github.io/dotclaude/memory-sync/index.md) for the custody trade-off.)
-- **On the archive host** (the always-on home server where `DOTCLAUDE_LOCAL_CHATS` → the NAS is mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.
-- **On a client with no local archive** (a laptop, or an **HPC login node**): run `bin/onboard-mcp-client.sh` (offered by `onboard.sh`). It points `DOTCLAUDE_MCP_REMOTE` at the archive host and registers an `ssh` entry; on connect, a forced command (`bin/dcmcp-serve.sh`) runs the server **on the archive host** and pipes MCP stdio back over the same SSH/ProxyJump path the relay uses. The server side stays a manual `authorized_keys` authorize (printed by the script), like the relay + memory keys. **One mechanism covers both kinds of client:** a laptop on the WireGuard mesh, *and* an HPC login node that can't join it — clusters typically block the outbound UDP that WireGuard needs, so those nodes fall back to plain SSH/ProxyJump instead. If neither path applies, `claude-sync.sh` prints a loud, actionable skip rather than silently doing nothing.
+- **On a GitHub (`git` backend) machine** — the `scrubjay-chats` clone *is* the archive: the relay writes the same `<host>/{readable,plans,…}` tree into it that a NAS holds, so `claude-sync.sh` registers a local stdio server pointed straight at the clone. `sync-session.sh` `git pull`s the clone at the start of each session, so recall spans **every** machine's sessions, not just this one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine *memory* recall rides its own repo, not `scrubjay-chats` — enable it with `/sjmemory`, which points it at a separate private `scrubjay-memory` GitHub repo for this backend; transcripts, plans, and the logs catalogue work out of the box. See [memory](https://henba1.github.io/scrubjay/memory-sync/index.md) for the custody trade-off.)
+- **On the archive host** (the always-on home server where `SCRUBJAY_LOCAL_CHATS` → the NAS is mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.
+- **On a client with no local archive** (a laptop, or an **HPC login node**): run `bin/onboard-mcp-client.sh` (offered by `onboard.sh`). It points `SCRUBJAY_MCP_REMOTE` at the archive host and registers an `ssh` entry; on connect, a forced command (`bin/sjmcp-serve.sh`) runs the server **on the archive host** and pipes MCP stdio back over the same SSH/ProxyJump path the relay uses. The server side stays a manual `authorized_keys` authorize (printed by the script), like the relay + memory keys. **One mechanism covers both kinds of client:** a laptop on the WireGuard mesh, *and* an HPC login node that can't join it — clusters typically block the outbound UDP that WireGuard needs, so those nodes fall back to plain SSH/ProxyJump instead. If neither path applies, `claude-sync.sh` prints a loud, actionable skip rather than silently doing nothing.
 
 ## The remote transport (SSH-stdio)
 
-A client with no local archive registers `dcmcp` as a *stdio* server whose command is `ssh <alias>`. That SSH **jumps the edge/bastion** (ProxyJump) to reach the archive host on the home LAN, where a forced command launches the read-only server; MCP JSON-RPC rides the pipe. The clever bit is the **two nested SSH sessions**: an *outer* one authenticates to the edge (whose key is restricted to forwarding a single port — no shell), and an *inner*, **end-to-end** session runs through that tunnel to the archive host. So the edge only ever relays opaque ciphertext — it can't read or tamper with the MCP traffic. Auth is asymmetric (an `ed25519` key, verified at both hops); the tunnel itself is the usual symmetric SSH channel.
+A client with no local archive registers `sjmcp` as a *stdio* server whose command is `ssh <alias>`. That SSH **jumps the edge/bastion** (ProxyJump) to reach the archive host on the home LAN, where a forced command launches the read-only server; MCP JSON-RPC rides the pipe. The clever bit is the **two nested SSH sessions**: an *outer* one authenticates to the edge (whose key is restricted to forwarding a single port — no shell), and an *inner*, **end-to-end** session runs through that tunnel to the archive host. So the edge only ever relays opaque ciphertext — it can't read or tamper with the MCP traffic. Auth is asymmetric (an `ed25519` key, verified at both hops); the tunnel itself is the usual symmetric SSH channel.
 
-Diagram source: [`transport-mcp.dot`](https://henba1.github.io/dotclaude/transport-mcp.dot) — `dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg`. Placeholder DDNS name + default ports; substitute your own.
+Diagram source: [`transport-mcp.dot`](https://henba1.github.io/scrubjay/transport-mcp.dot) — `dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg`. Placeholder DDNS name + default ports; substitute your own.
 
 ## The one manual step — authorize the client on the archive host
 
 `onboard-mcp-client.sh` does everything on the client, then prints the exact line(s) to install by hand (the server side is never automated — same rule as the relay + memory keys). Each key is pinned to the read-only server and nothing else:
 
-- **On the archive host**, add to the **owner account**'s `~/.ssh/authorized_keys` (the account with `uv` + the dotclaude clone + archive read — *not* the write-only relay account). The forced command confines the key to the one server, so a leaked key can only run read-only archive queries:
+- **On the archive host**, add to the **owner account**'s `~/.ssh/authorized_keys` (the account with `uv` + the scrubjay clone + archive read — *not* the write-only relay account). The forced command confines the key to the one server, so a leaked key can only run read-only archive queries:
 
 ```
-command="<abs-path-to-clone>/bin/dcmcp-serve.sh",restrict <the printed public key>
+command="<abs-path-to-clone>/bin/sjmcp-serve.sh",restrict <the printed public key>
 ```
 
 - **If the path crosses a ProxyJump edge/bastion** (e.g. an HPC client), also add to the jump user's `~/.ssh/authorized_keys` **on the edge** — letting the key tunnel only to the archive host's port, run nothing:
@@ -365,39 +365,39 @@ Then verify from the client — \`ssh
 
 # Slash commands
 
-All dotclaude commands live in `commands/*.md` and are symlinked into `~/.claude/commands/` by `claude-sync.sh`, so they're available in every session as `/<name>`. Because they ship with the **app** (not your private data repo), every machine that installs dotclaude gets them out of the box. They fall into two groups: **archive/recall** commands are thin wrappers that drive the read-only [`dcmcp` MCP tools](https://henba1.github.io/dotclaude/archive-mcp/index.md); **lifecycle** commands just run the same scripts the `SessionStart`/`SessionEnd` hooks do, on demand.
+All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/commands/` by `claude-sync.sh`, so they're available in every session as `/<name>`. Because they ship with the **app** (not your private data repo), every machine that installs scrubjay gets them out of the box. They fall into two groups: **archive/recall** commands are thin wrappers that drive the read-only [`sjmcp` MCP tools](https://henba1.github.io/scrubjay/archive-mcp/index.md); **lifecycle** commands just run the same scripts the `SessionStart`/`SessionEnd` hooks do, on demand.
 
-## Archive & recall (drive the `dcmcp` tools)
+## Archive & recall (drive the `sjmcp` tools)
 
 | Command                                                        | Calls under the hood                        | Typically useful for                                                                                                                                                                                                                                 |
 | -------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/dcrecall <topic> [host= project= since=]`                    | `dc_recall` → `dc_get`                      | *"I discussed X somewhere, ages ago — which machine even?"* Semantic recall across **all** machines: ranks candidates by topic, then pulls the one you pick (or a slice) into context. Start here when you remember the gist but not the where/when. |
-| `/dcbrowse [transcript\|plan\|memory] [host= project= since=]` | `dc_list` → `dc_get`                        | Eyeballing a **date-sorted list** and grabbing one, when you have no search term in mind — "show me the last few plans on `laptop`."                                                                                                                 |
-| `/dcfind <topic> in <session-id\|topic-words> [context=N]`     | `dc_search_within` (+ `dc_recall`/`dc_get`) | You know **which** session and want the **exact spot** a subject came up — returns turn/line anchors inside that one transcript instead of the whole thing.                                                                                          |
-| `/dcget <sid8 \| path \| dc://uri> [turns=A-B \| lines=A-B]`   | `dc_get` (one call, no search)              | You **already know the item** and just want it pulled in — cheapest way, no recall/ranking. Its edge is **slicing**: fetch only `lines=1200-1300` or `turns=5-10` of a huge transcript to keep tokens down.                                          |
+| `/sjrecall <topic> [host= project= since=]`                    | `sj_recall` → `sj_get`                      | *"I discussed X somewhere, ages ago — which machine even?"* Semantic recall across **all** machines: ranks candidates by topic, then pulls the one you pick (or a slice) into context. Start here when you remember the gist but not the where/when. |
+| `/sjbrowse [transcript\|plan\|memory] [host= project= since=]` | `sj_list` → `sj_get`                        | Eyeballing a **date-sorted list** and grabbing one, when you have no search term in mind — "show me the last few plans on `laptop`."                                                                                                                 |
+| `/sjfind <topic> in <session-id\|topic-words> [context=N]`     | `sj_search_within` (+ `sj_recall`/`sj_get`) | You know **which** session and want the **exact spot** a subject came up — returns turn/line anchors inside that one transcript instead of the whole thing.                                                                                          |
+| `/sjget <sid8 \| path \| sj://uri> [turns=A-B \| lines=A-B]`   | `sj_get` (one call, no search)              | You **already know the item** and just want it pulled in — cheapest way, no recall/ranking. Its edge is **slicing**: fetch only `lines=1200-1300` or `turns=5-10` of a huge transcript to keep tokens down.                                          |
 
-> For pulling a *whole small* doc with even less overhead than `/dcget`, `@`-mention it from the `dcmcp` resource picker (match on the title, e.g. `plan: … — <date> · <host>`) — the harness injects it directly with no tool call at all.
+> For pulling a *whole small* doc with even less overhead than `/sjget`, `@`-mention it from the `sjmcp` resource picker (match on the title, e.g. `plan: … — <date> · <host>`) — the harness injects it directly with no tool call at all.
 
 ## Lifecycle & sync (run the hook scripts on demand)
 
-| Command             | Mirrors      | Does                                                                                                                                                                                                                                                           |
-| ------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/dcsync`           | SessionStart | Pull the data repo + cross-machine memory, then re-apply config into `~/.claude`. Grab changes another machine just pushed, mid-session, instead of waiting for the next start.                                                                                |
-| `/dclog`            | SessionEnd   | Publish *now* without ending the session: log line + chats index + push data repo + push memory + relay this session's transcript/plans/history/tasks to the NAS. Handy so another machine (or `/dcrecall`) can see it right away.                             |
-| `/dconboard [hint]` | —            | Guided wrapper around `bin/onboard.sh` (gathers choices in chat, then runs it unattended). For onboarding or reconfiguring (e.g. *"switch backend to rsync-wg"*). For a *brand-new* machine without dotclaude yet, run `bin/onboard.sh` in a terminal instead. |
-| `/dcmemory`         | —            | Enable/repair cross-machine memory on **this** machine (idempotent — runs `bin/onboard-memory.sh`). First-time memory setup, or when memory sync looks broken.                                                                                                 |
+| Command             | Mirrors      | Does                                                                                                                                                                                                                                                          |
+| ------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/sjsync`           | SessionStart | Pull the data repo + cross-machine memory, then re-apply config into `~/.claude`. Grab changes another machine just pushed, mid-session, instead of waiting for the next start.                                                                               |
+| `/sjlog`            | SessionEnd   | Publish *now* without ending the session: log line + chats index + push data repo + push memory + relay this session's transcript/plans/history/tasks to the NAS. Handy so another machine (or `/sjrecall`) can see it right away.                            |
+| `/sjonboard [hint]` | —            | Guided wrapper around `bin/onboard.sh` (gathers choices in chat, then runs it unattended). For onboarding or reconfiguring (e.g. *"switch backend to rsync-wg"*). For a *brand-new* machine without scrubjay yet, run `bin/onboard.sh` in a terminal instead. |
+| `/sjmemory`         | —            | Enable/repair cross-machine memory on **this** machine (idempotent — runs `bin/onboard-memory.sh`). First-time memory setup, or when memory sync looks broken.                                                                                                |
 # Transcript relay
 
 # Transcripts: relay + NAS
 
-`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND`).
+`SessionEnd` ships a session's artifacts off the machine via a **pluggable backend** (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by `SCRUBJAY_TRANSCRIPT_BACKEND`).
 
 There are two parallel places those artifacts can land, chosen once at onboard time:
 
 - **Your own NAS** (`rsync-wg` / `local` backends) — peer-to-peer over WireGuard/SSH; nothing ever touches a third party. Needs a NAS + WireGuard, and is what most of this page describes.
-- **GitHub** (`git` backend) — each session is pushed to a private `claude-chats` repo. Zero infrastructure to run; the tradeoff is that transcripts live in a (private) third-party repo. See [Backends](#backends) below.
+- **GitHub** (`git` backend) — each session is pushed to a private `scrubjay-chats` repo. Zero infrastructure to run; the tradeoff is that transcripts live in a (private) third-party repo. See [Backends](#backends) below.
 
-The layout and artifacts are identical either way — with the `git` backend they just land in the `claude-chats` repo instead of on the NAS. The rest of this page walks the NAS design in full.
+The layout and artifacts are identical either way — with the `git` backend they just land in the `scrubjay-chats` repo instead of on the NAS. The rest of this page walks the NAS design in full.
 
 On the NAS path, what rides which route is split by **privacy**:
 
@@ -415,11 +415,11 @@ On the NAS path, what rides which route is split by **privacy**:
 
 The NAS holds **two parallel trees per host**. The `.jsonl` tree above is canonical — exact, machine-readable, the thing you'd resume or feed to a tool. Alongside it, a `readable/` tree holds the same sessions rendered as Markdown session logs (user + assistant text plus the full tool stream — each call shows its input, Bash commands verbatim, and the tool's output inline; only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by **project** (the session's working dir), each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified. Rendering happens automatically on every ship (`bin/render-transcript.sh`, additive — it never touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS.
 
-Plans get the same human-friendly treatment: Claude Code saves each plan under three random words (`rippling-sprouting-whisper.md`), so on every ship `dc_normalize_plans` (in `bin/lib.sh`) renames them *in place* to `<date>_<topic>.md` — date from the file's mtime, topic from the plan's first heading (a leading `Plan:` stripped) — before the `plans/` dir is mirrored. It's idempotent (already-dated names are left alone), so each machine self-normalizes its own plans going forward. Unlike the always-additive transcript/`readable/` trees, the `plans/` mirror is **authoritative** (`transport_ship … mirror`): the relay copy is made an exact copy of the local `plans/`, so a plan that was already shipped under its old random-word name doesn't linger as a stale duplicate after the rename.
+Plans get the same human-friendly treatment: Claude Code saves each plan under three random words (`rippling-sprouting-whisper.md`), so on every ship `sj_normalize_plans` (in `bin/lib.sh`) renames them *in place* to `<date>_<topic>.md` — date from the file's mtime, topic from the plan's first heading (a leading `Plan:` stripped) — before the `plans/` dir is mirrored. It's idempotent (already-dated names are left alone), so each machine self-normalizes its own plans going forward. Unlike the always-additive transcript/`readable/` trees, the `plans/` mirror is **authoritative** (`transport_ship … mirror`): the relay copy is made an exact copy of the local `plans/`, so a plan that was already shipped under its old random-word name doesn't linger as a stale duplicate after the rename.
 
-**Memory → its own git repo.** Auto-memory needs git's *bidirectional merge + history* (so the same project recalls memory written on any machine), so it rides a dedicated repo separate from everything else. Because it holds **sensitive paths**, *where* that repo lives is a custody choice that follows your backend: a **bare git repo on the NAS, reached over WireGuard** (`local`/`rsync-wg` — sensitive paths never leave your hardware; the default), or a **separate private GitHub repo** (`git` backend — simpler wiring, but stores those paths in a third party's private repo). `DOTCLAUDE_MEMORY_REMOTE` holds whichever — a local path on the NAS box, `ssh://…` over WG on clients, or a `git@github.com:…` repo. See [memory](https://henba1.github.io/dotclaude/memory-sync/index.md) for the trade-off in full. `claude-sync.sh` symlinks each project's native `~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines — *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`) publishes it on session end. No third party ever sees it. The pull and the publish also run on demand mid-session via the **`/dcsync`** and **`/dclog`** slash commands (shipped with the app, wrapping `sync-session.sh` and `hooks/publish-now.sh`). (Older versions kept memory per-host in `dotclaude-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.) See [memory-sync.md](https://henba1.github.io/dotclaude/memory-sync/index.md) for the bare-repo setup and per-client WG onboarding.
+**Memory → its own git repo.** Auto-memory needs git's *bidirectional merge + history* (so the same project recalls memory written on any machine), so it rides a dedicated repo separate from everything else. Because it holds **sensitive paths**, *where* that repo lives is a custody choice that follows your backend: a **bare git repo on the NAS, reached over WireGuard** (`local`/`rsync-wg` — sensitive paths never leave your hardware; the default), or a **separate private GitHub repo** (`git` backend — simpler wiring, but stores those paths in a third party's private repo). `SCRUBJAY_MEMORY_REMOTE` holds whichever — a local path on the NAS box, `ssh://…` over WG on clients, or a `git@github.com:…` repo. See [memory](https://henba1.github.io/scrubjay/memory-sync/index.md) for the trade-off in full. `claude-sync.sh` symlinks each project's native `~/.claude/projects/<project>/memory/` into a local clone (`SCRUBJAY_MEMORY`, shared across machines — *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`) publishes it on session end. No third party ever sees it. The pull and the publish also run on demand mid-session via the **`/sjsync`** and **`/sjlog`** slash commands (shipped with the app, wrapping `sync-session.sh` and `hooks/publish-now.sh`). (Older versions kept memory per-host in `scrubjay-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.) See [memory-sync.md](https://henba1.github.io/scrubjay/memory-sync/index.md) for the bare-repo setup and per-client WG onboarding.
 
-**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, *personal* `commands`, `agents`, the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal git. (The generic `/dc*` slash commands instead ship with the **app** in `dotclaude/commands/`, so a fresh install has them immediately; `claude-sync.sh` merges both sources into `~/.claude/commands/`. Memory used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
+**Not sensitive → git (`scrubjay-data`, GitHub).** Your rules, `settings`, *personal* `commands`, `agents`, the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal git. (The generic `/dc*` slash commands instead ship with the **app** in `scrubjay/commands/`, so a fresh install has them immediately; `claude-sync.sh` merges both sources into `~/.claude/commands/`. Memory used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
 
 ## The two peer-to-peer paths to your NAS
 
@@ -436,7 +436,7 @@ The bastion is the *only* box exposed to the internet; the receiver and NAS stay
 - a **DDNS** name (e.g. `home.ddns.example`) so the sender always finds your home even when the ISP rotates your public IP;
 - **one public TCP port** forwarded on your router to the bastion — the single inbound hole;
 - an **edge/bastion** machine (always-on, internet-facing, holds no NAS) whose jump key is restricted to *port-forwarding to the receiver only*, no shell;
-- the **receiver** (the NAS box) authorizes that same key as a write-only `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` + group-normalizes perms);
+- the **receiver** (the NAS box) authorizes that same key as a write-only `command="<APP>/bin/sj-receive.sh …",restrict` line (wraps `rrsync -wo` + group-normalizes perms);
 - `rsync ≥ 3.2.3` on both ends.
 
 `bin/onboard-hpc-client.sh` (on the sender) and `bin/onboard-edge-node.sh` (on the bastion) configure both ends; the private `runbooks/wireguard-transcripts.md` is the full walk-through.
@@ -445,17 +445,17 @@ The bastion is the *only* box exposed to the internet; the receiver and NAS stay
 
 One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *or* a directory):
 
-- **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
-- **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
-- **`git`** — the zero-infrastructure option: push each session to the private `claude-chats` repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that transcripts live in a (private) third-party repo rather than only on your own hardware. Optionally, a mirror host can *also* pull them down to a NAS ([mirror-host.md](https://henba1.github.io/dotclaude/mirror-host/index.md)) — but the GitHub repo is a perfectly good permanent home on its own.
+- **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set `SCRUBJAY_LOCAL_CHATS` to the NAS chats root.
+- **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set `SCRUBJAY_WG_TARGET` + `SCRUBJAY_WG_SSHKEY`.
+- **`git`** — the zero-infrastructure option: push each session to the private `scrubjay-chats` repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that transcripts live in a (private) third-party repo rather than only on your own hardware. Optionally, a mirror host can *also* pull them down to a NAS ([mirror-host.md](https://henba1.github.io/scrubjay/mirror-host/index.md)) — but the GitHub repo is a perfectly good permanent home on its own.
 
 **P2P requirements** (the `rsync-wg` path):
 
 - the sender can reach the receiver (the NAS box) over WireGuard;
-- a **per-machine** SSH key (`DOTCLAUDE_WG_SSHKEY`), authorized on the receiver as a **write-only** `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` and chmods each push group-readable) — a leaked key can't read the archive back, get a shell, or forward;
+- a **per-machine** SSH key (`SCRUBJAY_WG_SSHKEY`), authorized on the receiver as a **write-only** `command="<APP>/bin/sj-receive.sh …",restrict` line (wraps `rrsync -wo` and chmods each push group-readable) — a leaked key can't read the archive back, get a shell, or forward;
 - `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
 
-Full design + the WireGuard activation runbook: [transcript-transport.md](https://henba1.github.io/dotclaude/transcript-transport/index.md) and (private) `dotclaude-data/runbooks/wireguard-transcripts.md`.
+Full design + the WireGuard activation runbook: [transcript-transport.md](https://henba1.github.io/scrubjay/transcript-transport/index.md) and (private) `scrubjay-data/runbooks/wireguard-transcripts.md`.
 
 # Transcript transport (pluggable)
 
@@ -470,7 +470,7 @@ The `SessionEnd` hook relays a session's artifacts off each machine. The *how* i
 
 The layout is uniform: **`<host>/` + the same path Claude uses locally.** (Memory is the one exception — it drops the host prefix because it's *shared* across machines, not archived per-host; see `memory-sync.md`.) `CLAUDE.local.md` is host-specific, so it's a one-way per-host archive, not merged like memory.
 
-`transport_ship <src> <relpath>` accepts a file *or* a directory. (Memory is **not** shipped here — it rides the `dotclaude-data` git sync.)
+`transport_ship <src> <relpath>` accepts a file *or* a directory. (Memory is **not** shipped here — it rides the `scrubjay-data` git sync.)
 
 ## How it's wired
 
@@ -480,11 +480,11 @@ SessionEnd hook (hooks/log-session.sh)
          └─ hooks/transports/<backend>.sh   ::  transport_ship <src> <host/slug/session.jsonl>
 ```
 
-Backend is chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND` in `~/.config/dotclaude/config`. A backend is one file defining `transport_ship <src> <relpath>`.
+Backend is chosen by `SCRUBJAY_TRANSCRIPT_BACKEND` in `~/.config/scrubjay/config`. A backend is one file defining `transport_ship <src> <relpath>`.
 
 ## Backend: `git` (GitHub — zero infrastructure)
 
-Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS: GitHub *is* the shared store, and no WireGuard or receiver is involved. Optionally, a mirror host can *also* pull the repo down to a NAS (`mirror-host.md`), but that's an add-on — the private repo is a fine permanent home on its own.
+Copies the transcript into the `scrubjay-chats` private repo (`SCRUBJAY_CHATS`) and pushes it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS: GitHub *is* the shared store, and no WireGuard or receiver is involved. Optionally, a mirror host can *also* pull the repo down to a NAS (`mirror-host.md`), but that's an add-on — the private repo is a fine permanent home on its own.
 
 ⚠️ Tradeoff: transcripts transit and live on GitHub's servers. The repo is private, but it's still a third party — that's the price of not running your own storage. If that matters to you, use `rsync-wg`/`local` instead.
 
@@ -492,20 +492,20 @@ Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) a
 
 Each machine holds a per-machine SSH key and rsyncs **over a WireGuard/SSH tunnel** directly to the NAS receiver. No data on any third-party server.
 
-Set in `~/.config/dotclaude/config`:
+Set in `~/.config/scrubjay/config`:
 
 ```
-DOTCLAUDE_TRANSCRIPT_BACKEND="rsync-wg"
-DOTCLAUDE_WG_TARGET="claude-rx@claude-receiver"            # ssh destination ONLY — no remote path
-DOTCLAUDE_WG_SSHKEY="$HOME/.ssh/claude_transcripts_ed25519"
+SCRUBJAY_TRANSCRIPT_BACKEND="rsync-wg"
+SCRUBJAY_WG_TARGET="scrubjay-rx@scrubjay-receiver"            # ssh destination ONLY — no remote path
+SCRUBJAY_WG_SSHKEY="$HOME/.ssh/scrubjay_transcripts_ed25519"
 ```
 
-⚠️ **No remote path in `DOTCLAUDE_WG_TARGET`.** The receiver authorizes the key with a forced `command="<APP>/bin/dc-receive.sh <root>"` (which runs `rrsync -wo <root>` then chmods the landed files group-readable — see below), which pins the destination root; everything the client sends is taken **relative** to it. Including `:/srv/claude-chats` would make `rrsync` re-root it *under* itself (`/srv/claude-chats/srv/claude-chats/…`). Per-machine reachability — `HostName`, the (often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `claude-receiver` alias, so this config line is identical on every machine. `bin/onboard.sh` writes both.
+⚠️ **No remote path in `SCRUBJAY_WG_TARGET`.** The receiver authorizes the key with a forced `command="<APP>/bin/sj-receive.sh <root>"` (which runs `rrsync -wo <root>` then chmods the landed files group-readable — see below), which pins the destination root; everything the client sends is taken **relative** to it. Including `:/srv/scrubjay-chats` would make `rrsync` re-root it *under* itself (`/srv/scrubjay-chats/srv/scrubjay-chats/…`). Per-machine reachability — `HostName`, the (often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `scrubjay-receiver` alias, so this config line is identical on every machine. `bin/onboard.sh` writes both.
 
 Receiver requirements (see the private `runbooks/wireguard-transcripts.md`):
 
-- a restricted `command="<APP>/bin/dc-receive.sh <root>",restrict` line per machine key — `dc-receive.sh` wraps `rrsync -wo <root>` (write-only, no shell) and, after each push, chmods the new files group-readable so the archive owner (human + MCP server) can read what the relay account wrote (the relay writes `0600`; setgid stamps the shared group, this adds group-read);
-- the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:claude-rx:x` on a `0750` parent like `/media/<user>`);
+- a restricted `command="<APP>/bin/sj-receive.sh <root>",restrict` line per machine key — `sj-receive.sh` wraps `rrsync -wo <root>` (write-only, no shell) and, after each push, chmods the new files group-readable so the archive owner (human + MCP server) can read what the relay account wrote (the relay writes `0600`; setgid stamps the shared group, this adds group-read);
+- the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:scrubjay-rx:x` on a `0750` parent like `/media/<user>`);
 - `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
 
 ## Backend: `local` (the box that *is* the NAS)
@@ -513,8 +513,8 @@ Receiver requirements (see the private `runbooks/wireguard-transcripts.md`):
 The receiver itself (the machine with the NAS mounted) shouldn't rsync to itself over WG. The `local` backend just copies the transcript straight into the NAS chats root:
 
 ```
-DOTCLAUDE_TRANSCRIPT_BACKEND="local"
-DOTCLAUDE_LOCAL_CHATS="/mnt/nas1/dotclaude-storage"   # the NAS storage root
+SCRUBJAY_TRANSCRIPT_BACKEND="local"
+SCRUBJAY_LOCAL_CHATS="/mnt/nas1/scrubjay-storage"   # the NAS storage root
 ```
 
 Layout matches every other backend (`<host>/<slug>/<session>.jsonl`), so a `local` sender and the WG receivers all write into one tree. Lives in `hooks/transports/local.sh`.
@@ -526,63 +526,63 @@ Adding any other transport (e.g. S3, syncthing) is just another `hooks/transport
 Auto-memory (`~/.claude/projects/<project>/memory/`) wants git's **bidirectional merge + history** so the same project recalls memory written on any machine — so it rides its **own dedicated git repo**, separate from everything else. Where that repo lives mirrors your transcript backend, and the choice is a **custody trade-off** because memory holds **real filesystem paths**:
 
 - **Self-hosted on the NAS** (`local` / `rsync-wg` backends) — a bare repo on your own hardware, reached over the existing WireGuard tunnel. **No third party ever sees it.** This is the default and the reason the setup exists: sensitive paths stay on gear you own. The cost is standing infrastructure — a NAS box, WireGuard, DDNS.
-- **A private GitHub repo** (`git` backend) — a separate private `claude-memory` repo, pushed with your normal GitHub SSH credentials (no dedicated key, no receiver step — simpler than the NAS path). The trade-off: your memory's real filesystem paths now sit in a **third party's** private repo (encrypted at rest, private, but off your hardware). Choose this if that's acceptable and you'd rather skip the NAS/WireGuard/DDNS wiring.
+- **A private GitHub repo** (`git` backend) — a separate private `scrubjay-memory` repo, pushed with your normal GitHub SSH credentials (no dedicated key, no receiver step — simpler than the NAS path). The trade-off: your memory's real filesystem paths now sit in a **third party's** private repo (encrypted at rest, private, but off your hardware). Choose this if that's acceptable and you'd rather skip the NAS/WireGuard/DDNS wiring.
 
-Either way it's the *same* mechanism below — only `DOTCLAUDE_MEMORY_REMOTE` differs.
+Either way it's the *same* mechanism below — only `SCRUBJAY_MEMORY_REMOTE` differs.
 
 ```
-~/.claude/projects/<project>/memory/   ──symlink──►   $DOTCLAUDE_MEMORY/<project>/   (local clone)
+~/.claude/projects/<project>/memory/   ──symlink──►   $SCRUBJAY_MEMORY/<project>/   (local clone)
                                                               │  git pull --rebase  (SessionStart)
                                                               │  git push           (SessionEnd)
                                                               ▼
-                                          $DOTCLAUDE_MEMORY_REMOTE  =  bare repo on the NAS
+                                          $SCRUBJAY_MEMORY_REMOTE  =  bare repo on the NAS
                                           (local path on the NAS box · ssh://…over-WG on clients)
 ```
 
 - `bin/memory-sync.sh pull|push` — clones on first use, then pulls/pushes. Best-effort, never blocks.
-- `bin/claude-sync.sh` — symlinks each project's memory dir into the clone (**shared**, not per-host), and on first run migrates any legacy `dotclaude-data/memory/<host>/` content into it.
+- `bin/claude-sync.sh` — symlinks each project's memory dir into the clone (**shared**, not per-host), and on first run migrates any legacy `scrubjay-data/memory/<host>/` content into it.
 - Hooks: `sync-session.sh` pulls before linking; `log-session.sh` pushes at session end.
 
-## Config keys (`~/.config/dotclaude/config`)
+## Config keys (`~/.config/scrubjay/config`)
 
 ```
-: "${DOTCLAUDE_MEMORY:=$HOME/.dotclaude/claude-memory}"          # local working clone
-: "${DOTCLAUDE_MEMORY_REMOTE:=...}"                              # the bare repo (see below)
+: "${SCRUBJAY_MEMORY:=$HOME/.scrubjay/scrubjay-memory}"          # local working clone
+: "${SCRUBJAY_MEMORY_REMOTE:=...}"                              # the bare repo (see below)
 ```
 
-If `DOTCLAUDE_MEMORY_REMOTE` is unset, memory sync is **off** — the dir is just machine-local.
+If `SCRUBJAY_MEMORY_REMOTE` is unset, memory sync is **off** — the dir is just machine-local.
 
 ## Setup — automated
 
-`bin/onboard-memory.sh` does all of the below, idempotently, on any machine — it's also run by `bin/onboard.sh` and exposed as the **`/dcmemory`** slash command. Run it once; re-running on an already-configured machine is a safe no-op:
+`bin/onboard-memory.sh` does all of the below, idempotently, on any machine — it's also run by `bin/onboard.sh` and exposed as the **`/sjmemory`** slash command. Run it once; re-running on an already-configured machine is a safe no-op:
 
 ```
-bin/onboard-memory.sh        # or: /dcmemory   (from inside a session)
+bin/onboard-memory.sh        # or: /sjmemory   (from inside a session)
 ```
 
 - **NAS box** (`local` backend): derives the bare-repo path from the NAS root, `git init --bare`s it if absent, sets the config keys, then clones + migrates legacy memory in + links the memory dirs.
-- **WG client** (`rsync-wg` backend): generates a dedicated `claude_memory_ed25519` key + a `claude-memory` ssh alias (cribbing host/port from the `claude-receiver` alias), sets the config keys, and **prints the one `authorized_keys` line** to add on the receiver (the server-side step stays manual — see below). Override anything via `MEM_BARE`, `MEM_GIT_USER`, `MEM_RECV_HOST`, etc.
-- **GitHub-only** (`git` backend): points `DOTCLAUDE_MEMORY_REMOTE` at a **separate private GitHub repo**, defaulting to a `claude-memory` sibling of your other repos (derived from the `claude-chats`/app clone's owner; override with `MEM_GIT_REMOTE`). No key or receiver step — it uses your normal GitHub SSH credentials. **You must create that empty private repo on GitHub first** (GitHub won't auto-create it); the first push populates it. `onboard-memory.sh` prints the privacy trade-off before wiring it.
+- **WG client** (`rsync-wg` backend): generates a dedicated `scrubjay_memory_ed25519` key + a `scrubjay-memory` ssh alias (cribbing host/port from the `scrubjay-receiver` alias), sets the config keys, and **prints the one `authorized_keys` line** to add on the receiver (the server-side step stays manual — see below). Override anything via `MEM_BARE`, `MEM_GIT_USER`, `MEM_RECV_HOST`, etc.
+- **GitHub-only** (`git` backend): points `SCRUBJAY_MEMORY_REMOTE` at a **separate private GitHub repo**, defaulting to a `scrubjay-memory` sibling of your other repos (derived from the `scrubjay-chats`/app clone's owner; override with `MEM_GIT_REMOTE`). No key or receiver step — it uses your normal GitHub SSH credentials. **You must create that empty private repo on GitHub first** (GitHub won't auto-create it); the first push populates it. `onboard-memory.sh` prints the privacy trade-off before wiring it.
 
 ## Setup — what it does by hand (reference)
 
 NAS box (the bare repo lives **inside** the NAS storage folder, next to the transcript trees):
 
 ```
-git init --bare /mnt/nas1/dotclaude-storage/memory.git          # the bare repo
-# DOTCLAUDE_MEMORY_REMOTE=/mnt/nas1/dotclaude-storage/memory.git     (a LOCAL path; no SSH hop here)
+git init --bare /mnt/nas1/scrubjay-storage/memory.git          # the bare repo
+# SCRUBJAY_MEMORY_REMOTE=/mnt/nas1/scrubjay-storage/memory.git     (a LOCAL path; no SSH hop here)
 bin/memory-sync.sh pull && bin/claude-sync.sh && bin/memory-sync.sh push
 ```
 
-`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`dotclaude-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push).
+`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`scrubjay-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push).
 
 WG client — git needs **full git-over-SSH**, and the transcript relay key can't be reused (its forced `rrsync -wo` command blocks git). `onboard-memory.sh` makes the key + alias; you add its public key on the receiver, restricted to git:
 
 ```
 # on the receiver, in the git user's ~/.ssh/authorized_keys (printed for you by onboard-memory.sh):
 command="git-shell -c \"$SSH_ORIGINAL_COMMAND\"",restrict ssh-ed25519 AAAA... <host> memory-git
-# then on the client:  DOTCLAUDE_MEMORY_REMOTE=claude-memory:/srv/claude-chats/memory.git
-#   (/srv/claude-chats is the receiver's symlink to the dotclaude-storage folder)
+# then on the client:  SCRUBJAY_MEMORY_REMOTE=scrubjay-memory:/srv/scrubjay-chats/memory.git
+#   (/srv/scrubjay-chats is the receiver's symlink to the scrubjay-storage folder)
 bin/memory-sync.sh pull && bin/claude-sync.sh
 ```
 
@@ -591,12 +591,12 @@ From then on the client pulls others' memory at session start and publishes its 
 GitHub-only (`git` backend) — the simplest of the three: no bare repo, no key, no receiver admin. The **one prerequisite is yours to do first**, because GitHub won't create the repo for you:
 
 ```
-# 1) create an EMPTY private repo on GitHub — a SEPARATE one, not claude-chats. Name it claude-memory
+# 1) create an EMPTY private repo on GitHub — a SEPARATE one, not scrubjay-chats. Name it scrubjay-memory
 #    (that's the default onboard-memory.sh derives). e.g. with the gh CLI:
-gh repo create <owner>/claude-memory --private
-# 2) then run the onboarder (or /dcmemory) on this machine — it derives the remote, sets the config
+gh repo create <owner>/scrubjay-memory --private
+# 2) then run the onboarder (or /sjmemory) on this machine — it derives the remote, sets the config
 #    keys, and the first push populates the empty repo. Override the derived name with MEM_GIT_REMOTE.
-MEM_GIT_REMOTE=git@github.com:<owner>/claude-memory.git bin/onboard-memory.sh
+MEM_GIT_REMOTE=git@github.com:<owner>/scrubjay-memory.git bin/onboard-memory.sh
 ```
 
 Skip step 1 and the first push has nowhere to land — sync silently no-ops until the repo exists. Every other machine on the `git` backend just runs the onboarder and clones the same repo; no per-machine authorization (it rides your normal GitHub SSH credentials). Remember this repo now holds your memory's real filesystem paths — keep it **private**.
@@ -618,7 +618,7 @@ The memory ride reuses the transcript relay's *connection* (same host, port, acc
 
    ```
    sudo -u <relay-account> git config --global --add safe.directory <repo>          # real path
-   sudo -u <relay-account> git config --global --add safe.directory <symlink-path>  # e.g. /srv/claude-chats/memory.git
+   sudo -u <relay-account> git config --global --add safe.directory <symlink-path>  # e.g. /srv/scrubjay-chats/memory.git
    ```
 
 1. **Authorize each client key** with the `git-shell` forced-command line from step above, and make sure `git-shell` is installed on the receiver.
@@ -627,25 +627,25 @@ After these, every new client is fully covered by `onboard-memory.sh` + adding i
 
 # Mirror host (optional): also keep a NAS copy of the `git` backend
 
-**Optional add-on for the `git` backend.** If you use GitHub as your shared store, the private `claude-chats` repo is already a complete, permanent home for your transcripts — you don't need this page. But if you *also* want a copy on your home NAS (extra durability, or to feed the local MCP archive), an always-on **mirror host** (any small home server — make/model doesn't matter) bridges the two: it pulls the `claude-chats` repo every 30 min and mirrors it into `$NAS1/dotclaude-storage`.
+**Optional add-on for the `git` backend.** If you use GitHub as your shared store, the private `scrubjay-chats` repo is already a complete, permanent home for your transcripts — you don't need this page. But if you *also* want a copy on your home NAS (extra durability, or to feed the local MCP archive), an always-on **mirror host** (any small home server — make/model doesn't matter) bridges the two: it pulls the `scrubjay-chats` repo every 30 min and mirrors it into `$NAS1/scrubjay-storage`.
 
 ## One-time setup
 
-1. SSH key on the mirror host added to GitHub (read access to `claude-chats`).
+1. SSH key on the mirror host added to GitHub (read access to `scrubjay-chats`).
 
 1. Clone the app for the script:
 
    ```
-   git clone git@github.com:<your-gh-user>/dotclaude.git ~/dotclaude
+   git clone git@github.com:<your-gh-user>/scrubjay.git ~/scrubjay
    ```
 
-1. Make sure the NAS is mounted (e.g. `/mnt/nas1/dotclaude-storage`).
+1. Make sure the NAS is mounted (e.g. `/mnt/nas1/scrubjay-storage`).
 
-1. Test once (`CHATS_REPO_URL` is only needed the first run, to clone `claude-chats`):
+1. Test once (`CHATS_REPO_URL` is only needed the first run, to clone `scrubjay-chats`):
 
    ```
-   CHATS_REPO_URL=git@github.com:<your-gh-user>/claude-chats.git \
-   NAS_DIR=/mnt/nas1/dotclaude-storage ~/dotclaude/bin/pull-and-mirror.sh
+   CHATS_REPO_URL=git@github.com:<your-gh-user>/scrubjay-chats.git \
+   NAS_DIR=/mnt/nas1/scrubjay-storage ~/scrubjay/bin/pull-and-mirror.sh
    ```
 
 ## Cron (every 30 min)
@@ -653,10 +653,10 @@ After these, every new client is fully covered by `onboard-memory.sh` + adding i
 `crontab -e`:
 
 ```
-*/30 * * * * NAS_DIR=/mnt/nas1/dotclaude-storage CHATS_REPO=$HOME/claude-chats $HOME/dotclaude/bin/pull-and-mirror.sh >> $HOME/claude-mirror.log 2>&1
+*/30 * * * * NAS_DIR=/mnt/nas1/scrubjay-storage CHATS_REPO=$HOME/scrubjay-chats $HOME/scrubjay/bin/pull-and-mirror.sh >> $HOME/claude-mirror.log 2>&1
 ```
 
-Result: every machine's transcripts land on the NAS at `dotclaude-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session ending. With the mirror running, the NAS copy doubles your archive; you can then prune/rotate the GitHub repo if you like. Without it, the GitHub repo *is* your archive.
+Result: every machine's transcripts land on the NAS at `scrubjay-storage/<host>/<project-slug>/<session>.jsonl` within 30 min of a session ending. With the mirror running, the NAS copy doubles your archive; you can then prune/rotate the GitHub repo if you like. Without it, the GitHub repo *is* your archive.
 
 ## If you later move to the WireGuard transport
 

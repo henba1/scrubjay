@@ -18,20 +18,20 @@ bin/claude-sync.sh         # re-apply config (auto-runs at SessionStart)
 bin/claude-index-chats.sh  # refresh this host's chats.index.json (auto-runs at SessionEnd)
 ```
 
-Escape hatches (env, in `~/.config/dotclaude/config` or inline): `DOTCLAUDE_NOSYNC=1` (skip the start-of-session pull+sync), `DOTCLAUDE_SYNC_NOPULL=1` (sync without pulling). The full toggle list is in the [Reference cheatsheet](https://henba1.github.io/dotclaude/reference/#toggle-behaviour).
+Escape hatches (env, in `~/.config/scrubjay/config` or inline): `SCRUBJAY_NOSYNC=1` (skip the start-of-session pull+sync), `SCRUBJAY_SYNC_NOPULL=1` (sync without pulling). The full toggle list is in the [Reference cheatsheet](https://henba1.github.io/scrubjay/reference/#toggle-behaviour).
 
 ## Find a past chat
 
-Every session is logged by the `SessionEnd` hook to `dotclaude-data/logs/<host>.log` (one line: `time | host | cwd | "first prompt" | session=id`) and pushed, so all machines' histories are searchable from any clone of the data repo:
+Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log` (one line: `time | host | cwd | "first prompt" | session=id`) and pushed, so all machines' histories are searchable from any clone of the data repo:
 
 ```
-git -C ~/.dotclaude/dotclaude-data pull
-grep -i refactor ~/.dotclaude/dotclaude-data/logs/*.log
+git -C ~/.scrubjay/scrubjay-data pull
+grep -i refactor ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
-The full transcript (the `.jsonl`) lives in `claude-chats` / on the NAS under `<host>/<slug>/<session>.jsonl`.
+The full transcript (the `.jsonl`) lives in `scrubjay-chats` / on the NAS under `<host>/<slug>/<session>.jsonl`.
 
-For recall by *topic* (rather than an exact word you remember typing) from inside a live session, use the [`dcmcp` MCP server](https://henba1.github.io/dotclaude/archive-mcp/index.md).
+For recall by *topic* (rather than an exact word you remember typing) from inside a live session, use the [`sjmcp` MCP server](https://henba1.github.io/scrubjay/archive-mcp/index.md).
 
 ## Troubleshooting
 
@@ -39,4 +39,4 @@ For recall by *topic* (rather than an exact word you remember typing) from insid
 
 - **`SessionEnd` triggers on both `/exit` and `/clear`** (the latter then starts a fresh session). Either way, a session that began *before* the hooks were active won't ship.
 - **"SessionEnd hook … Hook cancelled":** Claude cancels hooks that haven't returned by the time the session process exits. `log-session.sh` detaches its network work (git push + relay) so shutdown can't interrupt it — just ensure the machine has pulled the app repo (`git -C <app-clone> pull`; `SessionStart` does this automatically next time).
-- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `dotclaude-data` git sync, not the session relay (see [Transcripts: relay + NAS](https://henba1.github.io/dotclaude/transports/index.md)).
+- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `scrubjay-data` git sync, not the session relay (see [Transcripts: relay + NAS](https://henba1.github.io/scrubjay/transports/index.md)).

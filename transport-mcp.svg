@@ -26,7 +26,7 @@
 <path fill="#f8fafc" stroke="#475569" d="M162,-106.5C162,-106.5 12,-106.5 12,-106.5 6,-106.5 0,-100.5 0,-94.5 0,-94.5 0,-66.5 0,-66.5 0,-60.5 6,-54.5 12,-54.5 12,-54.5 162,-54.5 162,-54.5 168,-54.5 174,-60.5 174,-66.5 174,-66.5 174,-94.5 174,-94.5 174,-100.5 168,-106.5 162,-106.5"/>
 <text text-anchor="middle" x="87" y="-94.5" font-family="Helvetica" font-size="10.00" fill="#0f172a">client</text>
 <text text-anchor="middle" x="87" y="-83.5" font-family="Helvetica" font-size="10.00" fill="#0f172a">no local archive (HPC node · laptop)</text>
-<text text-anchor="middle" x="87" y="-72.5" font-family="Helvetica" font-size="10.00" fill="#0f172a">registers dcmcp as a stdio server:</text>
+<text text-anchor="middle" x="87" y="-72.5" font-family="Helvetica" font-size="10.00" fill="#0f172a">registers sjmcp as a stdio server:</text>
 <text text-anchor="middle" x="87" y="-61.5" font-family="Helvetica" font-size="10.00" fill="#0f172a">command = ssh &lt;alias&gt;</text>
 </g>
 <!-- RT -->
@@ -50,8 +50,8 @@
 <title>ARCH</title>
 <path fill="#f8fafc" stroke="#475569" d="M1268,-101C1268,-101 1086,-101 1086,-101 1080,-101 1074,-95 1074,-89 1074,-89 1074,-72 1074,-72 1074,-66 1080,-60 1086,-60 1086,-60 1268,-60 1268,-60 1274,-60 1280,-66 1280,-72 1280,-72 1280,-89 1280,-89 1280,-95 1274,-101 1268,-101"/>
 <text text-anchor="middle" x="1177" y="-89" font-family="Helvetica" font-size="10.00" fill="#0f172a">archive host</text>
-<text text-anchor="middle" x="1177" y="-78" font-family="Helvetica" font-size="10.00" fill="#0f172a">owner account · read&#45;only dcmcp server</text>
-<text text-anchor="middle" x="1177" y="-67" font-family="Helvetica" font-size="10.00" fill="#0f172a">key pinned to: command=&quot;dcmcp&#45;serve.sh&quot;</text>
+<text text-anchor="middle" x="1177" y="-78" font-family="Helvetica" font-size="10.00" fill="#0f172a">owner account · read&#45;only sjmcp server</text>
+<text text-anchor="middle" x="1177" y="-67" font-family="Helvetica" font-size="10.00" fill="#0f172a">key pinned to: command=&quot;sjmcp&#45;serve.sh&quot;</text>
 </g>
 <!-- CLIENT&#45;&gt;ARCH -->
 <g id="edge5" class="edge">
@@ -92,7 +92,7 @@
 <title>NAS</title>
 <polygon fill="#dcfce7" stroke="#16a34a" points="1537,-101 1534,-105 1513,-105 1510,-101 1397,-101 1397,-60 1537,-60 1537,-101"/>
 <text text-anchor="middle" x="1467" y="-89" font-family="Helvetica" font-size="10.00" fill="#166534">NAS</text>
-<text text-anchor="middle" x="1467" y="-78" font-family="Helvetica" font-size="10.00" fill="#166534">dotclaude&#45;storage/</text>
+<text text-anchor="middle" x="1467" y="-78" font-family="Helvetica" font-size="10.00" fill="#166534">scrubjay&#45;storage/</text>
 <text text-anchor="middle" x="1467" y="-67" font-family="Helvetica" font-size="10.00" fill="#166534">transcripts · plans · memory</text>
 </g>
 <!-- ARCH&#45;&gt;NAS -->
