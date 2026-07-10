@@ -1,0 +1,5 @@
+# Belt-and-suspenders: this repo must NEVER contain Claude secrets or transcripts.
+*.credentials*
+.credentials.json
+.claude.json
+*.jsonl

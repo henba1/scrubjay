@@ -67,12 +67,17 @@ else
   fi
 fi
 
-# ---- 2) where the repos live + remote owner (inferred from this clone's origin) -------
-ORIGIN="$(git -C "$APP" remote get-url origin 2>/dev/null || echo)"
-case "$ORIGIN" in https://github.com/*) ORIGIN="git@github.com:${ORIGIN#https://github.com/}";; esac
-[ -n "$ORIGIN" ] || die "could not read this repo's origin remote."
-REMOTE_BASE="${ORIGIN%/dotclaude.git}"          # e.g. git@github.com:owner
-ok "remote owner: $REMOTE_BASE"
+# ---- 2) where the repos live + who owns YOUR private data repos -----------------------
+# Deliberately NOT inferred from this clone's origin. The app repo is public and you may run it
+# straight from upstream; your content lives in private repos under your OWN account. Keeping the
+# two apart is what makes forking unnecessary (and stops a fresh clone from reaching for the
+# maintainer's private repos). dc-bootstrap.sh creates + seeds them.
+[ -d "$APP/.git" ] || warn "this app clone has no .git — self-update won't work; install via 'git clone', not a tarball."
+DEFAULT_OWNER="${DOTCLAUDE_OWNER:-$(command -v gh >/dev/null 2>&1 && gh api user --jq .login 2>/dev/null)}"
+ask DOTCLAUDE_OWNER "GitHub account for your PRIVATE data repos" "${DEFAULT_OWNER:-}"
+[ -n "$DOTCLAUDE_OWNER" ] || die "no GitHub account given — set DOTCLAUDE_OWNER=<your-gh-user>"
+export DOTCLAUDE_OWNER
+ok "private repos owner: $DOTCLAUDE_OWNER"
 
 DEFAULT_BASE="$(dirname "$APP")"                # siblings of the app clone
 ask BASE "clone base dir for the data repos" "$DEFAULT_BASE"
@@ -117,15 +122,13 @@ case "$BACKEND" in
     ;;
 esac
 
-# ---- 4) clone sibling repos -----------------------------------------------------------
-clone_if_absent() {  # clone_if_absent <url> <dir> <label>
-  local url="$1" dir="$2" label="$3"
-  if [ -d "$dir/.git" ]; then ok "$label already cloned ($dir)"
-  else info "cloning $label → $dir"; git clone "$url" "$dir" || die "clone failed: $url"; fi
-}
+# ---- 4) create, seed + clone the private sibling repos --------------------------------
+# dc-bootstrap.sh creates them under $DOTCLAUDE_OWNER if they don't exist yet (via `gh`), clones
+# them, and seeds a fresh dotclaude-data from skeleton/data — claude-sync.sh hard-requires
+# settings/settings.base.json, and that file is where the SessionStart/SessionEnd hooks live.
 mkdir -p "$BASE"
-clone_if_absent "$REMOTE_BASE/dotclaude-data.git" "$DATA_DIR" "dotclaude-data"
-[ "$BACKEND" = git ] && clone_if_absent "$REMOTE_BASE/claude-chats.git" "$CHATS_DIR" "claude-chats"
+DOTCLAUDE_BACKEND="$BACKEND" BASE="$BASE" "$APP/bin/dc-bootstrap.sh" \
+  || die "bootstrap failed — create the private repo(s) it named, then re-run bin/onboard.sh"
 
 # ---- 5) write the machine-local pointer ----------------------------------------------
 CFGDIR="$HOME/.config/dotclaude"; CFG="$CFGDIR/config"; mkdir -p "$CFGDIR"
