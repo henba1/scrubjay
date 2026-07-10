@@ -49,11 +49,15 @@ NAS-vs-GitHub.** The full design is in [Concepts](https://henba1.github.io/dotcl
 
 ## Quick start
 
+**No fork needed.** Clone this repo straight from upstream — it's the app, and it updates itself
+by `git pull`. Your *content* lives in private repos under your **own** GitHub account, which the
+onboarder creates for you (`dotclaude-data`, plus `claude-chats` on the `git` backend).
+
 **With Claude Code** — clone, open Claude in the clone, and ask it to set things up. It reads
 [`AGENTS.md`](AGENTS.md), gathers your choices, and drives the onboarder:
 
 ```sh
-git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
+git clone git@github.com:henba1/dotclaude.git ~/.dotclaude/dotclaude
 cd ~/.dotclaude/dotclaude && claude
 # then: "set up dotclaude on this machine"
 ```
@@ -61,14 +65,19 @@ cd ~/.dotclaude/dotclaude && claude
 **By hand** — run the interactive onboarder directly:
 
 ```sh
-git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
-~/.dotclaude/dotclaude/bin/onboard.sh
+git clone git@github.com:henba1/dotclaude.git ~/.dotclaude/dotclaude
+~/.dotclaude/dotclaude/bin/onboard.sh          # asks for your GitHub account (or set DOTCLAUDE_OWNER)
 ```
 
-It clones the sibling data repos, writes the machine-local pointer, registers the host, applies
-config, and (for the peer-to-peer backends) prints one `authorized_keys` line to paste on the
-receiver — the single manual step, by design. Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub;
-no root. Full walkthrough: [Onboarding](https://henba1.github.io/dotclaude/onboarding/).
+It creates and seeds your private repos, writes the machine-local pointer, registers the host,
+applies config, and (for the peer-to-peer backends) prints one `authorized_keys` line to paste on
+the receiver — the single manual step, by design.
+
+Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub, and the [`gh`](https://cli.github.com) CLI to
+create the private repos (without it, the onboarder prints the exact `gh repo create` commands and
+stops). No root. Install with `git clone`, **not** a source tarball — the app self-updates by
+pulling, so an unpacked archive can never update itself. Full walkthrough:
+[Onboarding](https://henba1.github.io/dotclaude/onboarding/).
 
 ## Documentation
 

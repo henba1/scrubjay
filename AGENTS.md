@@ -23,8 +23,11 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
 
 ## Repo map
 
-- `bin/` — the shell logic. Entry point for setup is `bin/onboard.sh`; `bin/lib.sh` holds
-  shared helpers; `bin/claude-sync.sh` applies data-repo config into `~/.claude`.
+- `bin/` — the shell logic. Entry point for setup is `bin/onboard.sh`; `bin/dc-bootstrap.sh`
+  creates + seeds the user's private repos; `bin/lib.sh` holds shared helpers;
+  `bin/claude-sync.sh` applies data-repo config into `~/.claude`.
+- `skeleton/data/` — the seed for a fresh `dotclaude-data`. `settings/settings.base.json` is
+  load-bearing: `claude-sync.sh` requires it, and it registers the SessionStart/SessionEnd hooks.
 - `hooks/` — `sync-session.sh` (SessionStart), `log-session.sh` (SessionEnd), and
   `transports/<backend>.sh` (`git` / `rsync-wg` / `local`).
 - `mcp/dcmcp_server.py` — the read-only archive MCP server (`uv run --script`).
@@ -40,22 +43,32 @@ you can gather the choices in chat and run it unattended. (This mirrors the `/dc
 command in `commands/dconboard.md`, which only exists *after* install — on a fresh clone you
 are the front-end.)
 
+The user does **not** fork this repo — it's the app and runs from upstream. Their content lives in
+private repos under their own account (`dotclaude-data`; `claude-chats` on the `git` backend;
+`claude-memory` for memory). `bin/dc-bootstrap.sh` creates + seeds any that are missing, using the
+`gh` CLI. It refuses to treat the upstream account as the user's, so `DOTCLAUDE_OWNER` matters.
+
 Steps:
 
-1. **Gather choices in chat:** stable host name; relay backend (`rsync-wg` / `local` / `git`
-   / `off` — present them as peer options, no default) and its settings — for `rsync-wg`/`git` the receiver `user` / `host` /
-   `port` / rrsync-`path`; for `local` the NAS mount path; and whether to enable
-   cross-machine memory.
+1. **Gather choices in chat:** the GitHub account that will own their private repos
+   (`DOTCLAUDE_OWNER` — default `gh api user`); stable host name; relay backend (`rsync-wg` /
+   `local` / `git` / `off` — present them as peer options, no default) and its settings — for
+   `rsync-wg`/`git` the receiver `user` / `host` / `port` / rrsync-`path`; for `local` the NAS
+   mount path; and whether to enable cross-machine memory (on the `git` backend this puts real
+   filesystem paths in a private GitHub repo — surface that trade-off, don't just enable it).
 2. **Confirm, then run non-interactively** from the clone, e.g.:
 
    ```sh
-   DOTCLAUDE_HOST=<host> DOTCLAUDE_BACKEND=<backend> \
+   DOTCLAUDE_OWNER=<gh-user> DOTCLAUDE_HOST=<host> DOTCLAUDE_BACKEND=<backend> \
    RECV_USER=<user> RECV_HOST=<host-or-ip> RECV_PORT=<port> RECV_PATH=<rrsync-root> \
    bash ./bin/onboard.sh </dev/null
    ```
 
    (Omit the `RECV_*` for `local`/`off`; use `LOCAL_CHATS=<path>` for `local`.)
 3. **Report what changed** and surface the manual step below.
+
+If `gh` is absent, `dc-bootstrap.sh` prints the exact `gh repo create` commands and stops. Relay
+those to the user and let *them* run them — creating repos on someone's account is theirs to do.
 
 ### ⚠️ The one step you must NOT do for the user
 
