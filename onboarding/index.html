@@ -376,6 +376,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-three-repos-and-which-ones-are-yours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three repos, and which ones are yours
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#install-with-claude-code-agent-assisted" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -771,6 +782,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#the-three-repos-and-which-ones-are-yours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three repos, and which ones are yours
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#install-with-claude-code-agent-assisted" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -846,10 +868,51 @@
 
 
 <h1 id="onboarding">Onboarding<a class="headerlink" href="#onboarding" title="Permanent link">&para;</a></h1>
+<h2 id="the-three-repos-and-which-ones-are-yours">The three repos, and which ones are yours<a class="headerlink" href="#the-three-repos-and-which-ones-are-yours" title="Permanent link">&para;</a></h2>
+<p>dotclaude is the <strong>app</strong> — public, and you run it straight from upstream. <strong>You don't fork it.</strong>
+It updates itself with <code>git pull</code>, which is why it must be a <code>git clone</code> and not an unpacked
+source tarball (an archive has no <code>.git</code>, so the self-update silently never runs; the app tells
+you so at session start if you get this wrong).</p>
+<p>Your <strong>content</strong> lives in separate <strong>private</strong> repos under your own GitHub account:</p>
+<table>
+<thead>
+<tr>
+<th>Repo</th>
+<th>When</th>
+<th>Who creates it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dotclaude-data</code></td>
+<td>always</td>
+<td><code>bin/dc-bootstrap.sh</code>, seeded from <code>skeleton/data</code></td>
+</tr>
+<tr>
+<td><code>claude-chats</code></td>
+<td><code>git</code> backend</td>
+<td><code>bin/dc-bootstrap.sh</code></td>
+</tr>
+<tr>
+<td><code>claude-memory</code></td>
+<td>cross-machine memory on the <code>git</code> backend</td>
+<td><code>bin/onboard-memory.sh</code></td>
+</tr>
+</tbody>
+</table>
+<p>The onboarder asks which GitHub account owns them (preset it with <code>DOTCLAUDE_OWNER</code>) and creates
+any that are missing via the <a href="https://cli.github.com"><code>gh</code></a> CLI. Without <code>gh</code> it prints the exact
+<code>gh repo create</code> commands and stops — nothing is created behind your back.</p>
+<div class="admonition note">
+<p class="admonition-title">Why the app's origin doesn't decide where your data lives</p>
+<p>They're deliberately decoupled. Otherwise cloning the public app repo would make the onboarder
+reach for the <em>maintainer's</em> private <code>dotclaude-data</code>. It refuses to treat the upstream account
+as yours, and says so.</p>
+</div>
 <h2 id="install-with-claude-code-agent-assisted">Install with Claude Code (agent-assisted)<a class="headerlink" href="#install-with-claude-code-agent-assisted" title="Permanent link">&para;</a></h2>
 <p>The fastest path if you already run Claude Code: clone this repo, open Claude <em>inside</em>
 the clone, and ask it to set the machine up.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/dotclaude.git<span class="w"> </span>~/.dotclaude/dotclaude
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:henba1/dotclaude.git<span class="w"> </span>~/.dotclaude/dotclaude
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>~/.dotclaude/dotclaude
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>claude
 </code></pre></div>
@@ -863,14 +926,16 @@ the repo root, gathers your relay-backend choice and receiver details in chat, a
 pasting the printed <code>authorized_keys</code> line on the receiver (see the warning below).</p>
 <h2 id="fast-path-interactive-script">Fast path — interactive script<a class="headerlink" href="#fast-path-interactive-script" title="Permanent link">&para;</a></h2>
 <p>Clone this repo, then run <code>bin/onboard.sh</code>. It checks deps (and offers to install Claude
-Code if missing), clones the sibling data repos, writes the machine-local pointer,
+Code if missing), creates + seeds your private data repos, writes the machine-local pointer,
 registers the host and applies config, and — for the <code>rsync-wg</code> backend — optionally
 generates the dedicated relay SSH key, adds the <code>claude-receiver</code> ssh-alias, and prints
 the exact <code>authorized_keys</code> line to paste on the receiver. It's re-runnable and every
-prompt has a default (or preset it via env, e.g. <code>DOTCLAUDE_BACKEND</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/dotclaude.git<span class="w"> </span>~/.dotclaude/dotclaude
+prompt has a default (or preset it via env, e.g. <code>DOTCLAUDE_OWNER</code>, <code>DOTCLAUDE_BACKEND</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:henba1/dotclaude.git<span class="w"> </span>~/.dotclaude/dotclaude
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>~/.dotclaude/dotclaude/bin/onboard.sh
 </code></pre></div>
+<p>Run <code>bin/dc-bootstrap.sh</code> on its own to create/seed the private repos without onboarding, and
+<code>bin/onboard.sh --version</code> to see which commit you're on.</p>
 <div class="admonition warning">
 <p class="admonition-title">One manual step the script can't do for you — authorize the new host on the receiver.</p>
 <p>For the peer-to-peer backends, <code>onboard.sh</code> (transcripts) and <code>onboard-memory.sh</code> (memory) each

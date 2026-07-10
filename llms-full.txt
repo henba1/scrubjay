@@ -87,12 +87,30 @@ Everything is plain Markdown/JSON, so from any project you can ask Claude: *"rea
 
 # Onboarding
 
+## The three repos, and which ones are yours
+
+dotclaude is the **app** — public, and you run it straight from upstream. **You don't fork it.** It updates itself with `git pull`, which is why it must be a `git clone` and not an unpacked source tarball (an archive has no `.git`, so the self-update silently never runs; the app tells you so at session start if you get this wrong).
+
+Your **content** lives in separate **private** repos under your own GitHub account:
+
+| Repo             | When                                      | Who creates it                                     |
+| ---------------- | ----------------------------------------- | -------------------------------------------------- |
+| `dotclaude-data` | always                                    | `bin/dc-bootstrap.sh`, seeded from `skeleton/data` |
+| `claude-chats`   | `git` backend                             | `bin/dc-bootstrap.sh`                              |
+| `claude-memory`  | cross-machine memory on the `git` backend | `bin/onboard-memory.sh`                            |
+
+The onboarder asks which GitHub account owns them (preset it with `DOTCLAUDE_OWNER`) and creates any that are missing via the [`gh`](https://cli.github.com) CLI. Without `gh` it prints the exact `gh repo create` commands and stops — nothing is created behind your back.
+
+Why the app's origin doesn't decide where your data lives
+
+They're deliberately decoupled. Otherwise cloning the public app repo would make the onboarder reach for the *maintainer's* private `dotclaude-data`. It refuses to treat the upstream account as yours, and says so.
+
 ## Install with Claude Code (agent-assisted)
 
 The fastest path if you already run Claude Code: clone this repo, open Claude *inside* the clone, and ask it to set the machine up.
 
 ```
-git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
+git clone git@github.com:henba1/dotclaude.git ~/.dotclaude/dotclaude
 cd ~/.dotclaude/dotclaude
 claude
 ```
@@ -105,12 +123,14 @@ Claude reads [`AGENTS.md`](https://github.com/henba1/dotclaude/blob/main/AGENTS.
 
 ## Fast path — interactive script
 
-Clone this repo, then run `bin/onboard.sh`. It checks deps (and offers to install Claude Code if missing), clones the sibling data repos, writes the machine-local pointer, registers the host and applies config, and — for the `rsync-wg` backend — optionally generates the dedicated relay SSH key, adds the `claude-receiver` ssh-alias, and prints the exact `authorized_keys` line to paste on the receiver. It's re-runnable and every prompt has a default (or preset it via env, e.g. `DOTCLAUDE_BACKEND`):
+Clone this repo, then run `bin/onboard.sh`. It checks deps (and offers to install Claude Code if missing), creates + seeds your private data repos, writes the machine-local pointer, registers the host and applies config, and — for the `rsync-wg` backend — optionally generates the dedicated relay SSH key, adds the `claude-receiver` ssh-alias, and prints the exact `authorized_keys` line to paste on the receiver. It's re-runnable and every prompt has a default (or preset it via env, e.g. `DOTCLAUDE_OWNER`, `DOTCLAUDE_BACKEND`):
 
 ```
-git clone git@github.com:<your-gh-user>/dotclaude.git ~/.dotclaude/dotclaude
+git clone git@github.com:henba1/dotclaude.git ~/.dotclaude/dotclaude
 ~/.dotclaude/dotclaude/bin/onboard.sh
 ```
+
+Run `bin/dc-bootstrap.sh` on its own to create/seed the private repos without onboarding, and `bin/onboard.sh --version` to see which commit you're on.
 
 One manual step the script can't do for you — authorize the new host on the receiver.
 
