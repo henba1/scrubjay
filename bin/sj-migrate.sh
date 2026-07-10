@@ -122,8 +122,11 @@ cat <<EOF
 ── YOUR root / receiver steps (this script deliberately does NOT touch these) ──
 On the NAS/receiver box (needs sudo), if you renamed the storage dir:
   • repoint the relay symlink:   sudo ln -sfn <new-storage-path> /srv/scrubjay-chats   (and update RECV_PATH)
-  • in each remote machine's ~/.ssh/authorized_keys, the relay forced-command still names the
-    old receiver script — change  bin/dc-receive.sh  ->  bin/sj-receive.sh
+  • in the receiver's ~/.ssh/authorized_keys, TWO forced-commands still name old scripts:
+      relay key  →  bin/dc-receive.sh   ->  bin/sj-receive.sh   (write-only relay account)
+      MCP key    →  bin/dcmcp-serve.sh  ->  bin/sjmcp-serve.sh  (owner account, per client)
+    fix both in place:  sed -i.bak -e 's#/bin/dc-receive.sh#/bin/sj-receive.sh#g' \\
+                               -e 's#/bin/dcmcp-serve.sh#/bin/sjmcp-serve.sh#g'  <authorized_keys>
 On every OTHER machine (snellius, hensipi, …): run  bin/sj-migrate.sh --apply  there too.
 GitHub repos were renamed; existing clones keep working via GitHub's redirects, but re-run this
 script on each box to point remotes + config at the new names cleanly.
