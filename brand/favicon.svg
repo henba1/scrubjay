@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="gWing" x1="0.1" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#6AB0EC"/><stop offset="0.55" stop-color="#3B82CE"/><stop offset="1" stop-color="#204F97"/></linearGradient>
+<linearGradient id="gWingFar" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#28568F"/><stop offset="1" stop-color="#163863"/></linearGradient>
+<linearGradient id="gDorsal" x1="0.1" y1="0" x2="0.5" y2="1"><stop offset="0" stop-color="#4C92D8"/><stop offset="1" stop-color="#22509A"/></linearGradient>
+<linearGradient id="gTail" x1="1" y1="0" x2="0" y2="0.6"><stop offset="0" stop-color="#3E82C6"/><stop offset="1" stop-color="#1B4272"/></linearGradient>
+<linearGradient id="gBelly" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DCEAFA"/></linearGradient>
+
+<linearGradient id="fbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#143A5E"/><stop offset="1" stop-color="#0B1727"/></linearGradient>
+<clipPath id="sq"><rect width="512" height="512" rx="104"/></clipPath></defs>
+<g clip-path="url(#sq)"><rect width="512" height="512" fill="url(#fbg)"/>
+<circle cx="180" cy="200" r="230" fill="#3B82CE" opacity="0.22"/>
+<g transform="translate(-114.4,49.3) scale(1.0878)"><g>
+<path d="M 372 200 C 350 242, 322 282, 300 314 C 336 298, 372 260, 400 214 Z" fill="url(#gWingFar)"/>
+<path d="M 320 220 C 260 244, 208 268, 164 292 C 212 284, 274 268, 338 240 Z" fill="url(#gTail)"/>
+<g stroke="#123458" stroke-width="1.4" opacity="0.4"><line x1="314" y1="230" x2="186" y2="284"/><line x1="324" y1="238" x2="204" y2="288"/></g>
+<path d="M 300 234 C 316 226, 336 214, 352 200 C 372 178, 402 162, 438 158 C 456 160, 464 174, 458 190 C 454 212, 430 238, 404 246 C 366 258, 326 250, 300 234 Z" fill="url(#gBelly)"/>
+<path d="M 300 234 C 320 198, 348 168, 384 156 C 396 128, 416 113, 441 115 C 463 117, 479 131, 485 152 C 470 154, 452 156, 436 158 C 400 162, 372 178, 352 200 C 336 214, 316 226, 300 234 Z" fill="url(#gDorsal)"/>
+<path d="M 458 158 C 471 157, 482 159, 490 163 C 483 176, 469 183, 455 183 C 451 174, 452 165, 458 158 Z" fill="url(#gBelly)"/>
+<path d="M 452 133 C 466 130, 479 133, 486 139 C 476 137, 463 138, 452 140 Z" fill="#EFF7FF"/>
+<path d="M 456 172 C 459 185, 457 199, 449 207 C 437 202, 425 204, 415 210 C 425 190, 439 179, 456 172 Z" fill="url(#gDorsal)"/>
+<path d="M 398 172 C 356 128, 314 92, 250 66 C 286 120, 314 172, 340 214 C 368 206, 386 192, 398 172 Z" fill="url(#gWing)"/>
+<g stroke="#153B6C" stroke-width="2.2" opacity="0.5" fill="none" stroke-linecap="round">
+<path d="M 284 96 C 298 132, 316 170, 330 206"/><path d="M 308 80 C 320 118, 338 156, 348 192"/><path d="M 332 70 C 342 106, 358 142, 366 176"/></g>
+<path d="M 398 172 C 372 150, 344 132, 312 118 C 344 140, 372 164, 390 186 Z" fill="#93C6F1" opacity="0.45"/>
+<path d="M 485 152 L 517 159 L 485 167 Z" fill="#28313C"/>
+<circle cx="461" cy="146" r="5.4" fill="#0F1A26"/><circle cx="459.2" cy="144.2" r="1.7" fill="#EAF4FF"/></g></g></g></svg>
