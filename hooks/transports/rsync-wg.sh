@@ -3,18 +3,18 @@
 # no third-party server in the path. The receiver pins the destination via a forced
 # command="rrsync -wo <root>" in authorized_keys, so paths sent here are RELATIVE to that
 # root. (Sending an absolute /srv/... path makes rrsync re-root it *under* the root →
-# double-nested; verified.) Config in ~/.config/dotclaude/config:
-#   DOTCLAUDE_TRANSCRIPT_BACKEND="rsync-wg"
-#   DOTCLAUDE_WG_TARGET="claude-rx@claude-receiver"   # ssh destination ONLY — no remote path
-#   DOTCLAUDE_WG_SSHKEY="$HOME/.ssh/claude_transcripts_ed25519"
-# Per-machine reachability (HostName/Port/User) lives in the ~/.ssh/config 'claude-receiver'
+# double-nested; verified.) Config in ~/.config/scrubjay/config:
+#   SCRUBJAY_TRANSCRIPT_BACKEND="rsync-wg"
+#   SCRUBJAY_WG_TARGET="scrubjay-rx@scrubjay-receiver"   # ssh destination ONLY — no remote path
+#   SCRUBJAY_WG_SSHKEY="$HOME/.ssh/scrubjay_transcripts_ed25519"
+# Per-machine reachability (HostName/Port/User) lives in the ~/.ssh/config 'scrubjay-receiver'
 # alias, so this line stays identical on every machine.
 transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a file or a directory)
   local src="$1" relpath="$2" mode="${3:-}"
-  if [ -z "${DOTCLAUDE_WG_TARGET:-}" ]; then
-    echo "rsync-wg: DOTCLAUDE_WG_TARGET unset — backend inactive" >&2; return 0
+  if [ -z "${SCRUBJAY_WG_TARGET:-}" ]; then
+    echo "rsync-wg: SCRUBJAY_WG_TARGET unset — backend inactive" >&2; return 0
   fi
-  local key="${DOTCLAUDE_WG_SSHKEY:-$HOME/.ssh/id_ed25519}"
+  local key="${SCRUBJAY_WG_SSHKEY:-$HOME/.ssh/id_ed25519}"
   local ssh="ssh -i $key -o StrictHostKeyChecking=accept-new"
   # mirror: --delete makes the receiver dir an exact copy of src (drops renamed/stale plans). It
   #   rides the rrsync protocol so it works even with the write-only receiver; if rrsync refuses
@@ -22,7 +22,7 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   local del=""; [ "$mode" = mirror ] && del="--delete"
   # --no-perms: don't clone the source's restrictive transcript mode onto the receiver. It does
   #   NOT widen perms (rsync stamps the dest at the source mode; a umask can only remove bits) —
-  #   the receiver's dc-receive.sh forced-command wrapper is what chmods the archive
+  #   the receiver's sj-receive.sh forced-command wrapper is what chmods the archive
   #   group-readable after each push, so the human + MCP server can read it. relpath is relative
   #   to the receiver's rrsync root; --mkpath creates it.
   # Return the real rsync exit code so a broken relay (e.g. an unauthorized key on the receiver)
@@ -31,9 +31,9 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   # OPTIONAL --delete, so a refusal there must degrade silently, not read as a relay failure.
   local rc=0
   if [ -d "$src" ]; then                       # directory: trailing slashes mirror contents into <relpath>/
-    rsync -a --no-perms --mkpath $del -e "$ssh" "$src/" "$DOTCLAUDE_WG_TARGET:$relpath/" 2>/dev/null || rc=$?
+    rsync -a --no-perms --mkpath $del -e "$ssh" "$src/" "$SCRUBJAY_WG_TARGET:$relpath/" 2>/dev/null || rc=$?
   else
-    rsync -a --no-perms --mkpath -e "$ssh" "$src" "$DOTCLAUDE_WG_TARGET:$relpath" 2>/dev/null || rc=$?
+    rsync -a --no-perms --mkpath -e "$ssh" "$src" "$SCRUBJAY_WG_TARGET:$relpath" 2>/dev/null || rc=$?
   fi
   [ "$mode" = mirror ] && rc=0
   return $rc

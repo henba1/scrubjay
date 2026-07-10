@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manual "publish now" — runs the SessionEnd actions on demand (the /dclog command) WITHOUT ending
+# Manual "publish now" — runs the SessionEnd actions on demand (the /sjlog command) WITHOUT ending
 # the session: log line + chats index + data-repo push + memory push + transcript/plans/history/tasks
 # relay. The SessionEnd hook is normally fed a JSON payload by Claude; here we reconstruct it by
 # finding this session's transcript (the newest .jsonl that records the current working dir).
@@ -26,5 +26,5 @@ printf '{"session_id":"%s","cwd":"%s","transcript_path":"%s"}' "$sid" "$cwd" "$t
   | bash "$APP/hooks/log-session.sh" --detached
 
 echo "published session ${sid:0:8} (cwd $cwd)"
-M="$(dc_memory)"; [ -d "$M/.git" ] && echo "memory @ $(git -C "$M" log --oneline -1 2>/dev/null || echo '(no commits)')"
+M="$(sj_memory)"; [ -d "$M/.git" ] && echo "memory @ $(git -C "$M" log --oneline -1 2>/dev/null || echo '(no commits)')"
 exit 0

@@ -1,6 +1,6 @@
 # Global Claude Code instructions
 
-> Synced to every machine by dotclaude (symlinked to `~/.claude/CLAUDE.md`).
+> Synced to every machine by scrubjay (symlinked to `~/.claude/CLAUDE.md`).
 > Keep machine-specific details out of this file — those belong in `hosts/<machine>/env.md`.
 
 This is a starter. Replace it with your own standing instructions.

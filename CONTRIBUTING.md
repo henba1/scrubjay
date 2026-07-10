@@ -1,14 +1,14 @@
 # Contributing
 
-Thanks for your interest in dotclaude!
+Thanks for your interest in scrubjay!
 
 ## Scope
 
 This repo is the **app/logic only** — shell scripts, hooks, the MCP server, and docs. The
 maintainer's personal configuration and chat transcripts live in *separate private* repos
-(`dotclaude-data`, `claude-chats`) that are intentionally not here. Please keep this repo
+(`scrubjay-data`, `scrubjay-chats`) that are intentionally not here. Please keep this repo
 public-safe: no real hostnames, personal paths, IPs, or emails — use RFC-safe placeholders
-(`192.168.x`, `home.ddns.example`, `claude-rx`, `laptop`).
+(`192.168.x`, `home.ddns.example`, `scrubjay-rx`, `laptop`).
 
 ## Development
 

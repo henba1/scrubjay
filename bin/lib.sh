@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# Shared helpers for the dotclaude app. Source this; do not execute.
+# Shared helpers for the scrubjay app. Source this; do not execute.
 # The app (logic) is this repo; personal content lives in a separate data repo, and
-# transcripts in a separate relay repo. Pointers come from ~/.config/dotclaude/config.
+# transcripts in a separate relay repo. Pointers come from ~/.config/scrubjay/config.
 
-dc_load_config() {
-  [ -f "$HOME/.config/dotclaude/config" ] && . "$HOME/.config/dotclaude/config"
-  : "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
+sj_load_config() {
+  [ -f "$HOME/.config/scrubjay/config" ] && . "$HOME/.config/scrubjay/config"
+  : "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"
 }
 
 # Absolute path of the app repo (this file lives in <app>/bin/).
-dc_app() { (cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd); }
+sj_app() { (cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd); }
 
 # Version of the app. VERSION is the release marker; on the supported install (a git clone) the
 # precise commit is appended, so a bug report pins the exact code that ran.
-dc_version() {
+sj_version() {
   local app v
-  app="$(dc_app)"
+  app="$(sj_app)"
   v="$(cat "$app/VERSION" 2>/dev/null)" || v=""
   [ -n "$v" ] || v="unknown"
-  if dc_is_clone; then
+  if sj_is_clone; then
     printf '%s (%s)' "$v" "$(git -C "$app" describe --tags --always --dirty 2>/dev/null || echo 'no tag')"
   else
     printf '%s (not a git clone — self-update disabled)' "$v"
@@ -28,41 +28,41 @@ dc_version() {
 # The app updates ITSELF via `git pull` in hooks/sync-session.sh, and bin/onboard.sh reads the
 # clone to bootstrap. A source tarball/zip has no .git, so the pull silently no-ops and the install
 # rots unnoticed. Callers use this to say so out loud rather than fail quietly.
-dc_is_clone() { [ -d "$(dc_app)/.git" ] && command -v git >/dev/null 2>&1; }
+sj_is_clone() { [ -d "$(sj_app)/.git" ] && command -v git >/dev/null 2>&1; }
 
 # Stable host name — NOT `hostname -s` (transient on HPC login nodes).
-dc_host() {
+sj_host() {
   if   [ -n "${CLAUDE_HOST:-}" ];             then printf '%s' "$CLAUDE_HOST"
-  elif [ -f "$HOME/.config/dotclaude/host" ]; then cat "$HOME/.config/dotclaude/host"
+  elif [ -f "$HOME/.config/scrubjay/host" ]; then cat "$HOME/.config/scrubjay/host"
   else                                             hostname -s; fi
 }
 
 # Path to the data repo (required).
-dc_data() {
-  dc_load_config
-  if [ -z "${DOTCLAUDE_DATA:-}" ]; then
-    echo "dotclaude: DOTCLAUDE_DATA not set — see ~/.config/dotclaude/config" >&2
+sj_data() {
+  sj_load_config
+  if [ -z "${SCRUBJAY_DATA:-}" ]; then
+    echo "scrubjay: SCRUBJAY_DATA not set — see ~/.config/scrubjay/config" >&2
     return 1
   fi
-  printf '%s' "$DOTCLAUDE_DATA"
+  printf '%s' "$SCRUBJAY_DATA"
 }
 
 # Path to the transcripts relay repo (optional; empty if transcript sync is off).
-dc_chats() { dc_load_config; printf '%s' "${DOTCLAUDE_CHATS:-}"; }
+sj_chats() { sj_load_config; printf '%s' "${SCRUBJAY_CHATS:-}"; }
 
 # Cross-machine memory rides its OWN git repo, self-hosted on the NAS over WireGuard — so the
 # sensitive paths in auto-memory sync between machines (merge + history) without ever touching a
 # third party like GitHub (which still holds only the non-sensitive config).
-#   dc_memory         local working clone (Claude's per-project memory dirs symlink into it)
-#   dc_memory_remote  the bare repo: a local path on the NAS box, ssh://…over-WG on clients.
+#   sj_memory         local working clone (Claude's per-project memory dirs symlink into it)
+#   sj_memory_remote  the bare repo: a local path on the NAS box, ssh://…over-WG on clients.
 #                     Empty -> memory git sync is OFF (the dir is then just machine-local).
-dc_memory()        { dc_load_config; printf '%s' "${DOTCLAUDE_MEMORY:-$HOME/.dotclaude/claude-memory}"; }
-dc_memory_remote() { dc_load_config; printf '%s' "${DOTCLAUDE_MEMORY_REMOTE:-}"; }
+sj_memory()        { sj_load_config; printf '%s' "${SCRUBJAY_MEMORY:-$HOME/.scrubjay/scrubjay-memory}"; }
+sj_memory_remote() { sj_load_config; printf '%s' "${SCRUBJAY_MEMORY_REMOTE:-}"; }
 
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
 #   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
 #   real user prompt, slugified). Derived from the .jsonl itself so it also works for backfill.
-dc_readable_relpath() {  # dc_readable_relpath <transcript.jsonl> <session_id>
+sj_readable_relpath() {  # sj_readable_relpath <transcript.jsonl> <session_id>
   local src="$1" sid="$2" cwd project topic d
   if ! command -v jq >/dev/null 2>&1; then printf 'misc/%s' "${sid:0:8}"; return; fi
   cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
@@ -83,7 +83,7 @@ dc_readable_relpath() {  # dc_readable_relpath <transcript.jsonl> <session_id>
 #   with a leading "Plan:"/"Plan -" stripped). Idempotent: files already named <YYYY-MM-DD>_… are
 #   left untouched, so it can run on every ship. On a name clash with a *different* file a -N suffix
 #   is added. Best-effort and silent — it must never fail the caller (the ship).
-dc_normalize_plans() {  # dc_normalize_plans <plans_dir>
+sj_normalize_plans() {  # sj_normalize_plans <plans_dir>
   local dir="$1" f base topic d target n
   [ -d "$dir" ] || return 0
   for f in "$dir"/*.md; do
@@ -109,10 +109,10 @@ dc_normalize_plans() {  # dc_normalize_plans <plans_dir>
 # files (NOT in any synced repo) so a *silent* ship failure — e.g. an unauthorized/absent relay
 # key on the receiver — surfaces at the next SessionStart instead of going unnoticed for days.
 # Written by bin/ship-transcript.sh after the primary transcript push; read by hooks/sync-session.sh.
-dc_ship_status_file() { printf '%s' "$HOME/.config/dotclaude/last-ship"; }
-dc_record_ship() {  # dc_record_ship <ok|fail> <session_id> <backend> [rc]
+sj_ship_status_file() { printf '%s' "$HOME/.config/scrubjay/last-ship"; }
+sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
   local result="$1" sid="$2" backend="$3" rc="${4:-0}" f
-  f="$(dc_ship_status_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
+  f="$(sj_ship_status_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
   printf 'result=%s ts=%s host=%s backend=%s sid=%s rc=%s\n' \
-    "$result" "$(date +%FT%T)" "$(dc_host)" "$backend" "${sid:0:8}" "$rc" > "$f" 2>/dev/null || true
+    "$result" "$(date +%FT%T)" "$(sj_host)" "$backend" "${sid:0:8}" "$rc" > "$f" 2>/dev/null || true
 }

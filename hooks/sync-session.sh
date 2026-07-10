@@ -7,33 +7,33 @@
 # has real work when settings.base.json / the host overlay changed.
 # Never blocks the session: always exits 0.
 #
-# Env knobs:  DOTCLAUDE_NOSYNC=1  (skip entirely)   DOTCLAUDE_SYNC_NOPULL=1  (sync without pull)
+# Env knobs:  SCRUBJAY_NOSYNC=1  (skip entirely)   SCRUBJAY_SYNC_NOPULL=1  (sync without pull)
 #             CLAUDE_HOST=<name>
-[ "${DOTCLAUDE_NOSYNC:-0}" = "1" ] && exit 0
+[ "${SCRUBJAY_NOSYNC:-0}" = "1" ] && exit 0
 cat >/dev/null 2>&1 || true   # drain hook stdin, ignore
 
 self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
 APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
-DATA="$(dc_data 2>/dev/null || true)"
+DATA="$(sj_data 2>/dev/null || true)"
 
 # 1) pull latest from other machines (best-effort, fast). DATA = your config/content;
 #    APP = the scripts & hooks themselves, so hook/script fixes also propagate on their
 #    own. --ff-only never clobbers local edits (it just no-ops on a dirty/diverged tree).
-if [ "${DOTCLAUDE_SYNC_NOPULL:-0}" != "1" ]; then
-  # The APP pull below is dotclaude's ONLY self-update path, and it's guarded on .git — so an
+if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
+  # The APP pull below is scrubjay's ONLY self-update path, and it's guarded on .git — so an
   # install from a source tarball/zip would skip it forever, silently, and rot. Say it out loud
   # (stdout lands in the session's context, so the assistant surfaces it).
-  dc_is_clone || printf 'dotclaude: the app at %s is not a git clone, so it can never self-update. Source tarballs are not a supported install — reinstall with `git clone`.\n' "$APP"
+  sj_is_clone || printf 'scrubjay: the app at %s is not a git clone, so it can never self-update. Source tarballs are not a supported install — reinstall with `git clone`.\n' "$APP"
   for repo in "$DATA" "$APP"; do
     [ -n "$repo" ] && [ -d "$repo/.git" ] && \
       ( cd "$repo" && timeout 15 git pull --ff-only -q 2>/dev/null ) || true
   done
-  # git backend only: refresh the claude-chats clone so the local dcmcp archive spans every
+  # git backend only: refresh the scrubjay-chats clone so the local sjmcp archive spans every
   # machine's sessions (not just this one's) before claude-sync registers/serves it. Best-effort;
   # --ff-only just no-ops on a diverged tree (e.g. local ships that haven't pushed yet).
-  if [ "${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
-    chats="$(dc_chats 2>/dev/null || true)"
+  if [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
+    chats="$(sj_chats 2>/dev/null || true)"
     [ -n "$chats" ] && [ -d "$chats/.git" ] && \
       ( cd "$chats" && timeout 20 git pull --ff-only -q 2>/dev/null ) || true
   fi
@@ -51,9 +51,9 @@ fi
 #    session), so without this a dead/unauthorized relay key eats transcripts unnoticed. Printing
 #    to stdout adds it to the session's context, so the assistant flags it. Clears itself once a
 #    later ship succeeds (the breadcrumb is rewritten to result=ok).
-sfile="$(dc_ship_status_file 2>/dev/null || echo "$HOME/.config/dotclaude/last-ship")"
+sfile="$(sj_ship_status_file 2>/dev/null || echo "$HOME/.config/scrubjay/last-ship")"
 if [ -s "$sfile" ] && grep -q '^result=fail' "$sfile" 2>/dev/null; then
-  printf 'dotclaude: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. Check the relay SSH key / authorized_keys on the receiver, then re-ship. Breadcrumb: %s\n' "$(cat "$sfile")"
+  printf 'scrubjay: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. Check the relay SSH key / authorized_keys on the receiver, then re-ship. Breadcrumb: %s\n' "$(cat "$sfile")"
 fi
 
 exit 0

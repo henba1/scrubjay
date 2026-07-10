@@ -21,7 +21,7 @@ What you thought would happen instead.
 - `bash --version`:
 - `rsync --version` (if relay-related):
 - Transcript backend (`git` / `rsync-wg` / `local` / `off`):
-- Relevant `~/.config/dotclaude/config` (redact hosts/paths):
+- Relevant `~/.config/scrubjay/config` (redact hosts/paths):
 
 **Logs / output**
 Paste relevant output. Scrub any private hostnames, paths, or keys first.

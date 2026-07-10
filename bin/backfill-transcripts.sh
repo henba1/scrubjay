@@ -5,12 +5,12 @@
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-. "$APP/bin/lib.sh"; dc_load_config
+. "$APP/bin/lib.sh"; sj_load_config
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 PROJDIR="$CLAUDE_DIR/projects"
 [ "${1:-}" = "--host" ] && { CLAUDE_HOST="${2:?}"; export CLAUDE_HOST; shift 2; }
-HOST="$(dc_host)"
-backend="${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}"
+HOST="$(sj_host)"
+backend="${SCRUBJAY_TRANSCRIPT_BACKEND:-git}"
 
 # Top-level session transcripts only (projects/<slug>/<session>.jsonl) — same set the
 # hook ships; excludes nested subagent transcripts.
@@ -19,7 +19,7 @@ echo "found ${#files[@]} transcripts under $PROJDIR  (host=$HOST, backend=$backe
 [ "${#files[@]}" -gt 0 ] || exit 0
 
 if [ "$backend" = "git" ]; then
-  chats="$(dc_chats)"
+  chats="$(sj_chats)"
   [ -n "$chats" ] && [ -d "$chats/.git" ] || { echo "no chats repo at '$chats'" >&2; exit 1; }
   for f in "${files[@]}"; do
     slug="$(basename "$(dirname "$f")")"; sid="$(basename "$f" .jsonl)"
@@ -33,7 +33,7 @@ if [ "$backend" = "git" ]; then
   else
     added="$(git diff --cached --numstat | wc -l)"
     git commit -q -m "backfill: $added transcripts from $HOST"
-    if timeout 180 git push -q; then echo "pushed $added transcripts to claude-chats"
+    if timeout 180 git push -q; then echo "pushed $added transcripts to scrubjay-chats"
     else echo "committed; push failed (goes out on next push)"; fi
   fi
 else

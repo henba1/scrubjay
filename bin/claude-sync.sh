@@ -16,14 +16,14 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --host) CLAUDE_HOST="${2:?}"; export CLAUDE_HOST; shift 2;;
     --force) FORCE=1; shift;;
-    -v|--version) echo "dotclaude $(dc_version)"; exit 0;;
+    -v|--version) echo "scrubjay $(sj_version)"; exit 0;;
     -h|--help) usage 0;;
     *) echo "unknown arg: $1" >&2; usage 1;;
   esac
 done
 
-HOST="$(dc_host)"
-DATA="$(dc_data)"
+HOST="$(sj_host)"
+DATA="$(sj_data)"
 HOSTDIR="$DATA/hosts/$HOST"
 [ -d "$HOSTDIR" ] || {
   echo "ERROR: no host dir '$HOSTDIR'." >&2
@@ -47,8 +47,8 @@ link() {  # link <src> <dst>
   ln -s "$src" "$dst"; echo "  link  $dst"
 }
 
-# Slash commands come from TWO sources: the app repo ships the generic dotclaude commands
-# (the /dc* family — anyone who installs dotclaude gets them), the data repo holds personal
+# Slash commands come from TWO sources: the app repo ships the generic scrubjay commands
+# (the /dc* family — anyone who installs scrubjay gets them), the data repo holds personal
 # ones. We materialize ~/.claude/commands as a REAL dir of per-file symlinks into both, so the
 # app and personal commands coexist. Data-repo files win on a name clash (personal override).
 link_commands() {  # link_commands <dst-dir> <src-dir>...
@@ -74,7 +74,7 @@ link_commands() {  # link_commands <dst-dir> <src-dir>...
 # Claude auto-writes/reads ~/.claude/projects/<project>/memory/; we make that a symlink so the
 # files live in the data repo (synced) instead of stranded machine-locally. Migrates any
 # existing real dir in first, never clobbering a memory already in the repo.
-link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
+link_memory() {  # link_memory <repo-target-dir> <scrubjay-memory-path>
   local src="$1" dst="$2"
   if [ -L "$dst" ]; then
     [ "$(readlink "$dst")" = "$src" ] && { echo "  ok    $dst"; return 0; }
@@ -94,65 +94,65 @@ link_memory() {  # link_memory <repo-target-dir> <claude-memory-path>
   ln -s "$src" "$dst"; echo "  link  $dst -> $src"
 }
 
-# Register the dcmcp read-archive MCP server (the /dcrecall, /dcfind, /dcbrowse engine) at USER
+# Register the sjmcp read-archive MCP server (the /sjrecall, /sjfind, /sjbrowse engine) at USER
 # scope, so it's available in every project on this machine. TWO modes, chosen by what this box has:
-#   • LOCAL  (the archive host): the archive is mounted (DOTCLAUDE_LOCAL_CHATS) → a stdio server reads it here.
-#   • REMOTE (clients): no local archive but DOTCLAUDE_MCP_REMOTE points at the archive host → register
-#                       `ssh <target>`; a forced command (bin/dcmcp-serve.sh) runs the server THERE
+#   • LOCAL  (the archive host): the archive is mounted (SCRUBJAY_LOCAL_CHATS) → a stdio server reads it here.
+#   • REMOTE (clients): no local archive but SCRUBJAY_MCP_REMOTE points at the archive host → register
+#                       `ssh <target>`; a forced command (bin/sjmcp-serve.sh) runs the server THERE
 #                       and pipes MCP stdio back. Set up by bin/onboard-mcp-client.sh.
 # Uses the official `claude mcp` CLI (not a hand-edit of the big ~/.claude.json) and is idempotent:
 # it only (re)adds when missing or when the target changed. Best-effort — never fails the sync.
 # A loud, visible skip — MCP registration silently doing nothing is exactly the onboarding
 # surprise we want to avoid. Each reason says what to do about it. Returns 0 (never fails sync).
-skip_mcp() { echo "  ┌─ MCP archive server NOT registered (/dcrecall, /dcfind, /dcbrowse stay inert)"; echo "  └─ reason: $1"; return 0; }
+skip_mcp() { echo "  ┌─ MCP archive server NOT registered (/sjrecall, /sjfind, /sjbrowse stay inert)"; echo "  └─ reason: $1"; return 0; }
 
 _mcp_add_local() {  # _mcp_add_local <chats> <server.py>
   local chats="$1" server="$2"
-  if claude mcp get dcmcp >/dev/null 2>&1; then
-    case "$(claude mcp get dcmcp 2>/dev/null)" in
-      *"$server"*) echo "  ok    mcp dcmcp (local)"; return 0 ;;   # already points at our server
+  if claude mcp get sjmcp >/dev/null 2>&1; then
+    case "$(claude mcp get sjmcp 2>/dev/null)" in
+      *"$server"*) echo "  ok    mcp sjmcp (local)"; return 0 ;;   # already points at our server
     esac
-    claude mcp remove dcmcp -s user >/dev/null 2>&1 || claude mcp remove dcmcp >/dev/null 2>&1 || true
+    claude mcp remove sjmcp -s user >/dev/null 2>&1 || claude mcp remove sjmcp >/dev/null 2>&1 || true
   fi
-  if claude mcp add -s user dcmcp \
-       -e DOTCLAUDE_LOCAL_CHATS="$chats" \
-       -e DOTCLAUDE_MEMORY="$(dc_memory)" \
-       -e DOTCLAUDE_DATA="$DATA" \
+  if claude mcp add -s user sjmcp \
+       -e SCRUBJAY_LOCAL_CHATS="$chats" \
+       -e SCRUBJAY_MEMORY="$(sj_memory)" \
+       -e SCRUBJAY_DATA="$DATA" \
        -- uv run --script "$server" >/dev/null 2>&1; then
-    echo "  add   mcp dcmcp (local, user scope)"
+    echo "  add   mcp sjmcp (local, user scope)"
   else
-    echo "  WARN  mcp dcmcp registration failed (run: claude mcp add … by hand)"
+    echo "  WARN  mcp sjmcp registration failed (run: claude mcp add … by hand)"
   fi
 }
 
 _mcp_add_remote() {  # _mcp_add_remote <ssh-target>   (forced command on the far end runs the server)
   local target="$1"
-  if claude mcp get dcmcp >/dev/null 2>&1; then
-    case "$(claude mcp get dcmcp 2>/dev/null)" in
-      *"ssh"*"$target"*) echo "  ok    mcp dcmcp (remote → $target)"; return 0 ;;
+  if claude mcp get sjmcp >/dev/null 2>&1; then
+    case "$(claude mcp get sjmcp 2>/dev/null)" in
+      *"ssh"*"$target"*) echo "  ok    mcp sjmcp (remote → $target)"; return 0 ;;
     esac
-    claude mcp remove dcmcp -s user >/dev/null 2>&1 || claude mcp remove dcmcp >/dev/null 2>&1 || true
+    claude mcp remove sjmcp -s user >/dev/null 2>&1 || claude mcp remove sjmcp >/dev/null 2>&1 || true
   fi
-  # No -e env: the far-end forced command (dcmcp-serve.sh) supplies the archive pointers. BatchMode
+  # No -e env: the far-end forced command (sjmcp-serve.sh) supplies the archive pointers. BatchMode
   # so a missing/uninstalled key fails fast instead of hanging the MCP transport on a prompt.
-  if claude mcp add -s user dcmcp \
+  if claude mcp add -s user sjmcp \
        -- ssh -T -o BatchMode=yes -o ConnectTimeout=10 "$target" >/dev/null 2>&1; then
-    echo "  add   mcp dcmcp (remote → ssh $target)"
+    echo "  add   mcp sjmcp (remote → ssh $target)"
   else
-    echo "  WARN  mcp dcmcp remote registration failed (run: claude mcp add … by hand)"
+    echo "  WARN  mcp sjmcp remote registration failed (run: claude mcp add … by hand)"
   fi
 }
 
 register_mcp() {
   command -v claude >/dev/null 2>&1 || { skip_mcp "no 'claude' CLI on PATH — install Claude Code, then rerun bin/claude-sync.sh"; return 0; }
-  dc_load_config
-  local chats="${DOTCLAUDE_LOCAL_CHATS:-}" server="$APP/mcp/dcmcp_server.py" remote="${DOTCLAUDE_MCP_REMOTE:-}"
-  # git backend: the claude-chats clone IS the local archive — ship-transcript.sh writes the same
+  sj_load_config
+  local chats="${SCRUBJAY_LOCAL_CHATS:-}" server="$APP/mcp/sjmcp_server.py" remote="${SCRUBJAY_MCP_REMOTE:-}"
+  # git backend: the scrubjay-chats clone IS the local archive — ship-transcript.sh writes the same
   # <host>/{readable,plans,…} tree into it that a NAS archive holds. Point the local stdio server at
   # the clone so the GitHub path gets in-session recall with no NAS or SSH. (sync-session.sh pulls
   # the clone at SessionStart so it spans every machine's sessions, not just this one's.)
-  if [ -z "$chats" ] && [ -z "$remote" ] && [ "${DOTCLAUDE_TRANSCRIPT_BACKEND:-}" = git ]; then
-    local clone; clone="$(dc_chats)"
+  if [ -z "$chats" ] && [ -z "$remote" ] && [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-}" = git ]; then
+    local clone; clone="$(sj_chats)"
     [ -n "$clone" ] && [ -d "$clone/.git" ] && chats="$clone"
   fi
   if [ -n "$chats" ] && [ -d "$chats" ]; then
@@ -165,7 +165,7 @@ register_mcp() {
     command -v ssh >/dev/null 2>&1 || { skip_mcp "no 'ssh' to reach the remote archive host ($remote)"; return 0; }
     _mcp_add_remote "$remote"
   else
-    skip_mcp "no local archive (DOTCLAUDE_LOCAL_CHATS) and no remote (DOTCLAUDE_MCP_REMOTE) — on a client, run bin/onboard-mcp-client.sh to reach the archive host's server"
+    skip_mcp "no local archive (SCRUBJAY_LOCAL_CHATS) and no remote (SCRUBJAY_MCP_REMOTE) — on a client, run bin/onboard-mcp-client.sh to reach the archive host's server"
   fi
 }
 
@@ -205,9 +205,9 @@ else mv "$tmp" "$OUT"; echo "  wrote $OUT"; fi
 
 # Per-project memory: Claude auto-reads/writes ~/.claude/projects/<project>/memory/. We point each
 # at the SHARED, cross-machine memory clone (<mem>/<project>/) — its own git repo self-hosted on the
-# NAS over WireGuard (dc_memory_remote), so the sensitive paths in memory sync between machines
+# NAS over WireGuard (sj_memory_remote), so the sensitive paths in memory sync between machines
 # WITHOUT touching GitHub. Shared (not per-host) so the same project recalls memory written anywhere.
-MEM="$(dc_memory)"
+MEM="$(sj_memory)"
 mkdir -p "$MEM" 2>/dev/null || true
 
 # One-time migration: older versions kept memory in the data repo at <data>/memory/<host>/<project>/

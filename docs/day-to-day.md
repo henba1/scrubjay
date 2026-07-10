@@ -22,26 +22,26 @@ bin/claude-sync.sh         # re-apply config (auto-runs at SessionStart)
 bin/claude-index-chats.sh  # refresh this host's chats.index.json (auto-runs at SessionEnd)
 ```
 
-Escape hatches (env, in `~/.config/dotclaude/config` or inline): `DOTCLAUDE_NOSYNC=1`
-(skip the start-of-session pull+sync), `DOTCLAUDE_SYNC_NOPULL=1` (sync without pulling).
+Escape hatches (env, in `~/.config/scrubjay/config` or inline): `SCRUBJAY_NOSYNC=1`
+(skip the start-of-session pull+sync), `SCRUBJAY_SYNC_NOPULL=1` (sync without pulling).
 The full toggle list is in the [Reference cheatsheet](reference.md#toggle-behaviour).
 
 ## Find a past chat
 
-Every session is logged by the `SessionEnd` hook to `dotclaude-data/logs/<host>.log`
+Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log`
 (one line: `time | host | cwd | "first prompt" | session=id`) and pushed, so all
 machines' histories are searchable from any clone of the data repo:
 
 ```sh
-git -C ~/.dotclaude/dotclaude-data pull
-grep -i refactor ~/.dotclaude/dotclaude-data/logs/*.log
+git -C ~/.scrubjay/scrubjay-data pull
+grep -i refactor ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
-The full transcript (the `.jsonl`) lives in `claude-chats` / on the NAS under
+The full transcript (the `.jsonl`) lives in `scrubjay-chats` / on the NAS under
 `<host>/<slug>/<session>.jsonl`.
 
 For recall by *topic* (rather than an exact word you remember typing) from inside a live
-session, use the [`dcmcp` MCP server](archive-mcp.md).
+session, use the [`sjmcp` MCP server](archive-mcp.md).
 
 ## Troubleshooting
 
@@ -59,5 +59,5 @@ push). This is the usual reason a freshly-onboarded machine "ships nothing".
   time the session process exits. `log-session.sh` detaches its network work (git push +
   relay) so shutdown can't interrupt it — just ensure the machine has pulled the app repo
   (`git -C <app-clone> pull`; `SessionStart` does this automatically next time).
-- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `dotclaude-data`
+- **Expecting `memory/` on the NAS?** Memory isn't relayed — it rides the `scrubjay-data`
   git sync, not the session relay (see [Transcripts: relay + NAS](transports.md)).

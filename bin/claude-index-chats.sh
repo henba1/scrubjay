@@ -9,8 +9,8 @@ CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 PROJDIR="$CLAUDE_DIR/projects"
 [ "${1:-}" = "--host" ] && { CLAUDE_HOST="${2:?}"; export CLAUDE_HOST; shift 2; }
 
-HOST="$(dc_host)"
-DATA="$(dc_data)"
+HOST="$(sj_host)"
+DATA="$(sj_data)"
 OUT="$DATA/hosts/$HOST/chats.index.json"
 mkdir -p "$(dirname "$OUT")"
 

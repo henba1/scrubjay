@@ -2,19 +2,19 @@
 
 `SessionEnd` ships a session's artifacts off the machine via a **pluggable backend**
 (`ship-transcript.sh` → `hooks/transports/<backend>.sh`, chosen by
-`DOTCLAUDE_TRANSCRIPT_BACKEND`).
+`SCRUBJAY_TRANSCRIPT_BACKEND`).
 
 There are two parallel places those artifacts can land, chosen once at onboard time:
 
 - **Your own NAS** (`rsync-wg` / `local` backends) — peer-to-peer over WireGuard/SSH;
   nothing ever touches a third party. Needs a NAS + WireGuard, and is what most of this
   page describes.
-- **GitHub** (`git` backend) — each session is pushed to a private `claude-chats` repo.
+- **GitHub** (`git` backend) — each session is pushed to a private `scrubjay-chats` repo.
   Zero infrastructure to run; the tradeoff is that transcripts live in a (private)
   third-party repo. See [Backends](#backends) below.
 
 The layout and artifacts are identical either way — with the `git` backend they just land
-in the `claude-chats` repo instead of on the NAS. The rest of this page walks the NAS
+in the `scrubjay-chats` repo instead of on the NAS. The rest of this page walks the NAS
 design in full.
 
 On the NAS path, what rides which route is split by **privacy**:
@@ -42,7 +42,7 @@ Rendering happens automatically on every ship (`bin/render-transcript.sh`, addit
 touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS.
 
 Plans get the same human-friendly treatment: Claude Code saves each plan under three random words
-(`rippling-sprouting-whisper.md`), so on every ship `dc_normalize_plans` (in `bin/lib.sh`) renames
+(`rippling-sprouting-whisper.md`), so on every ship `sj_normalize_plans` (in `bin/lib.sh`) renames
 them *in place* to `<date>_<topic>.md` — date from the file's mtime, topic from the plan's first
 heading (a leading `Plan:` stripped) — before the `plans/` dir is mirrored. It's idempotent
 (already-dated names are left alone), so each machine self-normalizes its own plans going forward.
@@ -56,21 +56,21 @@ project recalls memory written on any machine), so it rides a dedicated repo sep
 else. Because it holds **sensitive paths**, *where* that repo lives is a custody choice that follows
 your backend: a **bare git repo on the NAS, reached over WireGuard** (`local`/`rsync-wg` — sensitive
 paths never leave your hardware; the default), or a **separate private GitHub repo** (`git` backend —
-simpler wiring, but stores those paths in a third party's private repo). `DOTCLAUDE_MEMORY_REMOTE`
+simpler wiring, but stores those paths in a third party's private repo). `SCRUBJAY_MEMORY_REMOTE`
 holds whichever — a local path on the NAS box, `ssh://…` over WG on clients, or a `git@github.com:…`
 repo. See [memory](memory-sync.md) for the trade-off in full. `claude-sync.sh` symlinks each project's native
-`~/.claude/projects/<project>/memory/` into a local clone (`DOTCLAUDE_MEMORY`, shared across machines —
+`~/.claude/projects/<project>/memory/` into a local clone (`SCRUBJAY_MEMORY`, shared across machines —
 *not* per-host), `sync-session.sh` pulls it on session start, and `log-session.sh` (`memory-sync.sh push`)
 publishes it on session end. No third party ever sees it. The pull and the publish also run on
-demand mid-session via the **`/dcsync`** and **`/dclog`** slash commands (shipped with the app, wrapping
+demand mid-session via the **`/sjsync`** and **`/sjlog`** slash commands (shipped with the app, wrapping
 `sync-session.sh` and `hooks/publish-now.sh`). (Older versions kept memory per-host in
-`dotclaude-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.)
+`scrubjay-data` on GitHub; `claude-sync.sh` migrates that content into the clone on first run.)
 See [memory-sync.md](memory-sync.md) for the bare-repo setup and per-client WG onboarding.
 
-**Not sensitive → git (`dotclaude-data`, GitHub).** Your rules, `settings`, *personal* `commands`,
+**Not sensitive → git (`scrubjay-data`, GitHub).** Your rules, `settings`, *personal* `commands`,
 `agents`, the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need
 merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal
-git. (The generic `/dc*` slash commands instead ship with the **app** in `dotclaude/commands/`, so a
+git. (The generic `/dc*` slash commands instead ship with the **app** in `scrubjay/commands/`, so a
 fresh install has them immediately; `claude-sync.sh` merges both sources into `~/.claude/commands/`.
 Memory used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
 
@@ -104,7 +104,7 @@ the archive back, or reach anything but the receiver.
 - an **edge/bastion** machine (always-on, internet-facing, holds no NAS) whose jump key is
   restricted to *port-forwarding to the receiver only*, no shell;
 - the **receiver** (the NAS box) authorizes that same key as a write-only
-  `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` + group-normalizes perms);
+  `command="<APP>/bin/sj-receive.sh …",restrict` line (wraps `rrsync -wo` + group-normalizes perms);
 - `rsync ≥ 3.2.3` on both ends.
 
 `bin/onboard-hpc-client.sh` (on the sender) and `bin/onboard-edge-node.sh` (on the bastion)
@@ -115,11 +115,11 @@ configure both ends; the private `runbooks/wireguard-transcripts.md` is the full
 One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *or* a directory):
 
 - **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set
-  `DOTCLAUDE_LOCAL_CHATS` to the NAS chats root.
+  `SCRUBJAY_LOCAL_CHATS` to the NAS chats root.
 - **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set
-  `DOTCLAUDE_WG_TARGET` + `DOTCLAUDE_WG_SSHKEY`.
+  `SCRUBJAY_WG_TARGET` + `SCRUBJAY_WG_SSHKEY`.
 - **`git`** — the zero-infrastructure option: push each session to the private
-  `claude-chats` repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that
+  `scrubjay-chats` repo on GitHub. No NAS or WireGuard to stand up; the tradeoff is that
   transcripts live in a (private) third-party repo rather than only on your own hardware.
   Optionally, a mirror host can *also* pull them down to a NAS
   ([mirror-host.md](mirror-host.md)) — but the GitHub repo is a perfectly good permanent
@@ -128,10 +128,10 @@ One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *o
 **P2P requirements** (the `rsync-wg` path):
 
 - the sender can reach the receiver (the NAS box) over WireGuard;
-- a **per-machine** SSH key (`DOTCLAUDE_WG_SSHKEY`), authorized on the receiver as a
-  **write-only** `command="<APP>/bin/dc-receive.sh …",restrict` line (wraps `rrsync -wo` and
+- a **per-machine** SSH key (`SCRUBJAY_WG_SSHKEY`), authorized on the receiver as a
+  **write-only** `command="<APP>/bin/sj-receive.sh …",restrict` line (wraps `rrsync -wo` and
   chmods each push group-readable) — a leaked key can't read the archive back, get a shell, or forward;
 - `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
 
 Full design + the WireGuard activation runbook: [transcript-transport.md](transcript-transport.md)
-and (private) `dotclaude-data/runbooks/wireguard-transcripts.md`.
+and (private) `scrubjay-data/runbooks/wireguard-transcripts.md`.

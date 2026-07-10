@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Transcript backend: local copy. For the box that has the NAS mounted (the receiver) —
-# no network hop, no rsync-to-self. Set DOTCLAUDE_LOCAL_CHATS to the NAS chats root, e.g.
-#   DOTCLAUDE_TRANSCRIPT_BACKEND="local"
-#   DOTCLAUDE_LOCAL_CHATS="/mnt/nas1/dotclaude-storage"
+# no network hop, no rsync-to-self. Set SCRUBJAY_LOCAL_CHATS to the NAS chats root, e.g.
+#   SCRUBJAY_TRANSCRIPT_BACKEND="local"
+#   SCRUBJAY_LOCAL_CHATS="/mnt/nas1/scrubjay-storage"
 # Best-effort; never fails the session.
 transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a file or a directory)
-  local src="$1" relpath="$2" mode="${3:-}" root="${DOTCLAUDE_LOCAL_CHATS:-}"
+  local src="$1" relpath="$2" mode="${3:-}" root="${SCRUBJAY_LOCAL_CHATS:-}"
   if [ -z "$root" ] || [ ! -d "$root" ]; then
-    echo "local: DOTCLAUDE_LOCAL_CHATS unset or missing ('$root') — backend inactive" >&2
+    echo "local: SCRUBJAY_LOCAL_CHATS unset or missing ('$root') — backend inactive" >&2
     return 0
   fi
   # Return the copy result so a real failure (bad perms, NAS unmounted mid-write) is detectable by

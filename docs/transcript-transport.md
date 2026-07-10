@@ -17,7 +17,7 @@ see `memory-sync.md`.) `CLAUDE.local.md` is host-specific, so it's a one-way per
 merged like memory.
 
 `transport_ship <src> <relpath>` accepts a file *or* a directory. (Memory is **not** shipped
-here — it rides the `dotclaude-data` git sync.)
+here — it rides the `scrubjay-data` git sync.)
 
 ## How it's wired
 
@@ -27,12 +27,12 @@ SessionEnd hook (hooks/log-session.sh)
          └─ hooks/transports/<backend>.sh   ::  transport_ship <src> <host/slug/session.jsonl>
 ```
 
-Backend is chosen by `DOTCLAUDE_TRANSCRIPT_BACKEND` in `~/.config/dotclaude/config`.
+Backend is chosen by `SCRUBJAY_TRANSCRIPT_BACKEND` in `~/.config/scrubjay/config`.
 A backend is one file defining `transport_ship <src> <relpath>`.
 
 ## Backend: `git`  (GitHub — zero infrastructure)
 
-Copies the transcript into the `claude-chats` private repo (`DOTCLAUDE_CHATS`) and pushes
+Copies the transcript into the `scrubjay-chats` private repo (`SCRUBJAY_CHATS`) and pushes
 it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS:
 GitHub *is* the shared store, and no WireGuard or receiver is involved. Optionally, a
 mirror host can *also* pull the repo down to a NAS (`mirror-host.md`), but that's an add-on
@@ -47,28 +47,28 @@ matters to you, use `rsync-wg`/`local` instead.
 Each machine holds a per-machine SSH key and rsyncs **over a WireGuard/SSH tunnel** directly
 to the NAS receiver. No data on any third-party server.
 
-Set in `~/.config/dotclaude/config`:
+Set in `~/.config/scrubjay/config`:
 
 ```sh
-DOTCLAUDE_TRANSCRIPT_BACKEND="rsync-wg"
-DOTCLAUDE_WG_TARGET="claude-rx@claude-receiver"            # ssh destination ONLY — no remote path
-DOTCLAUDE_WG_SSHKEY="$HOME/.ssh/claude_transcripts_ed25519"
+SCRUBJAY_TRANSCRIPT_BACKEND="rsync-wg"
+SCRUBJAY_WG_TARGET="scrubjay-rx@scrubjay-receiver"            # ssh destination ONLY — no remote path
+SCRUBJAY_WG_SSHKEY="$HOME/.ssh/scrubjay_transcripts_ed25519"
 ```
 
-⚠️ **No remote path in `DOTCLAUDE_WG_TARGET`.** The receiver authorizes the key with a forced
-`command="<APP>/bin/dc-receive.sh <root>"` (which runs `rrsync -wo <root>` then chmods the
+⚠️ **No remote path in `SCRUBJAY_WG_TARGET`.** The receiver authorizes the key with a forced
+`command="<APP>/bin/sj-receive.sh <root>"` (which runs `rrsync -wo <root>` then chmods the
 landed files group-readable — see below), which pins the destination root; everything the client sends is
-taken **relative** to it. Including `:/srv/claude-chats` would make `rrsync` re-root it *under*
-itself (`/srv/claude-chats/srv/claude-chats/…`). Per-machine reachability — `HostName`, the
-(often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `claude-receiver`
+taken **relative** to it. Including `:/srv/scrubjay-chats` would make `rrsync` re-root it *under*
+itself (`/srv/scrubjay-chats/srv/scrubjay-chats/…`). Per-machine reachability — `HostName`, the
+(often non-standard) SSH **`Port`**, `User` — lives in a `~/.ssh/config` `scrubjay-receiver`
 alias, so this config line is identical on every machine. `bin/onboard.sh` writes both.
 
 Receiver requirements (see the private `runbooks/wireguard-transcripts.md`):
-- a restricted `command="<APP>/bin/dc-receive.sh <root>",restrict` line per machine key —
-  `dc-receive.sh` wraps `rrsync -wo <root>` (write-only, no shell) and, after each push, chmods
+- a restricted `command="<APP>/bin/sj-receive.sh <root>",restrict` line per machine key —
+  `sj-receive.sh` wraps `rrsync -wo <root>` (write-only, no shell) and, after each push, chmods
   the new files group-readable so the archive owner (human + MCP server) can read what the relay
   account wrote (the relay writes `0600`; setgid stamps the shared group, this adds group-read);
-- the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:claude-rx:x`
+- the `rrsync` user must be able to **traverse** to the NAS root (e.g. `setfacl -m u:scrubjay-rx:x`
   on a `0750` parent like `/media/<user>`);
 - `rsync ≥ 3.2.3` on both ends (for `--mkpath`).
 
@@ -78,8 +78,8 @@ The receiver itself (the machine with the NAS mounted) shouldn't rsync to itself
 The `local` backend just copies the transcript straight into the NAS chats root:
 
 ```sh
-DOTCLAUDE_TRANSCRIPT_BACKEND="local"
-DOTCLAUDE_LOCAL_CHATS="/mnt/nas1/dotclaude-storage"   # the NAS storage root
+SCRUBJAY_TRANSCRIPT_BACKEND="local"
+SCRUBJAY_LOCAL_CHATS="/mnt/nas1/scrubjay-storage"   # the NAS storage root
 ```
 
 Layout matches every other backend (`<host>/<slug>/<session>.jsonl`), so a `local` sender and

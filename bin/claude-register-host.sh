@@ -6,8 +6,8 @@ set -euo pipefail
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$APP/bin/lib.sh"
 [ "${1:-}" = "--host" ] && { CLAUDE_HOST="${2:?}"; export CLAUDE_HOST; shift 2; }
-HOST="$(dc_host)"
-DATA="$(dc_data)"
+HOST="$(sj_host)"
+DATA="$(sj_data)"
 DST="$DATA/hosts/$HOST"
 
 if [ -e "$DST" ]; then
@@ -20,9 +20,9 @@ else
   echo "created $DST  (edit env.md to fill in the rest)"
 fi
 
-mkdir -p "$HOME/.config/dotclaude"
-echo "$HOST" > "$HOME/.config/dotclaude/host"
-echo "pinned host name -> ~/.config/dotclaude/host = $HOST"
+mkdir -p "$HOME/.config/scrubjay"
+echo "$HOST" > "$HOME/.config/scrubjay/host"
+echo "pinned host name -> ~/.config/scrubjay/host = $HOST"
 
 "$APP/bin/claude-index-chats.sh" --host "$HOST"
 echo "next: review $DST/, then run bin/claude-sync.sh"

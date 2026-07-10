@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 # Create + seed the PRIVATE sibling repos this machine needs, under YOUR GitHub account.
 #
-# dotclaude (the app) is public and you run it straight from upstream — no fork required. Your
+# scrubjay (the app) is public and you run it straight from upstream — no fork required. Your
 # actual content lives in separate PRIVATE repos under your own account:
 #
-#   dotclaude-data   instructions, settings, per-host notes, the log catalogue   (always required)
-#   claude-chats     full transcripts, for the `git` relay backend               (git backend only)
-#   claude-memory    cross-machine memory, for the `git` backend                 (opt-in; onboard-memory.sh)
+#   scrubjay-data   instructions, settings, per-host notes, the log catalogue   (always required)
+#   scrubjay-chats     full transcripts, for the `git` relay backend               (git backend only)
+#   scrubjay-memory    cross-machine memory, for the `git` backend                 (opt-in; onboard-memory.sh)
 #
-# This is the step that used to be missing: a fresh user had no dotclaude-data, so onboard.sh died
+# This is the step that used to be missing: a fresh user had no scrubjay-data, so onboard.sh died
 # on `clone failed`. Existence is probed over SSH (`git ls-remote`), so only *creating* a repo needs
 # the `gh` CLI — without it we print the exact command and stop.
 #
 # Idempotent: existing repos are left alone, and a data repo that already has settings/ is not reseeded.
 #
-# usage: dc-bootstrap.sh                # ensure dotclaude-data (+ claude-chats on the git backend)
-#        dc-bootstrap.sh --repo NAME    # ensure ONE private repo exists remotely; print its SSH URL
+# usage: sj-bootstrap.sh                # ensure scrubjay-data (+ scrubjay-chats on the git backend)
+#        sj-bootstrap.sh --repo NAME    # ensure ONE private repo exists remotely; print its SSH URL
 #
-# Env: DOTCLAUDE_OWNER    GitHub account owning your private repos (default: `gh api user`)
+# Env: SCRUBJAY_OWNER    GitHub account owning your private repos (default: `gh api user`)
 #      BASE               where sibling clones live (default: parent of the app clone)
-#      DOTCLAUDE_BACKEND  rsync-wg|local|git|off — decides whether claude-chats is needed
+#      SCRUBJAY_BACKEND  rsync-wg|local|git|off — decides whether scrubjay-chats is needed
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,22 +48,22 @@ remote_has() {
 # Deliberately independent of the app clone's origin: the app may come from upstream while your
 # content lives under your own account. That decoupling is why no fork is needed.
 resolve_owner() {
-  local o="${DOTCLAUDE_OWNER:-}" gl
+  local o="${SCRUBJAY_OWNER:-}" gl
   [ -n "$o" ] || o="$(gh_login)"
   if [ -z "$o" ]; then   # last resort: the app clone's origin owner
     o="$(git -C "$APP" remote get-url origin 2>/dev/null)" || o=""
     o="${o%.git}"; o="${o%/*}"; o="${o##*[:/]}"
   fi
-  [ -n "$o" ] || die "can't determine your GitHub account — set DOTCLAUDE_OWNER=<your-gh-user>"
+  [ -n "$o" ] || die "can't determine your GitHub account — set SCRUBJAY_OWNER=<your-gh-user>"
 
   # Refuse to treat the upstream account as yours. Without this, a user who clones the public app
-  # repo and has no `gh` would silently try to clone/create henba1/dotclaude-data.
+  # repo and has no `gh` would silently try to clone/create henba1/scrubjay-data.
   if [ "$o" = "$UPSTREAM_OWNER" ]; then
     gl="$(gh_login)"
     if [ "$gl" != "$UPSTREAM_OWNER" ]; then
       warn "owner resolved to '$UPSTREAM_OWNER' — that's this project's UPSTREAM account, not yours."
-      warn "You don't need to fork dotclaude; you need your own private data repos."
-      die  "set DOTCLAUDE_OWNER=<your-gh-user> and re-run${gl:+ (gh says you are '$gl')}"
+      warn "You don't need to fork scrubjay; you need your own private data repos."
+      die  "set SCRUBJAY_OWNER=<your-gh-user> and re-run${gl:+ (gh says you are '$gl')}"
     fi
   fi
   printf '%s' "$o"
@@ -97,35 +97,35 @@ ensure_clone() {  # ensure_clone <owner/name> <dir> <label>
   ok "cloned $label"
 }
 
-# Seed a brand-new dotclaude-data. claude-sync.sh REQUIRES settings/settings.base.json (it feeds it
+# Seed a brand-new scrubjay-data. claude-sync.sh REQUIRES settings/settings.base.json (it feeds it
 # to `jq --argjson` under `set -e`), and that file is where the SessionStart/SessionEnd hooks are
 # registered — an empty repo would leave the whole machine inert. So seed, commit, push.
 seed_data() {  # seed_data <dir>
   local dir="$1"
-  if [ -f "$dir/settings/settings.base.json" ]; then ok "dotclaude-data already seeded"; return 0; fi
-  info "seeding dotclaude-data from skeleton/data (settings + hooks, claude-md, host/log dirs)"
+  if [ -f "$dir/settings/settings.base.json" ]; then ok "scrubjay-data already seeded"; return 0; fi
+  info "seeding scrubjay-data from skeleton/data (settings + hooks, claude-md, host/log dirs)"
   cp -r "$APP/skeleton/data/." "$dir/" || { warn "copy of skeleton/data failed"; return 1; }
   if ( cd "$dir" && git add -A \
-         && git commit -q -m "seed dotclaude-data (settings + hooks, claude-md, host/log dirs)" \
+         && git commit -q -m "seed scrubjay-data (settings + hooks, claude-md, host/log dirs)" \
          && git push -qu origin HEAD ); then
-    ok "seeded + pushed dotclaude-data"
+    ok "seeded + pushed scrubjay-data"
   else
     warn "seeded locally, but the commit/push failed — push $dir by hand"
   fi
 }
 
-# claude-chats holds .jsonl transcripts, so its .gitignore must NOT block them (unlike the app/data
+# scrubjay-chats holds .jsonl transcripts, so its .gitignore must NOT block them (unlike the app/data
 # repos). Seed only a README so the default branch exists for the relay's first push.
 seed_chats() {  # seed_chats <dir>
   local dir="$1"
-  git -C "$dir" rev-parse --verify HEAD >/dev/null 2>&1 && { ok "claude-chats already has commits"; return 0; }
-  info "seeding claude-chats (README + credential guard; transcripts are NOT ignored)"
-  printf '%s\n' '# claude-chats' '' \
-    'Private transcript archive, relayed here by [dotclaude](https://github.com/henba1/dotclaude).' '' \
+  git -C "$dir" rev-parse --verify HEAD >/dev/null 2>&1 && { ok "scrubjay-chats already has commits"; return 0; }
+  info "seeding scrubjay-chats (README + credential guard; transcripts are NOT ignored)"
+  printf '%s\n' '# scrubjay-chats' '' \
+    'Private transcript archive, relayed here by [scrubjay](https://github.com/henba1/scrubjay).' '' \
     'Keep this repo **private** — it holds full chat transcripts.' > "$dir/README.md"
   printf '%s\n' '*.credentials*' '.credentials.json' '.claude.json' > "$dir/.gitignore"
-  if ( cd "$dir" && git add -A && git commit -q -m "seed claude-chats" && git push -qu origin HEAD ); then
-    ok "seeded + pushed claude-chats"
+  if ( cd "$dir" && git add -A && git commit -q -m "seed scrubjay-chats" && git push -qu origin HEAD ); then
+    ok "seeded + pushed scrubjay-chats"
   else
     warn "seeded locally, but the push failed — push $dir by hand"
   fi
@@ -133,42 +133,42 @@ seed_chats() {  # seed_chats <dir>
 
 # ---- --repo mode: ensure ONE repo, print its URL (used by onboard-memory.sh) -----------
 if [ "${1:-}" = "--repo" ]; then
-  [ -n "${2:-}" ] || die "usage: dc-bootstrap.sh --repo <name>"
+  [ -n "${2:-}" ] || die "usage: sj-bootstrap.sh --repo <name>"
   OWNER="$(resolve_owner)" || exit 1
-  ensure_repo "$OWNER/$2" "dotclaude: private $2" >&2 || exit 1
+  ensure_repo "$OWNER/$2" "scrubjay: private $2" >&2 || exit 1
   ssh_url "$OWNER/$2"; echo
   exit 0
 fi
 case "${1:-}" in
   -h|--help)    awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0;;
-  -v|--version) echo "dotclaude $(dc_version)"; exit 0;;
+  -v|--version) echo "scrubjay $(sj_version)"; exit 0;;
 esac
 
 # ---- normal mode -----------------------------------------------------------------------
-dc_load_config
+sj_load_config
 OWNER="$(resolve_owner)" || exit 1
-BACKEND="${DOTCLAUDE_BACKEND:-${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}}"
+BACKEND="${SCRUBJAY_BACKEND:-${SCRUBJAY_TRANSCRIPT_BACKEND:-git}}"
 BASE="${BASE:-$(dirname "$APP")}"
 mkdir -p "$BASE"
 
 echo; info "bootstrapping private repos for '$OWNER'  (backend: $BACKEND, base: $BASE)"
 
 rc=0
-ensure_repo  "$OWNER/dotclaude-data" "dotclaude: private Claude Code config (instructions, settings, hosts)" \
-  && ensure_clone "$OWNER/dotclaude-data" "$BASE/dotclaude-data" "dotclaude-data" \
-  && seed_data "$BASE/dotclaude-data" || rc=1
+ensure_repo  "$OWNER/scrubjay-data" "scrubjay: private Claude Code config (instructions, settings, hosts)" \
+  && ensure_clone "$OWNER/scrubjay-data" "$BASE/scrubjay-data" "scrubjay-data" \
+  && seed_data "$BASE/scrubjay-data" || rc=1
 
 if [ "$BACKEND" = git ]; then
-  ensure_repo  "$OWNER/claude-chats" "dotclaude: private Claude Code transcript archive" \
-    && ensure_clone "$OWNER/claude-chats" "$BASE/claude-chats" "claude-chats" \
-    && seed_chats "$BASE/claude-chats" || rc=1
+  ensure_repo  "$OWNER/scrubjay-chats" "scrubjay: private Claude Code transcript archive" \
+    && ensure_clone "$OWNER/scrubjay-chats" "$BASE/scrubjay-chats" "scrubjay-chats" \
+    && seed_chats "$BASE/scrubjay-chats" || rc=1
 fi
 
 echo
 if [ "$rc" = 0 ]; then
   ok "private repos ready under '$OWNER'"
-  info "cross-machine memory gets its own repo — enabled separately by bin/onboard-memory.sh (/dcmemory)"
+  info "cross-machine memory gets its own repo — enabled separately by bin/onboard-memory.sh (/sjmemory)"
 else
-  warn "bootstrap incomplete — create the repo(s) above, then re-run: bin/dc-bootstrap.sh"
+  warn "bootstrap incomplete — create the repo(s) above, then re-run: bin/sj-bootstrap.sh"
 fi
 exit "$rc"

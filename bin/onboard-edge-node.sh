@@ -58,9 +58,9 @@ echo "$LINE" >> "$tmp"; install -m 600 -o "$JUMP_USER" -g "$JUMP_USER" "$tmp" "$
 echo "installed restricted authorized_keys -> permitopen=$RECEIVER, no shell"
 
 # 3) sshd drop-in, scoped to the jump user (does NOT affect other users/accounts)
-DROP=/etc/ssh/sshd_config.d/20-dotclaude-bastion.conf
+DROP=/etc/ssh/sshd_config.d/20-scrubjay-bastion.conf
 cat > "$DROP" <<EOF
-# dotclaude bastion — restrictions apply ONLY to $JUMP_USER
+# scrubjay bastion — restrictions apply ONLY to $JUMP_USER
 Match User $JUMP_USER
     PasswordAuthentication no
     PubkeyAuthentication yes
@@ -81,12 +81,12 @@ else
 fi
 
 # 4) nftables allowlist for the HPC egress range -> the SSH port (print/file by default)
-NFT=/etc/nftables.d/dotclaude-ssh-allow.nft; mkdir -p "$(dirname "$NFT")"
+NFT=/etc/nftables.d/scrubjay-ssh-allow.nft; mkdir -p "$(dirname "$NFT")"
 cat > "$NFT" <<EOF
-# dotclaude: allow only the HPC egress range to the bastion SSH port.
+# scrubjay: allow only the HPC egress range to the bastion SSH port.
 # NOTE: a 'drop' in any nft table is final — review against your existing ruleset before
 # loading so you don't lock yourself out (keep LAN/your own access allowed elsewhere).
-table inet dotclaude {
+table inet scrubjay {
   set hpc_ssh_allow { type ipv4_addr; flags interval; elements = { $HPC_CIDR } }
   chain input {
     type filter hook input priority -5; policy accept;
@@ -97,7 +97,7 @@ table inet dotclaude {
 EOF
 echo "wrote nft snippet: $NFT"
 if [ "$APPLY_NFT" = 1 ]; then
-  nft -f "$NFT" && echo "  loaded nft table 'dotclaude'"
+  nft -f "$NFT" && echo "  loaded nft table 'scrubjay'"
 else
   echo "  (NOT loaded — review it, ensure LAN access stays open, then: nft -f $NFT)"
 fi
@@ -106,10 +106,10 @@ cat <<EOF
 
 ──────────────────────────────────────────────────────────────────────────────
  Edge node configured. Remaining:
- 1. RECEIVER ($RECEIVER): add to ~claude-rx/.ssh/authorized_keys
-    (<APP> = receiver's dotclaude checkout; wrapper widens the archive to group-read per push) —
-      restrict,command="<APP>/bin/dc-receive.sh /srv/claude-chats" $HPC_PUBKEY
+ 1. RECEIVER ($RECEIVER): add to ~scrubjay-rx/.ssh/authorized_keys
+    (<APP> = receiver's scrubjay checkout; wrapper widens the archive to group-read per push) —
+      restrict,command="<APP>/bin/sj-receive.sh /srv/scrubjay-chats" $HPC_PUBKEY
  2. Router: forward public TCP <port> -> THIS host:$SSH_PORT.
- 3. From the HPC node:  ssh $([ "$SSH_PORT" = 22 ] || echo "-p$SSH_PORT ")claude-receiver true
+ 3. From the HPC node:  ssh $([ "$SSH_PORT" = 22 ] || echo "-p$SSH_PORT ")scrubjay-receiver true
 ──────────────────────────────────────────────────────────────────────────────
 EOF

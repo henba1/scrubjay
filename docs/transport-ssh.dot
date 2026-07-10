@@ -22,7 +22,7 @@ digraph transport_ssh {
       label="internal — never internet-facing"; style="rounded,dashed"; color="#16a34a"; fontcolor="#166534"; fontsize=10;
       RX  [label="receiver\nwrite-only rsync (rrsync -wo)\nno shell, can't read back"];
       NAS [shape=folder, fillcolor="#dcfce7", color="#16a34a", fontcolor="#166534",
-           label="NAS\ndotclaude-storage/"];
+           label="NAS\nscrubjay-storage/"];
       RX -> NAS [label="land transcript +\nsubagents + plans"];
     }
 

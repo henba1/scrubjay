@@ -1,8 +1,8 @@
-site_name: dotclaude
+site_name: scrubjay
 site_description: The app/logic for syncing Claude Code across machines — config-sync + transcript relay.
-site_url: https://henba1.github.io/dotclaude/
-repo_url: https://github.com/henba1/dotclaude
-repo_name: henba1/dotclaude
+site_url: https://henba1.github.io/scrubjay/
+repo_url: https://github.com/henba1/scrubjay
+repo_name: henba1/scrubjay
 copyright: Copyright &copy; 2026 Hendrik
 
 theme:
@@ -47,7 +47,7 @@ plugins:
   - search
   - llmstxt:
       markdown_description: >-
-        dotclaude is the app/logic for syncing Claude Code across machines: a git-based
+        scrubjay is the app/logic for syncing Claude Code across machines: a git-based
         config sync plus a pluggable, peer-to-peer transcript relay to your own NAS.
         Personal content lives in separate private repos so this one is publishable.
       full_output: llms-full.txt

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Transcript backend: git. Copy the transcript into the claude-chats clone and push it.
-# Requires DOTCLAUDE_CHATS (a clone of the private relay repo). Best-effort; never fails.
+# Transcript backend: git. Copy the transcript into the scrubjay-chats clone and push it.
+# Requires SCRUBJAY_CHATS (a clone of the private relay repo). Best-effort; never fails.
 transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a file or a directory)
   local src="$1" relpath="$2" mode="${3:-}" chats d b
-  chats="$(dc_chats)"
+  chats="$(sj_chats)"
   [ -n "$chats" ] && [ -d "$chats/.git" ] || return 0
   local dst="$chats/$relpath"
   if [ -d "$src" ]; then

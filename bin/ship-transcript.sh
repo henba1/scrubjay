@@ -9,20 +9,20 @@
 # These are full conversation / sensitive content, so they ride the same
 # (P2P) backend as the transcript — never a separate third-party path.
 #   usage: ship-transcript.sh <transcript_path> <slug> <session_id> [host] [cwd]
-# Selects $DOTCLAUDE_TRANSCRIPT_BACKEND (default: git). Each backend lives in
+# Selects $SCRUBJAY_TRANSCRIPT_BACKEND (default: git). Each backend lives in
 # hooks/transports/<backend>.sh and must define:  transport_ship <src> <relpath>
 # (src may be a file or a directory).
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-. "$APP/bin/lib.sh"; dc_load_config
+. "$APP/bin/lib.sh"; sj_load_config
 
 src="${1:?transcript path}"; slug="${2:?slug}"; sid="${3:?session id}"
-host="${4:-$(dc_host)}"
+host="${4:-$(sj_host)}"
 cwd="${5:-}"                                   # session working dir (for project-root files)
 [ -f "$src" ] || exit 0
 
-backend="${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}"
+backend="${SCRUBJAY_TRANSCRIPT_BACKEND:-git}"
 impl="$APP/hooks/transports/$backend.sh"
 [ -f "$impl" ] || { echo "ship-transcript: unknown backend '$backend'" >&2; exit 0; }
 # shellcheck source=/dev/null  # backend chosen at runtime; see hooks/transports/<backend>.sh
@@ -32,8 +32,8 @@ impl="$APP/hooks/transports/$backend.sh"
 #    "is the relay working?" signal — record its outcome as a machine-local breadcrumb so a silent
 #    failure (e.g. an unauthorized relay key) is flagged at the next SessionStart, not days later.
 transport_ship "$src" "$host/$slug/$sid.jsonl"; ship_rc=$?
-if [ "$ship_rc" -eq 0 ]; then dc_record_ship ok "$sid" "$backend"
-else dc_record_ship fail "$sid" "$backend" "$ship_rc"; fi
+if [ "$ship_rc" -eq 0 ]; then sj_record_ship ok "$sid" "$backend"
+else sj_record_ship fail "$sid" "$backend" "$ship_rc"; fi
 
 # 2) this session's subagent artifacts (subagent transcripts, tool-results), if present.
 #    They sit in a sibling dir named after the session id, next to <session>.jsonl.
@@ -46,7 +46,7 @@ sess_dir="$(dirname "$src")/$sid"
 #    Derive the Claude config root from the transcript path (…/<root>/projects/<slug>/…).
 claude_root="${src%/projects/*}"
 if [ "$claude_root" != "$src" ] && [ -d "$claude_root/plans" ]; then
-  dc_normalize_plans "$claude_root/plans"
+  sj_normalize_plans "$claude_root/plans"
   # `mirror`: the relay copy is an *exact* mirror of the (normalized) local plans/, so a plan
   #  that was shipped under its old random-word name and then renamed in place doesn't linger
   #  as a stale duplicate on the NAS.
@@ -55,7 +55,7 @@ fi
 
 # 4) human-readable rendering (clean conversation) → <host>/readable/<project>/<date>_<topic>__<sid8>.md
 #    Additive: machine .jsonl tree above is untouched; this is the browsable layer.
-rel="$(dc_readable_relpath "$src" "$sid")"
+rel="$(sj_readable_relpath "$src" "$sid")"
 tmpmd="$(mktemp 2>/dev/null)" || tmpmd=""
 if [ -n "$tmpmd" ]; then
   bash "$APP/bin/render-transcript.sh" "$src" > "$tmpmd" 2>/dev/null

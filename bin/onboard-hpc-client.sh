@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Onboard an HPC login node as a dotclaude transcript client that ships over SSH,
+# Onboard an HPC login node as a scrubjay transcript client that ships over SSH,
 # ProxyJumping through a home edge/bastion to the receiver. HPC nodes usually can't run
 # WireGuard (no root/TUN; outbound UDP commonly blocked), so the transport rides TCP/SSH.
 #
@@ -7,7 +7,7 @@
 #   1. generates a passphraseless relay key if absent (forced-command restricted on the far
 #      end, so a leak can only append transcripts — see the edge/receiver authorized_keys);
 #   2. writes marker-bounded blocks into ~/.ssh/config (bastion + receiver via ProxyJump);
-#   3. prepares the rsync-wg backend pointer in ~/.config/dotclaude/config;
+#   3. prepares the rsync-wg backend pointer in ~/.config/scrubjay/config;
 #   4. prints the egress IP, the public key, and the two authorized_keys lines to install.
 # It does NOT flip the active transcript backend unless --activate is given, so the node
 # keeps shipping via its current backend until the home side is verified.
@@ -19,15 +19,15 @@
 #   --receiver-host H   receiver address as seen FROM the edge node (its LAN IP)
 # Optional:
 #   --receiver-port P   receiver sshd port (as seen from the bastion; omit = ssh default 22)
-#   --receiver-user U   default: claude-rx
-#   --receiver-path P   rrsync root on the receiver (default: /srv/claude-chats)
-#   --alias A           ssh_config Host alias for the receiver (default: claude-receiver)
-#   --key F             relay key path (default: ~/.ssh/claude_transcripts_ed25519)
-#   --activate          set DOTCLAUDE_TRANSCRIPT_BACKEND=rsync-wg now (default: leave as-is)
+#   --receiver-user U   default: scrubjay-rx
+#   --receiver-path P   rrsync root on the receiver (default: /srv/scrubjay-chats)
+#   --alias A           ssh_config Host alias for the receiver (default: scrubjay-receiver)
+#   --key F             relay key path (default: ~/.ssh/scrubjay_transcripts_ed25519)
+#   --activate          set SCRUBJAY_TRANSCRIPT_BACKEND=rsync-wg now (default: leave as-is)
 set -euo pipefail
 
-RECEIVER_USER=claude-rx; RECEIVER_PATH=/srv/claude-chats; ALIAS=claude-receiver
-KEY="$HOME/.ssh/claude_transcripts_ed25519"; ACTIVATE=0
+RECEIVER_USER=scrubjay-rx; RECEIVER_PATH=/srv/scrubjay-chats; ALIAS=scrubjay-receiver
+KEY="$HOME/.ssh/scrubjay_transcripts_ed25519"; ACTIVATE=0
 BASTION_HOST=; BASTION_PORT=; BASTION_USER=; RECEIVER_HOST=; RECEIVER_PORT=
 while [ $# -gt 0 ]; do case "$1" in
   --bastion-host) BASTION_HOST="$2"; shift 2;;
@@ -50,7 +50,7 @@ JUMP_ALIAS="${ALIAS}-jump"
 # 1) relay key (passphraseless: the hook is non-interactive; far-end forced-command limits a leak)
 mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
 if [ ! -f "$KEY" ]; then
-  ssh-keygen -t ed25519 -N "" -f "$KEY" -C "dotclaude-transcripts $(hostname -s) -> $ALIAS" >/dev/null
+  ssh-keygen -t ed25519 -N "" -f "$KEY" -C "scrubjay-transcripts $(hostname -s) -> $ALIAS" >/dev/null
   echo "generated relay key: $KEY"
 else
   echo "relay key exists: $KEY (reusing)"
@@ -59,7 +59,7 @@ chmod 600 "$KEY"
 
 # 2) ssh_config: a marker-bounded block (idempotent — rewritten on each run)
 CFG="$HOME/.ssh/config"; touch "$CFG"; chmod 600 "$CFG"
-B="# >>> dotclaude $ALIAS >>>"; E="# <<< dotclaude $ALIAS <<<"
+B="# >>> scrubjay $ALIAS >>>"; E="# <<< scrubjay $ALIAS <<<"
 tmp="$(mktemp)"; awk -v b="$B" -v e="$E" '
   $0==b{s=1} !s{print} $0==e{s=0}' "$CFG" > "$tmp"   # drop any prior block
 {
@@ -77,29 +77,29 @@ tmp="$(mktemp)"; awk -v b="$B" -v e="$E" '
 } > "$CFG.new" && mv "$CFG.new" "$CFG"; chmod 600 "$CFG"; rm -f "$tmp"
 echo "wrote ssh_config blocks: $JUMP_ALIAS, $ALIAS"
 
-# 3) dotclaude pointer. The WG block holds ONLY target+key. The backend is the single
-#    existing DOTCLAUDE_TRANSCRIPT_BACKEND line, flipped IN PLACE to rsync-wg with --activate
+# 3) scrubjay pointer. The WG block holds ONLY target+key. The backend is the single
+#    existing SCRUBJAY_TRANSCRIPT_BACKEND line, flipped IN PLACE to rsync-wg with --activate
 #    (a second ':=' line is a no-op — ':=' is first-assignment-wins). The target carries NO
 #    remote path: the receiver's `rrsync -wo <root>` forced command roots it; an absolute path
 #    here double-nests under the root (verified by the archive-host smoke test).
-DCFG="$HOME/.config/dotclaude/config"; mkdir -p "$(dirname "$DCFG")"; touch "$DCFG"
-BB="# >>> dotclaude wg >>>"; EE="# <<< dotclaude wg <<<"
+DCFG="$HOME/.config/scrubjay/config"; mkdir -p "$(dirname "$DCFG")"; touch "$DCFG"
+BB="# >>> scrubjay wg >>>"; EE="# <<< scrubjay wg <<<"
 tmp="$(mktemp)"; awk -v b="$BB" -v e="$EE" '$0==b{s=1} !s{print} $0==e{s=0}' "$DCFG" > "$tmp"
 if [ "$ACTIVATE" = 1 ]; then
-  if grep -q 'DOTCLAUDE_TRANSCRIPT_BACKEND' "$tmp"; then
-    sed -i -E 's/(DOTCLAUDE_TRANSCRIPT_BACKEND:=)[^}"]*/\1rsync-wg/' "$tmp"
+  if grep -q 'SCRUBJAY_TRANSCRIPT_BACKEND' "$tmp"; then
+    sed -i -E 's/(SCRUBJAY_TRANSCRIPT_BACKEND:=)[^}"]*/\1rsync-wg/' "$tmp"
   else
-    printf ': "${DOTCLAUDE_TRANSCRIPT_BACKEND:=rsync-wg}"\n' >> "$tmp"
+    printf ': "${SCRUBJAY_TRANSCRIPT_BACKEND:=rsync-wg}"\n' >> "$tmp"
   fi
 fi
 {
   cat "$tmp"
   echo "$BB"
-  echo ": \"\${DOTCLAUDE_WG_TARGET:=$RECEIVER_USER@$ALIAS}\""
-  echo ": \"\${DOTCLAUDE_WG_SSHKEY:=$KEY}\""
+  echo ": \"\${SCRUBJAY_WG_TARGET:=$RECEIVER_USER@$ALIAS}\""
+  echo ": \"\${SCRUBJAY_WG_SSHKEY:=$KEY}\""
   echo "$EE"
 } > "$DCFG.new" && mv "$DCFG.new" "$DCFG"; rm -f "$tmp"
-echo "wrote dotclaude WG pointer (backend $([ "$ACTIVATE" = 1 ] && echo 'flipped to rsync-wg' || echo 'unchanged — pass --activate to flip'))"
+echo "wrote scrubjay WG pointer (backend $([ "$ACTIVATE" = 1 ] && echo 'flipped to rsync-wg' || echo 'unchanged — pass --activate to flip'))"
 
 # 4) report: egress, pubkey, the lines to install at home
 EGRESS="$(curl -s --max-time 8 https://api.ipify.org 2>/dev/null || true)"
@@ -120,15 +120,15 @@ A) on the EDGE node — run onboard-edge-node.sh with:
    --hpc-allow-cidr <that /24>   --receiver $RECEIVER_HOST:22
 
 B) on the RECEIVER ($RECEIVER_HOST) — add to ~$RECEIVER_USER/.ssh/authorized_keys
-   (<APP> = the receiver's dotclaude checkout; the wrapper chmods the archive group-readable
+   (<APP> = the receiver's scrubjay checkout; the wrapper chmods the archive group-readable
    after each push so the human + MCP server can read what the relay writes):
-   restrict,command="<APP>/bin/dc-receive.sh $RECEIVER_PATH" $PUB
+   restrict,command="<APP>/bin/sj-receive.sh $RECEIVER_PATH" $PUB
 
 VERIFY (after the home side + router port-forward are up):
    ssh $ALIAS true                                  # silent success via ProxyJump
-   DOTCLAUDE_TRANSCRIPT_BACKEND=rsync-wg \\
-   DOTCLAUDE_WG_TARGET=$RECEIVER_USER@$ALIAS \\
-   ~/.dotclaude/dotclaude/bin/ship-transcript.sh <a-real.jsonl> testslug testsid \$(hostname -s)
-THEN activate permanently:  re-run this script with --activate (or edit ~/.config/dotclaude/config)
+   SCRUBJAY_TRANSCRIPT_BACKEND=rsync-wg \\
+   SCRUBJAY_WG_TARGET=$RECEIVER_USER@$ALIAS \\
+   ~/.scrubjay/scrubjay/bin/ship-transcript.sh <a-real.jsonl> testslug testsid \$(hostname -s)
+THEN activate permanently:  re-run this script with --activate (or edit ~/.config/scrubjay/config)
 ──────────────────────────────────────────────────────────────────────────────
 EOF

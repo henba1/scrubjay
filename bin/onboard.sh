@@ -2,19 +2,19 @@
 # Interactive onboarding for a new machine. Condenses the README "Onboard a new machine"
 # steps into one guided run:
 #   - check deps (git, jq) and Claude Code — offer to install Claude if missing
-#   - clone the sibling data repos (dotclaude-data, and claude-chats only for the git backend)
-#   - write ~/.config/dotclaude/{config,host}
+#   - clone the sibling data repos (scrubjay-data, and scrubjay-chats only for the git backend)
+#   - write ~/.config/scrubjay/{config,host}
 #   - register the host + apply config into ~/.claude
 #   - for the rsync-wg (P2P) backend: optionally generate a dedicated relay SSH key,
-#     add the `claude-receiver` ssh-alias, and print the receiver authorized_keys line
+#     add the `scrubjay-receiver` ssh-alias, and print the receiver authorized_keys line
 #   - set up cross-machine memory (self-hosted NAS git repo) via onboard-memory.sh
 #
 # Re-runnable: skips anything already in place. Prompts have sensible defaults; any value
-# can be preset via its env var (DOTCLAUDE_HOST, DOTCLAUDE_BACKEND, …) to run unattended.
+# can be preset via its env var (SCRUBJAY_HOST, SCRUBJAY_BACKEND, …) to run unattended.
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-. "$APP/bin/lib.sh"   # dc_version / dc_is_clone (function definitions only; no side effects)
+. "$APP/bin/lib.sh"   # sj_version / sj_is_clone (function definitions only; no side effects)
 
 # ---- pretty output + prompt helpers ---------------------------------------------------
 info() { printf '\033[1;34m›\033[0m %s\n' "$*"; }
@@ -40,10 +40,10 @@ confirm() {  # confirm "prompt" "Y"|"N"
 
 case "${1:-}" in
   -h|--help)    awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0;;
-  -v|--version) echo "dotclaude $(dc_version)"; exit 0;;
+  -v|--version) echo "scrubjay $(sj_version)"; exit 0;;
 esac
 
-echo; info "dotclaude onboarding  (app: $APP, version: $(dc_version))"
+echo; info "scrubjay onboarding  (app: $APP, version: $(sj_version))"
 
 # ---- 1) dependencies ------------------------------------------------------------------
 have git || die "git not found — install it first (e.g. sudo apt install git)."
@@ -57,11 +57,11 @@ else
       || warn "Claude install reported an error — continuing; install it manually later."
   fi
 fi
-# uv runs the dcmcp archive server (mcp/dcmcp_server.py via `uv run --script`). Only the box that
+# uv runs the sjmcp archive server (mcp/sjmcp_server.py via `uv run --script`). Only the box that
 # serves the archive strictly needs it, but check+offer here so claude-sync can wire MCP in one go.
 if have uv; then ok "uv present ($(command -v uv))"
 else
-  warn "uv not found — the dcmcp MCP server (/dcrecall, /dcfind, /dcbrowse) won't register without it."
+  warn "uv not found — the sjmcp MCP server (/sjrecall, /sjfind, /sjbrowse) won't register without it."
   if confirm "Install it now via the official installer?" Y; then
     curl -LsSf https://astral.sh/uv/install.sh | sh \
       && ok "uv installed (you may need to reopen your shell so 'uv' is on PATH)" \
@@ -73,78 +73,78 @@ fi
 # Deliberately NOT inferred from this clone's origin. The app repo is public and you may run it
 # straight from upstream; your content lives in private repos under your OWN account. Keeping the
 # two apart is what makes forking unnecessary (and stops a fresh clone from reaching for the
-# maintainer's private repos). dc-bootstrap.sh creates + seeds them.
-dc_is_clone || warn "this app dir has no .git — self-update won't work; install via 'git clone', not a source tarball."
-DEFAULT_OWNER="${DOTCLAUDE_OWNER:-$(command -v gh >/dev/null 2>&1 && gh api user --jq .login 2>/dev/null)}"
-ask DOTCLAUDE_OWNER "GitHub account for your PRIVATE data repos" "${DEFAULT_OWNER:-}"
-[ -n "$DOTCLAUDE_OWNER" ] || die "no GitHub account given — set DOTCLAUDE_OWNER=<your-gh-user>"
-export DOTCLAUDE_OWNER
-ok "private repos owner: $DOTCLAUDE_OWNER"
+# maintainer's private repos). sj-bootstrap.sh creates + seeds them.
+sj_is_clone || warn "this app dir has no .git — self-update won't work; install via 'git clone', not a source tarball."
+DEFAULT_OWNER="${SCRUBJAY_OWNER:-$(command -v gh >/dev/null 2>&1 && gh api user --jq .login 2>/dev/null)}"
+ask SCRUBJAY_OWNER "GitHub account for your PRIVATE data repos" "${DEFAULT_OWNER:-}"
+[ -n "$SCRUBJAY_OWNER" ] || die "no GitHub account given — set SCRUBJAY_OWNER=<your-gh-user>"
+export SCRUBJAY_OWNER
+ok "private repos owner: $SCRUBJAY_OWNER"
 
 DEFAULT_BASE="$(dirname "$APP")"                # siblings of the app clone
 ask BASE "clone base dir for the data repos" "$DEFAULT_BASE"
-ask DOTCLAUDE_HOST "stable host name" "$(hostname -s 2>/dev/null || echo host)"
-HOST="$DOTCLAUDE_HOST"
-DATA_DIR="$BASE/dotclaude-data"
-CHATS_DIR="$BASE/claude-chats"
+ask SCRUBJAY_HOST "stable host name" "$(hostname -s 2>/dev/null || echo host)"
+HOST="$SCRUBJAY_HOST"
+DATA_DIR="$BASE/scrubjay-data"
+CHATS_DIR="$BASE/scrubjay-chats"
 
 # ---- 3) backend choice ----------------------------------------------------------------
-if [ -z "${DOTCLAUDE_BACKEND:-}" ]; then
+if [ -z "${SCRUBJAY_BACKEND:-}" ]; then
   echo; info "Session-relay backend — where each session's records go (pick one):"
   echo "    1) rsync-wg  peer-to-peer to your own NAS over WireGuard — records stay off third parties; needs a NAS"
   echo "    2) local     this box HAS the NAS mounted — copy straight in, no network hop"
-  echo "    3) git       push to a private claude-chats repo on GitHub — no NAS or WireGuard to run"
+  echo "    3) git       push to a private scrubjay-chats repo on GitHub — no NAS or WireGuard to run"
   echo "    4) off       don't ship sessions"
   ask BACKEND_CHOICE "choose 1-4" ""
   case "$BACKEND_CHOICE" in
-    1) DOTCLAUDE_BACKEND=rsync-wg;; 2) DOTCLAUDE_BACKEND=local;;
-    3) DOTCLAUDE_BACKEND=git;;      4) DOTCLAUDE_BACKEND=off;;
-    "") die "no backend chosen — pick 1-4, or preset DOTCLAUDE_BACKEND (rsync-wg|local|git|off)";;
+    1) SCRUBJAY_BACKEND=rsync-wg;; 2) SCRUBJAY_BACKEND=local;;
+    3) SCRUBJAY_BACKEND=git;;      4) SCRUBJAY_BACKEND=off;;
+    "") die "no backend chosen — pick 1-4, or preset SCRUBJAY_BACKEND (rsync-wg|local|git|off)";;
     *)  die "invalid choice '$BACKEND_CHOICE'";;
   esac
 fi
-BACKEND="$DOTCLAUDE_BACKEND"
+BACKEND="$SCRUBJAY_BACKEND"
 ok "backend: $BACKEND"
 
 # backend-specific settings
 WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PORT=""; RECV_PATH=""; GEN_KEY=0
 case "$BACKEND" in
   rsync-wg)
-    ask RECV_USER "receiver SSH user" "claude-rx"
+    ask RECV_USER "receiver SSH user" "scrubjay-rx"
     ask RECV_HOST "receiver host/IP (reachable over WG/LAN)" "192.168.1.10"
     ask RECV_PORT "receiver SSH port" "22"
-    ask RECV_PATH "receiver rrsync root (its authorized_keys -wo dir)" "/srv/claude-chats"
-    ask WG_KEY "relay SSH key path" "$HOME/.ssh/claude_transcripts_ed25519"
+    ask RECV_PATH "receiver rrsync root (its authorized_keys -wo dir)" "/srv/scrubjay-chats"
+    ask WG_KEY "relay SSH key path" "$HOME/.ssh/scrubjay_transcripts_ed25519"
     # ssh destination ONLY — no remote path. rrsync pins the root; paths are relative to it.
-    WG_TARGET="$RECV_USER@claude-receiver"              # alias resolved via ~/.ssh/config
+    WG_TARGET="$RECV_USER@scrubjay-receiver"              # alias resolved via ~/.ssh/config
     [ -f "$WG_KEY" ] || confirm "generate the dedicated relay SSH key now?" Y && GEN_KEY=1
     ;;
   local)
-    ask LOCAL_CHATS "NAS storage root (this box's mount)" "/mnt/nas1/dotclaude-storage"
+    ask LOCAL_CHATS "NAS storage root (this box's mount)" "/mnt/nas1/scrubjay-storage"
     ;;
 esac
 
 # ---- 4) create, seed + clone the private sibling repos --------------------------------
-# dc-bootstrap.sh creates them under $DOTCLAUDE_OWNER if they don't exist yet (via `gh`), clones
-# them, and seeds a fresh dotclaude-data from skeleton/data — claude-sync.sh hard-requires
+# sj-bootstrap.sh creates them under $SCRUBJAY_OWNER if they don't exist yet (via `gh`), clones
+# them, and seeds a fresh scrubjay-data from skeleton/data — claude-sync.sh hard-requires
 # settings/settings.base.json, and that file is where the SessionStart/SessionEnd hooks live.
 mkdir -p "$BASE"
-DOTCLAUDE_BACKEND="$BACKEND" BASE="$BASE" "$APP/bin/dc-bootstrap.sh" \
+SCRUBJAY_BACKEND="$BACKEND" BASE="$BASE" "$APP/bin/sj-bootstrap.sh" \
   || die "bootstrap failed — create the private repo(s) it named, then re-run bin/onboard.sh"
 
 # ---- 5) write the machine-local pointer ----------------------------------------------
-CFGDIR="$HOME/.config/dotclaude"; CFG="$CFGDIR/config"; mkdir -p "$CFGDIR"
+CFGDIR="$HOME/.config/scrubjay"; CFG="$CFGDIR/config"; mkdir -p "$CFGDIR"
 if [ -f "$CFG" ] && ! confirm "overwrite existing $CFG?" N; then
   warn "keeping existing $CFG (review it matches the choices above)"
 else
   [ -f "$CFG" ] && cp "$CFG" "$CFG.bak.$(date +%s)"
   {
-    echo ": \"\${DOTCLAUDE_DATA:=$DATA_DIR}\""
-    echo ": \"\${DOTCLAUDE_CHATS:=$CHATS_DIR}\""
-    echo ": \"\${DOTCLAUDE_TRANSCRIPT_BACKEND:=$BACKEND}\""
-    [ "$BACKEND" = local ]    && echo ": \"\${DOTCLAUDE_LOCAL_CHATS:=$LOCAL_CHATS}\""
-    [ "$BACKEND" = rsync-wg ] && { echo ": \"\${DOTCLAUDE_WG_TARGET:=$WG_TARGET}\""
-                                   echo ": \"\${DOTCLAUDE_WG_SSHKEY:=$WG_KEY}\""; }
+    echo ": \"\${SCRUBJAY_DATA:=$DATA_DIR}\""
+    echo ": \"\${SCRUBJAY_CHATS:=$CHATS_DIR}\""
+    echo ": \"\${SCRUBJAY_TRANSCRIPT_BACKEND:=$BACKEND}\""
+    [ "$BACKEND" = local ]    && echo ": \"\${SCRUBJAY_LOCAL_CHATS:=$LOCAL_CHATS}\""
+    [ "$BACKEND" = rsync-wg ] && { echo ": \"\${SCRUBJAY_WG_TARGET:=$WG_TARGET}\""
+                                   echo ": \"\${SCRUBJAY_WG_SSHKEY:=$WG_KEY}\""; }
   } > "$CFG"
   ok "wrote $CFG"
 fi
@@ -155,13 +155,13 @@ if [ "$GEN_KEY" = 1 ]; then
   if [ -f "$WG_KEY" ]; then ok "relay key already exists ($WG_KEY)"
   else ssh-keygen -t ed25519 -N "" -f "$WG_KEY" -C "$HOST transcripts" && ok "generated $WG_KEY"; fi
   SSHCFG="$HOME/.ssh/config"; touch "$SSHCFG"; chmod 600 "$SSHCFG"
-  if grep -qE '^[Hh]ost[[:space:]]+claude-receiver$' "$SSHCFG"; then
-    ok "ssh alias 'claude-receiver' already present"
+  if grep -qE '^[Hh]ost[[:space:]]+scrubjay-receiver$' "$SSHCFG"; then
+    ok "ssh alias 'scrubjay-receiver' already present"
   else
-    { echo; echo "Host claude-receiver"; echo "    HostName $RECV_HOST"
+    { echo; echo "Host scrubjay-receiver"; echo "    HostName $RECV_HOST"
       echo "    Port $RECV_PORT"; echo "    User $RECV_USER"
       echo "    IdentityFile $WG_KEY"; } >> "$SSHCFG"
-    ok "added ssh alias 'claude-receiver' → $RECV_USER@$RECV_HOST:$RECV_PORT"
+    ok "added ssh alias 'scrubjay-receiver' → $RECV_USER@$RECV_HOST:$RECV_PORT"
   fi
 fi
 
@@ -186,15 +186,15 @@ fi
 # ---- 7c) MCP remote: a client with no local archive queries the archive host over SSH -
 # (On a 'local' backend the box HAS the archive — claude-sync already registered MCP locally.)
 if [ "$BACKEND" != local ]; then
-  if confirm "set up archive querying over MCP (/dcrecall, /dcfind, /dcbrowse against the archive host)?" Y; then
-    ask MCP_USER "owner account ON THE ARCHIVE HOST (the one with uv + the dotclaude clone)" "${MCP_USER:-$USER}"
+  if confirm "set up archive querying over MCP (/sjrecall, /sjfind, /sjbrowse against the archive host)?" Y; then
+    ask MCP_USER "owner account ON THE ARCHIVE HOST (the one with uv + the scrubjay clone)" "${MCP_USER:-$USER}"
     MCP_USER="$MCP_USER" MCP_RECV_HOST="${RECV_HOST:-}" MCP_RECV_PORT="${RECV_PORT:-22}" \
       "$APP/bin/onboard-mcp-client.sh" || warn "MCP-client onboarding had issues — see the README 'Query the archive (MCP)' section"
   fi
 fi
 
 # ---- 8) offer to push the new host dir ------------------------------------------------
-if confirm "commit + push the new hosts/$HOST entry to dotclaude-data?" Y; then
+if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \
       && { git pull --rebase -q 2>/dev/null; git push -q; } ) \
     && ok "pushed hosts/$HOST" || warn "push skipped/failed — do it manually in $DATA_DIR"
@@ -205,11 +205,11 @@ echo; ok "onboarding complete for '$HOST' (backend: $BACKEND)"
 if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
   echo
   info "Final step — authorize this machine on the receiver. Add this ONE line to the"
-  info "receiver's ~claude-rx/.ssh/authorized_keys (replace <APP> with the receiver's"
-  info "dotclaude checkout path — the wrapper widens the archive to group-read after each push):"
+  info "receiver's ~scrubjay-rx/.ssh/authorized_keys (replace <APP> with the receiver's"
+  info "scrubjay checkout path — the wrapper widens the archive to group-read after each push):"
   echo
-  echo "    command=\"<APP>/bin/dc-receive.sh $RECV_PATH\",restrict $(cat "$WG_KEY.pub")"
+  echo "    command=\"<APP>/bin/sj-receive.sh $RECV_PATH\",restrict $(cat "$WG_KEY.pub")"
   echo
-  info "Then verify from here:  ssh claude-receiver true   (should succeed silently),"
+  info "Then verify from here:  ssh scrubjay-receiver true   (should succeed silently),"
   info "and a session-end will rsync transcripts/subagents/plans to the NAS."
 fi

@@ -7,7 +7,7 @@ assignees: ""
 ---
 
 **The problem**
-What are you trying to do that dotclaude makes hard or impossible today?
+What are you trying to do that scrubjay makes hard or impossible today?
 
 **Proposed solution**
 What you'd like to see. If it touches the sync/relay design, note which side

@@ -6,21 +6,21 @@
 #   usage: memory-sync.sh [pull|push]   (default: pull)
 # Best-effort: clones on first use, never blocks a session, always exits 0.
 #
-# Config (~/.config/dotclaude/config):
-#   DOTCLAUDE_MEMORY         local clone (default ~/.dotclaude/claude-memory)
-#   DOTCLAUDE_MEMORY_REMOTE  the memory repo — a local path on the NAS box, ssh://…over-WG on
+# Config (~/.config/scrubjay/config):
+#   SCRUBJAY_MEMORY         local clone (default ~/.scrubjay/scrubjay-memory)
+#   SCRUBJAY_MEMORY_REMOTE  the memory repo — a local path on the NAS box, ssh://…over-WG on
 #                            clients, or a git@github.com:…private repo (git backend).
 #                            Unset -> sync is off (this script no-ops).
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-. "$APP/bin/lib.sh"; dc_load_config
+. "$APP/bin/lib.sh"; sj_load_config
 
 warn() { printf '\033[1;33m!\033[0m memory-sync: %s\n' "$*" >&2; }   # loud, but never blocks (exit stays 0)
 
 mode="${1:-pull}"
-mem="$(dc_memory)"
-remote="$(dc_memory_remote)"
+mem="$(sj_memory)"
+remote="$(sj_memory_remote)"
 [ -n "$remote" ] || exit 0                      # memory git sync not configured on this machine
 
 # First use: clone the bare repo (creating an empty working tree if the repo has no commits yet).
@@ -54,7 +54,7 @@ case "$mode" in
   push)
     git add -A 2>/dev/null
     git diff --cached --quiet 2>/dev/null && { track; exit 0; }   # nothing new to publish
-    git commit -q -m "memory sync: $(dc_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
+    git commit -q -m "memory sync: $(sj_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
     if ! timeout 30 git push -q origin "$branch" 2>/dev/null; then
       # remote moved on (another machine pushed): tree is clean after commit, so rebase onto it + retry.
       if timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null \

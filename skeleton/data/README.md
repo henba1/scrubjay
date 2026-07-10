@@ -1,6 +1,6 @@
-# dotclaude-data
+# scrubjay-data
 
-Your **private** companion repo to [dotclaude](https://github.com/henba1/dotclaude) — the app that
+Your **private** companion repo to [scrubjay](https://github.com/henba1/scrubjay) — the app that
 syncs it. This repo holds your actual Claude Code content; the app repo holds only machinery.
 
 **Keep this repo private.** It carries your standing instructions, per-machine notes, and settings.
@@ -23,6 +23,6 @@ into `~/.claude/settings.json` (arrays are unioned, so a host can only *add* per
 
 ## Don't remove
 
-- The `hooks` block in `settings/settings.base.json` — it registers dotclaude's `SessionStart`
+- The `hooks` block in `settings/settings.base.json` — it registers scrubjay's `SessionStart`
   and `SessionEnd` hooks. Without it, nothing syncs and no transcript is ever relayed.
 - `settings/settings.base.json` itself — `claude-sync.sh` requires it.

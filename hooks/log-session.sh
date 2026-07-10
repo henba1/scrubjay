@@ -4,8 +4,8 @@
 #   2) relay the full transcript via ship-transcript.sh (pluggable backend)
 # Never blocks the session: always exits 0.
 #
-# Env knobs:  DOTCLAUDE_LOG_NOGIT=1  (append log, skip its git)   CLAUDE_HOST=<name>
-#             DOTCLAUDE_NOSHIP=1     (skip transcript relay)
+# Env knobs:  SCRUBJAY_LOG_NOGIT=1  (append log, skip its git)   CLAUDE_HOST=<name>
+#             SCRUBJAY_NOSHIP=1     (skip transcript relay)
 
 input="$(cat)"
 command -v jq >/dev/null 2>&1 || exit 0
@@ -33,8 +33,8 @@ sid="$(printf '%s' "$input"  | jq -r '.session_id // empty')"
 cwd="$(printf '%s' "$input"  | jq -r '.cwd // empty')"
 tpath="$(printf '%s' "$input"| jq -r '.transcript_path // empty')"
 [ -n "$sid" ] || exit 0
-host="$(dc_host)"
-DATA="$(dc_data 2>/dev/null || true)"
+host="$(sj_host)"
+DATA="$(sj_data 2>/dev/null || true)"
 
 # ---- 1) session line + chat index + auto-sync the whole data repo ----
 if [ -n "$DATA" ] && [ -d "$DATA" ]; then
@@ -61,7 +61,7 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   #     log line, chat index, plus any memory/ templates/ hosts/ settings/ edits.
   #     .gitignore blocks secrets/transcripts (*.credentials*, *.jsonl, .claude.json),
   #     so `git add -A` can never stage those.
-  if [ "${DOTCLAUDE_LOG_NOGIT:-0}" != "1" ]; then
+  if [ "${SCRUBJAY_LOG_NOGIT:-0}" != "1" ]; then
     (
       cd "$DATA" || exit 0
 
@@ -105,7 +105,7 @@ fi
 "$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
 
 # ---- 2) relay the full transcript (pluggable backend) ----
-if [ "${DOTCLAUDE_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
+if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
   slug="$(basename "$(dirname "$tpath")")"
   "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true
 fi

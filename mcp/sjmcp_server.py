@@ -3,25 +3,25 @@
 # requires-python = ">=3.10"
 # dependencies = ["mcp[cli]>=1.2"]
 # ///
-"""dcmcp — a read interface over the dotclaude archive, exposed via MCP.
+"""sjmcp — a read interface over the scrubjay archive, exposed via MCP.
 
-dotclaude *writes* every session's records to the NAS (transcripts, plans, cross-machine
+scrubjay *writes* every session's records to the NAS (transcripts, plans, cross-machine
 memory); this server is the missing *read* path back into a live Claude Code session. It is
 **read-only** and runs where the archive is mounted (the archive host). Config comes from the same
-pointers the rest of dotclaude uses (`~/.config/dotclaude/config`), passed in as env:
+pointers the rest of scrubjay uses (`~/.config/scrubjay/config`), passed in as env:
 
-    DOTCLAUDE_LOCAL_CHATS   storage root: contains <host>/{readable,plans,<slug>}/, memory/
-    DOTCLAUDE_MEMORY        the cross-machine memory clone (fallback memory source)
-    DOTCLAUDE_DATA          the data repo: logs/<host>.log, hosts/<host>/chats.index.json
+    SCRUBJAY_LOCAL_CHATS   storage root: contains <host>/{readable,plans,<slug>}/, memory/
+    SCRUBJAY_MEMORY        the cross-machine memory clone (fallback memory source)
+    SCRUBJAY_DATA          the data repo: logs/<host>.log, hosts/<host>/chats.index.json
 
 Where a tree is absent (e.g. a non-NAS machine has no readable/ archive) the server simply
 serves what it can and reports the rest as unavailable, rather than failing.
 
 The recall path is deliberately embedding-free: a fast ripgrep prefilter surfaces candidate
-snippets and the in-session model does the semantic ranking. (The deferred local
-embedding option is sketched in docs/dcmcp-embedding-rerank.md.)
+snippets and the in-session model does the semantic ranking. (A deferred local-embedding
+rerank was considered and kept as an internal note, not built.)
 
-Run `python dcmcp_server.py --selftest` to exercise the core logic against the real archive
+Run `python sjmcp_server.py --selftest` to exercise the core logic against the real archive
 without the MCP stdio handshake.
 """
 from __future__ import annotations
@@ -49,9 +49,9 @@ def _dir(env: str) -> Path | None:
 
 @dataclass(frozen=True)
 class Roots:
-    chats: Path | None  # DOTCLAUDE_LOCAL_CHATS (the archive root)
-    memory: Path | None  # memory tree (chats/memory if present, else DOTCLAUDE_MEMORY clone)
-    data: Path | None  # DOTCLAUDE_DATA (logs + chats.index.json)
+    chats: Path | None  # SCRUBJAY_LOCAL_CHATS (the archive root)
+    memory: Path | None  # memory tree (chats/memory if present, else SCRUBJAY_MEMORY clone)
+    data: Path | None  # SCRUBJAY_DATA (logs + chats.index.json)
 
     @property
     def all(self) -> list[Path]:
@@ -59,14 +59,14 @@ class Roots:
 
 
 def roots() -> Roots:
-    chats = _dir("DOTCLAUDE_LOCAL_CHATS")
+    chats = _dir("SCRUBJAY_LOCAL_CHATS")
     # Prefer the archive's own memory/ tree (full, cross-machine) over the local clone.
-    mem = (chats / "memory") if chats and (chats / "memory").is_dir() else _dir("DOTCLAUDE_MEMORY")
-    return Roots(chats=chats, memory=mem, data=_dir("DOTCLAUDE_DATA"))
+    mem = (chats / "memory") if chats and (chats / "memory").is_dir() else _dir("SCRUBJAY_MEMORY")
+    return Roots(chats=chats, memory=mem, data=_dir("SCRUBJAY_DATA"))
 
 
 # ── metadata parsing ───────────────────────────────────────────────────────────────────────
-# Filenames already encode the metadata dotclaude assigns on relay:
+# Filenames already encode the metadata scrubjay assigns on relay:
 #   readable transcript: <project>/<date>_<topic>__<sid8>.md
 #   plan:                <date>_<topic>.md
 #   memory:              <project>/<name>.md   (+ a MEMORY.md index per project)
@@ -244,8 +244,8 @@ def _iter_logs(r: Roots) -> list[LogEntry]:
 
 
 # ── id / path resolution ───────────────────────────────────────────────────────────────────
-# A `ref` accepted by dc_get / dc_search_within may be: an absolute path under a known root, a
-# root-relative path, a `dc://…` resource URI, or a bare 8-char session id. We resolve to a real
+# A `ref` accepted by sj_get / sj_search_within may be: an absolute path under a known root, a
+# root-relative path, a `sj://…` resource URI, or a bare 8-char session id. We resolve to a real
 # path and confine it to the configured roots (no traversal out of the archive).
 
 
@@ -265,7 +265,7 @@ def _confined(p: Path, r: Roots) -> Path | None:
 
 def resolve_ref(ref: str, r: Roots) -> Path | None:
     ref = ref.strip()
-    if ref.startswith("dc://"):
+    if ref.startswith("sj://"):
         return _resolve_uri(ref, r)
     # bare session id (8 hex) → find the readable for it
     if re.fullmatch(r"[0-9a-f]{8}", ref):
@@ -522,7 +522,7 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     scored.sort(key=lambda x: (x[0], x[1].get("date", "")), reverse=True)
     results = [r_ for _, r_ in scored[: int(k)]]
     note = ("ripgrep" if _rg_available() else "grep") + " prefilter (transcripts·plans·memory + " \
-           "the session-log catalogue) — rank these by reading the snippets; dc_get the best one. " \
+           "the session-log catalogue) — rank these by reading the snippets; sj_get the best one. " \
            "type=log hits have no transcript here: their host/cwd/date tell you where to find it."
     return {"query": query, "engine": note, "count": len(results), "results": results}
 
@@ -588,7 +588,7 @@ def core_status(r=None):
 
 def _with_timeout(fn, seconds: int = 45):
     """Run fn() under a wall-clock budget so a stalled archive read can't hang the stdio
-    response (a stuck read once silently wedged a remote dc_recall/dc_get — no repro, so this
+    response (a stuck read once silently wedged a remote sj_recall/sj_get — no repro, so this
     is a safety net, not a targeted fix). Returns fn()'s dict, or an error dict on timeout.
     A daemon thread is used because a blocking filesystem syscall can't be interrupted; on
     timeout we abandon the thread and return so the client isn't left waiting forever."""
@@ -614,46 +614,46 @@ def _with_timeout(fn, seconds: int = 45):
 def build_server():
     from mcp.server.fastmcp import FastMCP
 
-    mcp = FastMCP("dcmcp")
+    mcp = FastMCP("sjmcp")
     R = roots()
 
     @mcp.tool()
-    def dc_list(type: str | None = None, host: str | None = None, project: str | None = None,
+    def sj_list(type: str | None = None, host: str | None = None, project: str | None = None,
                 since: str | None = None, until: str | None = None, limit: int = 50) -> dict:
         """List archived artifacts (transcripts, plans, memories) with metadata.
 
         Filters: type (transcript|plan|memory|log), host, project (substring), since/until
-        (YYYY-MM-DD). Newest first. Use this to browse, then dc_get to pull one in.
+        (YYYY-MM-DD). Newest first. Use this to browse, then sj_get to pull one in.
         type=log browses the cross-machine session catalogue (one row per session, all hosts)."""
         return _with_timeout(lambda: core_list(type, host, project, since, until, limit))
 
     @mcp.tool()
-    def dc_get(ref: str, format: str = "readable", turns: str | None = None,
+    def sj_get(ref: str, format: str = "readable", turns: str | None = None,
                lines: str | None = None) -> dict:
         """Fetch an artifact (or a slice) to inject into context.
 
-        ref: a dc:// URI, a session id (8 hex), or a path. format: 'readable' (default) or
+        ref: a sj:// URI, a session id (8 hex), or a path. format: 'readable' (default) or
         'raw' (the .jsonl). Slice with turns='5-10' or lines='1200-1300'."""
         return _with_timeout(lambda: core_get(ref, format, turns, lines))
 
     @mcp.tool()
-    def dc_recall(query: str, host: str | None = None, project: str | None = None,
+    def sj_recall(query: str, host: str | None = None, project: str | None = None,
                   since: str | None = None, k: int = 8) -> dict:
         """Find past sessions/plans/memories matching a topic description.
 
         Runs a lexical prefilter and returns candidate files with matched snippets + line
-        anchors; YOU rank them by reading the snippets, then dc_get the best match."""
+        anchors; YOU rank them by reading the snippets, then sj_get the best match."""
         return _with_timeout(lambda: core_recall(query, host, project, since, k))
 
     @mcp.tool()
-    def dc_search_within(ref: str, query: str, context: int = 2) -> dict:
+    def sj_search_within(ref: str, query: str, context: int = 2) -> dict:
         """Find where a topic appears *within* one session/plan/memory.
 
         Returns matching passages with line anchors and the enclosing turn number."""
         return _with_timeout(lambda: core_search_within(ref, query, context))
 
     @mcp.tool()
-    def dc_status() -> dict:
+    def sj_status() -> dict:
         """Report which archive trees are reachable from this machine and their counts."""
         return core_status()
 
@@ -678,17 +678,17 @@ def build_server():
     try:
         _register_concrete()
     except Exception as e:  # never let resource listing break the tools
-        print(f"dcmcp: resource registration skipped: {e}", file=sys.stderr)
+        print(f"sjmcp: resource registration skipped: {e}", file=sys.stderr)
 
-    @mcp.resource("dc://transcript/{host}/{project}/{stem}")
+    @mcp.resource("sj://transcript/{host}/{project}/{stem}")
     def _transcript(host: str, project: str, stem: str) -> str:
         return _read_template(R, "transcript", host=host, project=project, stem=stem)
 
-    @mcp.resource("dc://plan/{host}/{stem}")
+    @mcp.resource("sj://plan/{host}/{stem}")
     def _plan(host: str, stem: str) -> str:
         return _read_template(R, "plan", host=host, stem=stem)
 
-    @mcp.resource("dc://memory/{project}/{name}")
+    @mcp.resource("sj://memory/{project}/{name}")
     def _memory(project: str, name: str) -> str:
         return _read_template(R, "memory", project=project, name=name)
 
@@ -702,12 +702,12 @@ def _uri_for(a: dict) -> str | None:
     t = a["type"]
     if t == "transcript":
         stem = Path(a["path"]).stem
-        return f"dc://transcript/{a.get('host','')}/{a.get('project','')}/{stem}"
+        return f"sj://transcript/{a.get('host','')}/{a.get('project','')}/{stem}"
     if t == "plan":
         stem = Path(a["path"]).stem
-        return f"dc://plan/{a.get('host','')}/{stem}"
+        return f"sj://plan/{a.get('host','')}/{stem}"
     if t == "memory":
-        return f"dc://memory/{a.get('project','')}/{Path(a['path']).stem}"
+        return f"sj://memory/{a.get('project','')}/{Path(a['path']).stem}"
     return None
 
 
@@ -734,7 +734,7 @@ def _read_template(r: Roots, kind: str, **kw) -> str:
 
 
 def _resolve_uri(uri: str, r: Roots) -> Path | None:
-    m = re.match(r"^dc://(transcript|plan|memory)/(.+)$", uri)
+    m = re.match(r"^sj://(transcript|plan|memory)/(.+)$", uri)
     if not m:
         return None
     kind, rest = m.group(1), m.group(2).split("/")
@@ -758,11 +758,11 @@ def _selftest():
     r = roots()
     print("== status =="); print(json.dumps(core_status(r=r), indent=2))
     print("\n== list transcripts (5) =="); print(json.dumps(core_list(type="transcript", limit=5, r=r), indent=2))
-    print("\n== recall 'extend dotclaude with an MCP server' =="); print(json.dumps(core_recall("extend dotclaude with an MCP server", k=4, r=r), indent=2))
+    print("\n== recall 'extend scrubjay with an MCP server' =="); print(json.dumps(core_recall("extend scrubjay with an MCP server", k=4, r=r), indent=2))
     print("\n== list logs (catalogue, 5) =="); print(json.dumps(core_list(type="log", limit=5, r=r), indent=2))
     print("\n== recall 'VERONA foolbox' (log-only / cross-machine pointer) =="); print(json.dumps(core_recall("VERONA foolbox attack", k=4, r=r), indent=2))
     # search within the known transcript for 'mcp'
-    rec = core_recall("read and understand the dotclaude project", k=1, r=r)
+    rec = core_recall("read and understand the scrubjay project", k=1, r=r)
     if rec["results"]:
         ref = rec["results"][0]["path"]
         sw = core_search_within(ref, "mcp", context=1, r=r)
