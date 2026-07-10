@@ -186,6 +186,18 @@ if [ -e "$PLUG_DST" ] && [ ! -L "$PLUG_DST" ]; then
 fi
 [ -d "$CLAUDE_DIR/plugins" ] && link "$PLUG_SRC" "$PLUG_DST"
 
+# Register the clean filter that <data>/.gitattributes references for known_marketplaces.json,
+# so the harness's per-machine `lastUpdated` timestamp never reaches a commit and the file stays
+# byte-identical across machines (git won't auto-enable a filter from a cloned .gitattributes —
+# it must be set in each repo's config). Idempotent; jq is already a hard dependency, and `cat`
+# is a safe identity fallback if it's somehow missing.
+if command -v jq >/dev/null 2>&1; then
+  git -C "$DATA" config filter.sjstripvolatile.clean "jq -S 'del(.. | .lastUpdated?)'"
+else
+  git -C "$DATA" config filter.sjstripvolatile.clean cat
+fi
+git -C "$DATA" config filter.sjstripvolatile.smudge cat
+
 echo "merging settings:"
 BASE="$DATA/settings/settings.base.json"
 OVER="$HOSTDIR/claude/settings.json"

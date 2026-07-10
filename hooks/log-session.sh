@@ -86,10 +86,18 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
       git diff --cached | grep -qE '^\+(<{7} |>{7} )' && exit 0
       git commit -q -m "auto-sync (session end): $host $ts" 2>/dev/null || exit 0
       if ! timeout 20 git push -q 2>/dev/null; then
-        # remote moved on: rebase onto it and retry. On ANY rebase trouble, abort so we
-        # never hand the next session a wedged repo. Append-only logs use a union merge
-        # driver (.gitattributes: logs/*.log merge=union), so they won't conflict here.
-        if timeout 20 git pull --rebase -q 2>/dev/null; then
+        # Remote moved on: rebase our commit onto it and retry. What makes this wedge-proof
+        # where a bare `git pull --rebase` was not is that nothing here can stop on a conflict:
+        #   * append-only logs union both sides (.gitattributes: logs/*.log merge=union);
+        #   * for any *shared* file that genuinely diverged — e.g. plugins/known_marketplaces.json
+        #     or settings — `-X ours` takes origin's copy (during a rebase "ours" is the upstream
+        #     we replay onto) instead of pausing. A machine's auto-sync must never fork shared
+        #     config; deliberate shared edits are made by hand, not by this fallback. A bare pull
+        #     --rebase aborted on the first such conflict and left the machine's commits stacking
+        #     locally forever — the July-2026 hensipi wedge.
+        # Belt and suspenders: if anything still fails, abort so the next session starts clean.
+        if timeout 20 git fetch -q origin 2>/dev/null \
+           && timeout 30 git rebase -X ours -q origin/main 2>/dev/null; then
           timeout 20 git push -q 2>/dev/null || true
         else
           git rebase --abort 2>/dev/null || true
