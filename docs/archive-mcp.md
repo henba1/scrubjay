@@ -10,7 +10,10 @@ It's a single-file, **read-only** server (`mcp/dcmcp_server.py`, run via `uv run
 reads the same storage pointers as the rest of dotclaude (`DOTCLAUDE_LOCAL_CHATS`,
 `DOTCLAUDE_MEMORY`, `DOTCLAUDE_DATA`). Recall is deliberately **embedding-free** — a fast ripgrep
 prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic
-ranking — so there's no index to build and nothing sensitive ever leaves the NAS. It also folds the
+ranking — so there's no index to build and nothing sensitive ever leaves the NAS. Each `dc_recall`
+enumerates the archive **once** and resolves every candidate's metadata from that single pass, so
+cost scales with the size of the archive rather than the number of matches — it stays snappy as the
+corpus grows (a NAS-mounted archive of ~100+ sessions recalls in tens of milliseconds). It also folds the
 `logs/<host>.log` **session catalogue** into recall: a topic match there links to the transcript
 when present, or stands alone as a "you had this on `<host>`" pointer — so recall spans even
 sessions whose full transcript isn't on the machine you're asking from. It exposes:
@@ -84,6 +87,3 @@ pinned to the read-only server and nothing else:
 
 Then verify from the client — `ssh <mcp-alias> </dev/null && echo OK` (first run is slow once while
 `uv` resolves deps on the archive host, then caches). dcmcp activates on the next Claude session.
-
-The deferred local-embedding-rerank phase (only if lexical recall proves too blunt) is sketched in
-[dcmcp-embedding-rerank.md](dcmcp-embedding-rerank.md).

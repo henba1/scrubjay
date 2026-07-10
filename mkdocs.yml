@@ -67,7 +67,6 @@ plugins:
           - transcript-transport.md
           - memory-sync.md
           - mirror-host.md
-          - dcmcp-embedding-rerank.md
 
 nav:
   - Home: index.md
@@ -82,4 +81,3 @@ nav:
       - Transcript transport: transcript-transport.md
       - Memory sync: memory-sync.md
       - Mirror host (git backend): mirror-host.md
-      - MCP embedding rerank: dcmcp-embedding-rerank.md
