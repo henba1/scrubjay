@@ -99,6 +99,18 @@ if command -v claude >/dev/null 2>&1; then
   run "claude mcp remove dcmcp -s user 2>/dev/null || true"
 fi
 
+# If this script is running FROM a clone that step 3 just renamed, $APP now points at a path that
+# no longer exists — remap it to the moved location so the final claude-sync (which relinks
+# ~/.claude/{hooks,commands} and registers sjmcp) runs from the real clone, not a ghost.
+if [ "$APPLY" = 1 ] && [ ! -d "$APP" ]; then
+  case "$APP" in
+    "$OLDD"/*) rest="${APP#"$OLDD"/}"; rest="${rest/#dotclaude/scrubjay}"; cand="$NEWD/$rest"
+               if [ -d "$cand" ]; then APP="$cand"; ok "app clone moved by migration → $APP"
+               else warn "app clone moved and $cand not found — run bin/claude-sync.sh by hand from the moved clone"; fi ;;
+    *) warn "app path $APP vanished — run bin/claude-sync.sh by hand from the moved clone" ;;
+  esac
+fi
+
 # 6) re-apply config into ~/.claude ---------------------------------------------------
 step "claude-sync: relink ~/.claude (now /sj* commands) + register sjmcp"
 run "'$APP/bin/claude-sync.sh' >/dev/null 2>&1 || true"
