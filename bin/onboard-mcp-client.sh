@@ -83,6 +83,7 @@ export DOTCLAUDE_MCP_REMOTE="$ALIAS"
 pub="$(cat "$key.pub")"
 echo
 info "Final step — authorize this machine on the archive host. Add ONE line to the '$muser' user's"
+# shellcheck disable=SC2088  # display text for the reader, not a path this script expands
 info "~/.ssh/authorized_keys ON THE ARCHIVE HOST (pins this key to the read-only server, nothing else):"
 echo
 printf '    command="%s",restrict %s\n' "$serve" "$pub"

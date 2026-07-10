@@ -26,7 +26,8 @@ if [ "$backend" = "git" ]; then
     dst="$chats/$HOST/$slug/$sid.jsonl"
     mkdir -p "$(dirname "$dst")"; cp -f "$f" "$dst"
   done
-  cd "$chats"; git add -A
+  cd "$chats" || { echo "backfill: cannot cd into '$chats'" >&2; exit 1; }
+  git add -A
   if git diff --cached --quiet; then
     echo "relay already up to date — nothing to push"
   else

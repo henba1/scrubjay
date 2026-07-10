@@ -21,6 +21,10 @@ DATA="$(dc_data 2>/dev/null || true)"
 #    APP = the scripts & hooks themselves, so hook/script fixes also propagate on their
 #    own. --ff-only never clobbers local edits (it just no-ops on a dirty/diverged tree).
 if [ "${DOTCLAUDE_SYNC_NOPULL:-0}" != "1" ]; then
+  # The APP pull below is dotclaude's ONLY self-update path, and it's guarded on .git — so an
+  # install from a source tarball/zip would skip it forever, silently, and rot. Say it out loud
+  # (stdout lands in the session's context, so the assistant surfaces it).
+  dc_is_clone || printf 'dotclaude: the app at %s is not a git clone, so it can never self-update. Source tarballs are not a supported install — reinstall with `git clone`.\n' "$APP"
   for repo in "$DATA" "$APP"; do
     [ -n "$repo" ] && [ -d "$repo/.git" ] && \
       ( cd "$repo" && timeout 15 git pull --ff-only -q 2>/dev/null ) || true

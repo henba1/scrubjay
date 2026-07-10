@@ -139,9 +139,10 @@ if [ "${1:-}" = "--repo" ]; then
   ssh_url "$OWNER/$2"; echo
   exit 0
 fi
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0
-fi
+case "${1:-}" in
+  -h|--help)    awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0;;
+  -v|--version) echo "dotclaude $(dc_version)"; exit 0;;
+esac
 
 # ---- normal mode -----------------------------------------------------------------------
 dc_load_config

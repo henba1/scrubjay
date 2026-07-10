@@ -1,0 +1,48 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bin/**"
+      - "hooks/**"
+      - ".github/workflows/lint.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Parse every shipped script. Catches the syntax break that would otherwise only surface
+      # on a user's machine at SessionStart, where hooks swallow their own errors.
+      - name: bash -n (syntax)
+        run: |
+          set -euo pipefail
+          find bin hooks -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          echo "all scripts parse"
+
+      # shellcheck from the distro, not a third-party action: this repo installs SessionStart
+      # hooks and writes ~/.ssh/config, so the lint step itself shouldn't pull in extra supply chain.
+      - name: shellcheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --version
+          shellcheck -S warning -x bin/*.sh hooks/*.sh hooks/transports/*.sh
+
+      # The seeded data repo must stay valid JSON — claude-sync.sh feeds settings.base.json
+      # straight to `jq --argjson` under `set -e`, so a typo here bricks every fresh install.
+      - name: seed JSON is valid
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq jq
+          jq empty skeleton/data/settings/settings.base.json
+          jq empty skeleton/host/claude/settings.json
+          jq -e '.hooks.SessionStart and .hooks.SessionEnd' skeleton/data/settings/settings.base.json >/dev/null
+          echo "seed settings valid, both hooks registered"

@@ -8,6 +8,28 @@ dc_load_config() {
   : "${DOTCLAUDE_TRANSCRIPT_BACKEND:=git}"
 }
 
+# Absolute path of the app repo (this file lives in <app>/bin/).
+dc_app() { (cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd); }
+
+# Version of the app. VERSION is the release marker; on the supported install (a git clone) the
+# precise commit is appended, so a bug report pins the exact code that ran.
+dc_version() {
+  local app v
+  app="$(dc_app)"
+  v="$(cat "$app/VERSION" 2>/dev/null)" || v=""
+  [ -n "$v" ] || v="unknown"
+  if dc_is_clone; then
+    printf '%s (%s)' "$v" "$(git -C "$app" describe --tags --always --dirty 2>/dev/null || echo 'no tag')"
+  else
+    printf '%s (not a git clone — self-update disabled)' "$v"
+  fi
+}
+
+# The app updates ITSELF via `git pull` in hooks/sync-session.sh, and bin/onboard.sh reads the
+# clone to bootstrap. A source tarball/zip has no .git, so the pull silently no-ops and the install
+# rots unnoticed. Callers use this to say so out loud rather than fail quietly.
+dc_is_clone() { [ -d "$(dc_app)/.git" ] && command -v git >/dev/null 2>&1; }
+
 # Stable host name — NOT `hostname -s` (transient on HPC login nodes).
 dc_host() {
   if   [ -n "${CLAUDE_HOST:-}" ];             then printf '%s' "$CLAUDE_HOST"

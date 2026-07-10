@@ -14,6 +14,7 @@
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$APP/bin/lib.sh"   # dc_version / dc_is_clone (function definitions only; no side effects)
 
 # ---- pretty output + prompt helpers ---------------------------------------------------
 info() { printf '\033[1;34m›\033[0m %s\n' "$*"; }
@@ -37,11 +38,12 @@ confirm() {  # confirm "prompt" "Y"|"N"
   __a="${__a:-$__d}"; case "$__a" in [Yy]*) return 0;; *) return 1;; esac
 }
 
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0
-fi
+case "${1:-}" in
+  -h|--help)    awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0;;
+  -v|--version) echo "dotclaude $(dc_version)"; exit 0;;
+esac
 
-echo; info "dotclaude onboarding  (app: $APP)"
+echo; info "dotclaude onboarding  (app: $APP, version: $(dc_version))"
 
 # ---- 1) dependencies ------------------------------------------------------------------
 have git || die "git not found — install it first (e.g. sudo apt install git)."
@@ -72,7 +74,7 @@ fi
 # straight from upstream; your content lives in private repos under your OWN account. Keeping the
 # two apart is what makes forking unnecessary (and stops a fresh clone from reaching for the
 # maintainer's private repos). dc-bootstrap.sh creates + seeds them.
-[ -d "$APP/.git" ] || warn "this app clone has no .git — self-update won't work; install via 'git clone', not a tarball."
+dc_is_clone || warn "this app dir has no .git — self-update won't work; install via 'git clone', not a source tarball."
 DEFAULT_OWNER="${DOTCLAUDE_OWNER:-$(command -v gh >/dev/null 2>&1 && gh api user --jq .login 2>/dev/null)}"
 ask DOTCLAUDE_OWNER "GitHub account for your PRIVATE data repos" "${DEFAULT_OWNER:-}"
 [ -n "$DOTCLAUDE_OWNER" ] || die "no GitHub account given — set DOTCLAUDE_OWNER=<your-gh-user>"

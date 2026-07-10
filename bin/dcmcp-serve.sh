@@ -24,5 +24,8 @@ command -v uv >/dev/null 2>&1 || { echo "dcmcp-serve: 'uv' not found for $(whoam
 [ -f "$APP/mcp/dcmcp_server.py" ] || { echo "dcmcp-serve: server missing at $APP/mcp/dcmcp_server.py" >&2; exit 1; }
 
 # Hand the same pointers the local server gets to the child, then become the (read-only) server.
-export DOTCLAUDE_LOCAL_CHATS="$chats" DOTCLAUDE_MEMORY="$(dc_memory)" DOTCLAUDE_DATA="$(dc_data)"
+# Assign before export so a failing dc_data() surfaces instead of being masked by export's status.
+mem="$(dc_memory)"
+data="$(dc_data)" || { echo "dcmcp-serve: DOTCLAUDE_DATA not set" >&2; exit 1; }
+export DOTCLAUDE_LOCAL_CHATS="$chats" DOTCLAUDE_MEMORY="$mem" DOTCLAUDE_DATA="$data"
 exec uv run --script "$APP/mcp/dcmcp_server.py"

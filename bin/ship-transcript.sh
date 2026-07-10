@@ -25,6 +25,7 @@ cwd="${5:-}"                                   # session working dir (for projec
 backend="${DOTCLAUDE_TRANSCRIPT_BACKEND:-git}"
 impl="$APP/hooks/transports/$backend.sh"
 [ -f "$impl" ] || { echo "ship-transcript: unknown backend '$backend'" >&2; exit 0; }
+# shellcheck source=/dev/null  # backend chosen at runtime; see hooks/transports/<backend>.sh
 . "$impl"
 
 # 1) the transcript itself: <host>/<project-slug>/<session>.jsonl. This push is the canonical

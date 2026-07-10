@@ -11,11 +11,12 @@ APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 FORCE=0; HOST=""
 
-usage() { echo "usage: claude-sync.sh [--host NAME] [--force]"; exit "${1:-0}"; }
+usage() { echo "usage: claude-sync.sh [--host NAME] [--force] [--version]"; exit "${1:-0}"; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --host) CLAUDE_HOST="${2:?}"; export CLAUDE_HOST; shift 2;;
     --force) FORCE=1; shift;;
+    -v|--version) echo "dotclaude $(dc_version)"; exit 0;;
     -h|--help) usage 0;;
     *) echo "unknown arg: $1" >&2; usage 1;;
   esac
