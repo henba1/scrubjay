@@ -446,22 +446,26 @@ def _grep(query: str, paths: list[Path], globs=("*.md",), max_count_per_file=3
 # ── core: recall ───────────────────────────────────────────────────────────────────────────
 
 
-def _index_meta(path: str, r: Roots) -> dict:
-    """Best-effort metadata for a hit's file, so recall results are self-describing."""
-    p = Path(path)
-    for it in (_iter_transcripts, _iter_plans, _iter_memories):
-        for a in it(r):
-            if a.path == path:
-                row = a.to_row()
-                row.setdefault("topic", p.stem)
-                return row
-    return {"type": "file", "path": path, "topic": p.stem}
+def _index_meta(path: str, by_path: dict) -> dict:
+    """Best-effort metadata for a hit's file, so recall results are self-describing. Looks the
+    file up in a prebuilt {path: Artifact} map (built once per recall) instead of re-walking the
+    whole archive per hit."""
+    a = by_path.get(path)
+    if a:
+        row = a.to_row()
+        row.setdefault("topic", Path(path).stem)
+        return row
+    return {"type": "file", "path": path, "topic": Path(path).stem}
 
 
 def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     r = r or roots()
     terms = [t for t in re.split(r"\s+", query.strip()) if len(t) > 2] or [query]
     paths = _search_paths(r)
+    # Enumerate the archive ONCE and index by path, so a hit's metadata (below) is a dict lookup
+    # rather than re-walking the whole tree per candidate (recall used to be O(hits × corpus)).
+    arts = _all_artifacts(r)
+    by_path = {a.path: a for a in arts}
     # Union hits across the individual terms (OR), then score files by distinct-term coverage +
     # hit count. This is the lexical *prefilter*; the calling model does the semantic ranking.
     per_file: dict[str, dict] = {}
@@ -479,7 +483,7 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     # so a session matched in BOTH its body and its log naturally scores higher (more terms/hits).
     logs_dir = _logs_dir(r)
     if logs_dir:
-        readable_by_sid = {a.sid: a.path for a in _iter_transcripts(r) if a.sid}
+        readable_by_sid = {a.sid: a.path for a in arts if a.type == "transcript" and a.sid}
         for term in terms:
             for _lf, lineno, text in _grep(term, [logs_dir], globs=("*.log",), max_count_per_file=80):
                 e = _parse_log_line(text)
@@ -504,7 +508,7 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
                     "path": str((logs_dir / f"{log.host}.log")) if logs_dir else "",
                     "note": "transcript not in this archive — recall it on this host"}
         else:
-            meta = _index_meta(key, r)
+            meta = _index_meta(key, by_path)
             if log:  # enrich a transcript hit with the log's exact cwd (readables keep only basename)
                 meta.setdefault("cwd", log.cwd)
         if host and meta.get("host") != host:
