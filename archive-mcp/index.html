@@ -687,34 +687,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../dcmcp-embedding-rerank/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    MCP embedding rerank
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -811,7 +783,10 @@ it — or just the relevant slice — straight into context without leaving Clau
 reads the same storage pointers as the rest of dotclaude (<code>DOTCLAUDE_LOCAL_CHATS</code>,
 <code>DOTCLAUDE_MEMORY</code>, <code>DOTCLAUDE_DATA</code>). Recall is deliberately <strong>embedding-free</strong> — a fast ripgrep
 prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic
-ranking — so there's no index to build and nothing sensitive ever leaves the NAS. It also folds the
+ranking — so there's no index to build and nothing sensitive ever leaves the NAS. Each <code>dc_recall</code>
+enumerates the archive <strong>once</strong> and resolves every candidate's metadata from that single pass, so
+cost scales with the size of the archive rather than the number of matches — it stays snappy as the
+corpus grows (a NAS-mounted archive of ~100+ sessions recalls in tens of milliseconds). It also folds the
 <code>logs/&lt;host&gt;.log</code> <strong>session catalogue</strong> into recall: a topic match there links to the transcript
 when present, or stands alone as a "you had this on <code>&lt;host&gt;</code>" pointer — so recall spans even
 sessions whose full transcript isn't on the machine you're asking from. It exposes:</p>

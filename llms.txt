@@ -26,5 +26,4 @@ dotclaude is the app/logic for syncing Claude Code across machines: a git-based 
 - [Transcript transport](https://henba1.github.io/dotclaude/transcript-transport/index.md)
 - [Memory sync](https://henba1.github.io/dotclaude/memory-sync/index.md)
 - [Mirror host (git backend)](https://henba1.github.io/dotclaude/mirror-host/index.md)
-- [MCP embedding rerank](https://henba1.github.io/dotclaude/dcmcp-embedding-rerank/index.md)
 
