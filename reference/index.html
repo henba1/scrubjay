@@ -395,6 +395,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../slash-commands/" class="md-nav__link">
         
   
@@ -542,6 +569,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#continue-another-machines-chat-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continue another machine's chat here
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#register-the-current-machine-first-time-onboarding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -602,10 +640,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -623,8 +661,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -785,6 +823,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#continue-another-machines-chat-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continue another machine's chat here
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#register-the-current-machine-first-time-onboarding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -857,8 +906,15 @@ elsewhere, adjust, or run <code>bin/*</code> from inside the repo). For the in-s
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>pull
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>grep<span class="w"> </span>-i<span class="w"> </span>&lt;keyword&gt;<span class="w"> </span>~/.scrubjay/scrubjay-data/logs/*.log
 </code></pre></div>
+<h2 id="continue-another-machines-chat-here">Continue another machine's chat here<a class="headerlink" href="#continue-another-machines-chat-here" title="Permanent link">&para;</a></h2>
+<p>Stage it, then resume with Claude Code's own picker — see <a href="../handoff/">handoff.md</a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>--list<span class="w">       </span><span class="c1"># what&#39;s resumable, from other machines</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">cd</span><span class="w"> </span>&lt;the<span class="w"> </span>project<span class="w"> </span>dir<span class="w"> </span>on<span class="w"> </span>this<span class="w"> </span>machine&gt;
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>&lt;sid8&gt;<span class="w">       </span><span class="c1"># stage it (rewrites the other host&#39;s paths)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>claude<span class="w"> </span>--resume<span class="w"> </span>&lt;sid&gt;<span class="w">                              </span><span class="c1"># …or /resume inside a session here</span>
+</code></pre></div>
 <h2 id="register-the-current-machine-first-time-onboarding">Register the current machine (first-time onboarding)<a class="headerlink" href="#register-the-current-machine-first-time-onboarding" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
 </code></pre></div>
 <h2 id="toggle-behaviour">Toggle behaviour<a class="headerlink" href="#toggle-behaviour" title="Permanent link">&para;</a></h2>
 <p>Set in <code>~/.config/scrubjay/config</code> (persistent) or inline before a command (one-off) — no file
@@ -895,17 +951,17 @@ editing needed:</p>
 </table>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Move the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="s">: &quot;${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}&quot;</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="s">: &quot;${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}&quot;</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="s">: &quot;${SCRUBJAY_TRANSCRIPT_BACKEND:=git}&quot;</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="s">EOF</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s">: &quot;${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}&quot;</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="s">: &quot;${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}&quot;</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="s">: &quot;${SCRUBJAY_TRANSCRIPT_BACKEND:=git}&quot;</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="s">EOF</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
 </code></pre></div>
 <p><code>claude-sync.sh</code> recomputes the app location from its own path and re-links every scope, so
 nothing else needs touching. Confirm with

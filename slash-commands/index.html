@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://henba1.github.io/scrubjay/slash-commands/">
       
       
-        <link rel="prev" href="../archive-mcp/">
+        <link rel="prev" href="../handoff/">
       
       
         <link rel="next" href="../transports/">
@@ -392,6 +392,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -558,10 +585,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -579,8 +606,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -812,6 +839,11 @@ injects it directly with no tool call at all.</p>
 <td><code>/sjlog</code></td>
 <td>SessionEnd</td>
 <td>Publish <em>now</em> without ending the session: log line + chats index + push data repo + push memory + relay this session's transcript/plans/history/tasks to the NAS. Handy so another machine (or <code>/sjrecall</code>) can see it right away.</td>
+</tr>
+<tr>
+<td><code>/sjresume [sid8 \| words]</code></td>
+<td>—</td>
+<td><strong>Continue a session from another machine here</strong> (<a href="../handoff/">hand-off</a>). Stages the archived transcript — plus its subagents, tasks and file history — into this machine's <code>~/.claude/projects/</code>, rewriting the other host's paths to this one's, so Claude Code's own <code>/resume</code> can pick it up. Run it from the project dir; then <code>/resume</code>.</td>
 </tr>
 <tr>
 <td><code>/sjonboard [hint]</code></td>

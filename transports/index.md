@@ -53,7 +53,16 @@ The bastion is the *only* box exposed to the internet; the receiver and NAS stay
 
 ## Backends
 
-One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *or* a directory):
+One file each, defining a **write** side — `transport_ship <src> <relpath>` (`src` may be a file *or* a directory) — and a **read** side used only by [session hand-off](https://henba1.github.io/scrubjay/handoff/index.md):
+
+```
+transport_resolve <sid>            # -> TSV: <relpath> <lines> <mtime>, one row per archived copy
+transport_fetch   <relpath> <dst>  # file or directory
+```
+
+`local` and `git` read straight off the filesystem (the NAS mount, or the clone). `rsync-wg` **cannot** — its relay key is write-only by design (below) — so it reads over the separate, read-only [`sjmcp` SSH channel](https://henba1.github.io/scrubjay/archive-mcp/index.md) instead. The write-only property of the relay key is preserved.
+
+The backends themselves:
 
 - **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set `SCRUBJAY_LOCAL_CHATS` to the NAS chats root.
 - **`rsync-wg`** — every other machine rsyncs over WireGuard to the receiver. Set `SCRUBJAY_WG_TARGET` + `SCRUBJAY_WG_SSHKEY`.

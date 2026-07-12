@@ -24,6 +24,18 @@ A client with no local archive registers `sjmcp` as a *stdio* server whose comma
 
 Diagram source: [`transport-mcp.dot`](https://henba1.github.io/scrubjay/transport-mcp.dot) — `dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg`. Placeholder DDNS name + default ports; substitute your own.
 
+## The same channel also serves session hand-off
+
+`bin/sjmcp-serve.sh` dispatches on `$SSH_ORIGINAL_COMMAND`, so the one pinned forced command answers three things:
+
+| `$SSH_ORIGINAL_COMMAND` | Serves                                                                 |
+| ----------------------- | ---------------------------------------------------------------------- |
+| *(empty)*               | the MCP stdio server — recall/search/get, i.e. everything on this page |
+| `resolve <sid>`         | `<relpath> <lines> <mtime>` for every archived copy of a session       |
+| `fetch <relpath>`       | a tar stream of that archive entry (file or directory)                 |
+
+The two extra verbs exist so a machine on the **write-only** `rsync-wg` relay can pull a whole session back down for `claude --resume` ([session hand-off](https://henba1.github.io/scrubjay/handoff/index.md)) without the transcript having to cross the client's context window to reach its disk. They grant this key nothing new — it can already hand out the same raw `.jsonl` via `sj_get(format="raw")`. Both verbs re-check the resolved path against the archive root (so a symlink inside the archive is not a way out), and anything else is refused.
+
 ## The one manual step — authorize the client on the archive host
 
 `onboard-mcp-client.sh` does everything on the client, then prints the exact line(s) to install by hand (the server side is never automated — same rule as the relay + memory keys). Each key is pinned to the read-only server and nothing else:

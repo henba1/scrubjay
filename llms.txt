@@ -19,6 +19,7 @@ scrubjay is the app/logic for syncing Claude Code across machines: a git-based c
 
 - [Query the archive (MCP)](https://henba1.github.io/scrubjay/archive-mcp/index.md)
 - [Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md)
+- [Session hand-off](https://henba1.github.io/scrubjay/handoff/index.md)
 
 ## Transcript relay
 

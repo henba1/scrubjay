@@ -16,7 +16,7 @@
         <link rel="prev" href="../day-to-day/">
       
       
-        <link rel="next" href="../slash-commands/">
+        <link rel="next" href="../handoff/">
       
       
         
@@ -450,6 +450,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-same-channel-also-serves-session-hand-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The same channel also serves session hand-off
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-one-manual-step-authorize-the-client-on-the-archive-host" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -464,6 +475,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -569,10 +607,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -590,8 +628,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -741,6 +779,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-same-channel-also-serves-session-hand-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The same channel also serves session hand-off
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-one-manual-step-authorize-the-client-on-the-archive-host" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -844,6 +893,37 @@ read or tamper with the MCP traffic. Auth is asymmetric (an <code>ed25519</code>
 the tunnel itself is the usual symmetric SSH channel.</p>
 <p><img alt="Query the archive (MCP) over SSH-stdio, jumping the edge" src="../transport-mcp.svg" /></p>
 <p><sub>Diagram source: <a href="../transport-mcp.dot"><code>transport-mcp.dot</code></a> — <code>dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg</code>. Placeholder DDNS name + default ports; substitute your own.</sub></p>
+<h2 id="the-same-channel-also-serves-session-hand-off">The same channel also serves session hand-off<a class="headerlink" href="#the-same-channel-also-serves-session-hand-off" title="Permanent link">&para;</a></h2>
+<p><code>bin/sjmcp-serve.sh</code> dispatches on <code>$SSH_ORIGINAL_COMMAND</code>, so the one pinned forced command answers
+three things:</p>
+<table>
+<thead>
+<tr>
+<th><code>$SSH_ORIGINAL_COMMAND</code></th>
+<th>Serves</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(empty)</em></td>
+<td>the MCP stdio server — recall/search/get, i.e. everything on this page</td>
+</tr>
+<tr>
+<td><code>resolve &lt;sid&gt;</code></td>
+<td><code>&lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;</code> for every archived copy of a session</td>
+</tr>
+<tr>
+<td><code>fetch &lt;relpath&gt;</code></td>
+<td>a tar stream of that archive entry (file or directory)</td>
+</tr>
+</tbody>
+</table>
+<p>The two extra verbs exist so a machine on the <strong>write-only</strong> <code>rsync-wg</code> relay can pull a whole
+session back down for <code>claude --resume</code> (<a href="../handoff/">session hand-off</a>) without the transcript having
+to cross the client's context window to reach its disk. They grant this key nothing new — it can
+already hand out the same raw <code>.jsonl</code> via <code>sj_get(format="raw")</code>. Both verbs re-check the resolved
+path against the archive root (so a symlink inside the archive is not a way out), and anything else
+is refused.</p>
 <h2 id="the-one-manual-step-authorize-the-client-on-the-archive-host">The one manual step — authorize the client on the archive host<a class="headerlink" href="#the-one-manual-step-authorize-the-client-on-the-archive-host" title="Permanent link">&para;</a></h2>
 <p><code>onboard-mcp-client.sh</code> does everything on the client, then prints the exact line(s) to install by
 hand (the server side is never automated — same rule as the relay + memory keys). Each key is

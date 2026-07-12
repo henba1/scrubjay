@@ -395,6 +395,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../handoff/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session hand-off
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../slash-commands/" class="md-nav__link">
         
   
@@ -558,10 +585,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -579,8 +606,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -873,7 +900,15 @@ the archive back, or reach anything but the receiver.</p>
 <p><code>bin/onboard-hpc-client.sh</code> (on the sender) and <code>bin/onboard-edge-node.sh</code> (on the bastion)
 configure both ends; the private <code>runbooks/wireguard-transcripts.md</code> is the full walk-through.</p>
 <h2 id="backends">Backends<a class="headerlink" href="#backends" title="Permanent link">&para;</a></h2>
-<p>One file each, defining <code>transport_ship &lt;src&gt; &lt;relpath&gt;</code> (<code>src</code> may be a file <em>or</em> a directory):</p>
+<p>One file each, defining a <strong>write</strong> side — <code>transport_ship &lt;src&gt; &lt;relpath&gt;</code> (<code>src</code> may be a file <em>or</em>
+a directory) — and a <strong>read</strong> side used only by <a href="../handoff/">session hand-off</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>transport_resolve<span class="w"> </span>&lt;sid&gt;<span class="w">            </span><span class="c1"># -&gt; TSV: &lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;, one row per archived copy</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>transport_fetch<span class="w">   </span>&lt;relpath&gt;<span class="w"> </span>&lt;dst&gt;<span class="w">  </span><span class="c1"># file or directory</span>
+</code></pre></div>
+<p><code>local</code> and <code>git</code> read straight off the filesystem (the NAS mount, or the clone). <code>rsync-wg</code> <strong>cannot</strong>
+— its relay key is write-only by design (below) — so it reads over the separate, read-only
+<a href="../archive-mcp/"><code>sjmcp</code> SSH channel</a> instead. The write-only property of the relay key is preserved.</p>
+<p>The backends themselves:</p>
 <ul>
 <li><strong><code>local</code></strong> — the box that <em>has</em> the NAS mounted copies straight in, no network hop. Set
   <code>SCRUBJAY_LOCAL_CHATS</code> to the NAS chats root.</li>
