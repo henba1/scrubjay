@@ -1,7 +1,7 @@
 ---
 description: scrubjay — semantically recall a past session/plan/memory across all machines
 argument-hint: <topic description> [host=… project=… since=YYYY-MM-DD]
-allowed-tools: mcp__sjmcp__dc_recall, mcp__sjmcp__dc_get, mcp__sjmcp__dc_status
+allowed-tools: mcp__sjmcp__sj_recall, mcp__sjmcp__sj_get, mcp__sjmcp__sj_status
 ---
 The user wants to find a past conversation, plan, or memory from the scrubjay archive by
 describing its topic — not its filename or which machine it was on.

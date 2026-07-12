@@ -116,3 +116,77 @@ sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
   printf 'result=%s ts=%s host=%s backend=%s sid=%s rc=%s\n' \
     "$result" "$(date +%FT%T)" "$(sj_host)" "$backend" "${sid:0:8}" "$rc" > "$f" 2>/dev/null || true
 }
+
+# --- session hand-off (bin/sj-resume.sh) ------------------------------------------------------
+# Claude Code stores a session at ~/.claude/projects/<slug>/<sid>.jsonl, where <slug> is the
+# session's absolute cwd with every character outside [A-Za-z0-9-] replaced by '-'. The encoding
+# is LOSSY (a '-' may have been '/', '_', '.' or a space), so scrubjay never decodes a slug — it
+# stores the one Claude used, verbatim, and recomputes a *local* one when importing.
+
+# Claude Code's project-dir encoding. Verified against the archive: '/', '_', '.' and spaces all
+# collapse to '-'; letters, digits and existing '-' pass through with case preserved.
+sj_slug() { printf '%s' "$1" | sed 's/[^A-Za-z0-9-]/-/g'; }
+
+# The ~/.claude/projects/ dir that holds sessions for <cwd> (default: $PWD). Prefer *asking the
+# archive of local sessions* — find the dir whose transcripts record this cwd — because that is
+# exact and survives the edge cases sj_slug() cannot see (e.g. a symlinked home: snellius records
+# cwd=/home/jvrijn/… but Claude slugged the resolved /gpfs/home2/jvrijn/…). Fall back to encoding
+# the resolved path, which is all we can do for a project that has no sessions on this host yet.
+sj_local_project_dir() {  # sj_local_project_dir [cwd]
+  local cwd="${1:-$PWD}" proj d f real
+  proj="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+  for d in "$proj"/*/; do
+    [ -d "$d" ] || continue
+    f="$(ls -t "$d"*.jsonl 2>/dev/null | head -1)" || continue
+    [ -n "$f" ] || continue
+    if grep -qF "\"cwd\":\"$cwd\"" "$f" 2>/dev/null; then printf '%s' "${d%/}"; return 0; fi
+  done
+  real="$(realpath -e "$cwd" 2>/dev/null || printf '%s' "$cwd")"
+  printf '%s/%s' "$proj" "$(sj_slug "$real")"
+}
+
+# Every host's sessions, newest first, from the data repo's logs/ — which already carries
+#   <ts> | <host> | <cwd> | "<topic>" | session=<sid>
+# for every session ever ended, and rides the data repo to every machine. This is the *catalogue*
+# (what can I resume, and what was it about); the archive itself stays authoritative for the path,
+# via transport_resolve. Emits TSV: <ts> <host> <sid> <cwd> <topic>.
+sj_log_catalogue() {  # sj_log_catalogue [limit]
+  local limit="${1:-0}" data
+  data="$(sj_data)" || return 1
+  awk -F' *\\| *' '
+    { sid=""; for (i=1; i<=NF; i++) if ($i ~ /^session=/) { sid=substr($i, 9) }
+      if (sid == "") next
+      topic=$4; gsub(/^"|"$/, "", topic)
+      printf "%s\t%s\t%s\t%s\t%s\n", $1, $2, sid, $3, topic }
+  ' "$data"/logs/*.log 2>/dev/null | sort -r | { [ "$limit" -gt 0 ] && head -n "$limit" || cat; }
+}
+
+# --- reading an archive that is on this filesystem --------------------------------------------
+# Shared by the `local` backend (NAS mount) and the `git` backend (the scrubjay-chats clone IS the
+# archive). The `rsync-wg` backend has no filesystem view of the archive — its relay key is
+# write-only by design — so it reaches these same two operations over the sjmcp SSH channel
+# instead. See hooks/transports/*.sh.
+
+# Locate every archived copy of a session. The same <sid> legitimately appears under SEVERAL hosts
+# once it has been handed off (each host ships into its own <host>/ subtree), so this returns all
+# of them and lets the caller pick — bin/sj-resume.sh takes the longest, since a hand-off only ever
+# appends turns. <sid> may be an 8-hex prefix. Emits TSV: <relpath> <lines> <mtime-epoch>.
+sj_archive_resolve() {  # sj_archive_resolve <root> <sid|sid8>
+  local root="$1" sid="$2" f rel
+  [ -n "$root" ] && [ -d "$root" ] || return 1
+  for f in "$root"/*/*/"$sid"*.jsonl; do
+    [ -f "$f" ] || continue
+    rel="${f#"$root"/}"
+    printf '%s\t%s\t%s\n' "$rel" "$(wc -l < "$f" 2>/dev/null || echo 0)" \
+      "$(date -r "$f" +%s 2>/dev/null || echo 0)"
+  done
+}
+
+# Copy one archive entry (file or directory) out to <dst>. Read-only w.r.t. the archive.
+sj_archive_copy() {  # sj_archive_copy <root> <relpath> <dst>
+  local root="$1" rel="$2" dst="$3" src="$1/$2"
+  case "$rel" in /*|*..*) echo "sj: refusing unsafe archive path '$rel'" >&2; return 2 ;; esac
+  if   [ -d "$src" ]; then mkdir -p "$dst" && cp -a "$src/." "$dst/"
+  elif [ -f "$src" ]; then mkdir -p "$(dirname "$dst")" && cp -f "$src" "$dst"
+  else return 1; fi
+}

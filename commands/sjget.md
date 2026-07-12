@@ -1,7 +1,7 @@
 ---
 description: scrubjay — pull a KNOWN archive item straight into context by id/path (no search); slice big transcripts
 argument-hint: <sid8 | path | sj://uri> [turns=A-B | lines=A-B]
-allowed-tools: mcp__sjmcp__dc_get
+allowed-tools: mcp__sjmcp__sj_get
 ---
 The user already knows exactly which archived item they want and is naming it directly —
 so there is nothing to search or rank. The point of this command is minimal token usage:

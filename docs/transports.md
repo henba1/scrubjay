@@ -112,7 +112,19 @@ configure both ends; the private `runbooks/wireguard-transcripts.md` is the full
 
 ## Backends
 
-One file each, defining `transport_ship <src> <relpath>` (`src` may be a file *or* a directory):
+One file each, defining a **write** side — `transport_ship <src> <relpath>` (`src` may be a file *or*
+a directory) — and a **read** side used only by [session hand-off](handoff.md):
+
+```sh
+transport_resolve <sid>            # -> TSV: <relpath> <lines> <mtime>, one row per archived copy
+transport_fetch   <relpath> <dst>  # file or directory
+```
+
+`local` and `git` read straight off the filesystem (the NAS mount, or the clone). `rsync-wg` **cannot**
+— its relay key is write-only by design (below) — so it reads over the separate, read-only
+[`sjmcp` SSH channel](archive-mcp.md) instead. The write-only property of the relay key is preserved.
+
+The backends themselves:
 
 - **`local`** — the box that *has* the NAS mounted copies straight in, no network hop. Set
   `SCRUBJAY_LOCAL_CHATS` to the NAS chats root.

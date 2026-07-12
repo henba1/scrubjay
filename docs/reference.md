@@ -31,6 +31,17 @@ git -C ~/.scrubjay/scrubjay-data pull
 grep -i <keyword> ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
+## Continue another machine's chat here
+
+Stage it, then resume with Claude Code's own picker — see [handoff.md](handoff.md).
+
+```sh
+~/.scrubjay/scrubjay/bin/sj-resume.sh --list       # what's resumable, from other machines
+cd <the project dir on this machine>
+~/.scrubjay/scrubjay/bin/sj-resume.sh <sid8>       # stage it (rewrites the other host's paths)
+claude --resume <sid>                              # …or /resume inside a session here
+```
+
 ## Register the current machine (first-time onboarding)
 
 ```sh

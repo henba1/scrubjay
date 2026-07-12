@@ -38,3 +38,41 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   [ "$mode" = mirror ] && rc=0
   return $rc
 }
+
+# --- read side (session hand-off) -------------------------------------------------------------
+# The relay key CANNOT read: the receiver pins it to `rrsync -wo` (write-only) on purpose, so a
+# stolen relay key can never exfiltrate the archive. That property stays. Reading back therefore
+# rides the OTHER key this host already has — the one pinned to bin/sjmcp-serve.sh, which is
+# read-only, confined to the archive roots, and already able to hand out raw .jsonl via
+# sj_get(format="raw"). We are not widening what that key may see, only how it says it:
+#   ssh <alias> resolve <sid>      -> TSV: <relpath> <lines> <mtime>
+#   ssh <alias> fetch   <relpath>  -> a tar stream of that file or directory
+# A host with no SCRUBJAY_MCP_REMOTE has no read channel at all; say so, and point at the script
+# that grants one, rather than failing obscurely.
+_wg_mcp_remote() {
+  if [ -z "${SCRUBJAY_MCP_REMOTE:-}" ]; then
+    echo "rsync-wg: the relay is write-only; reading the archive needs the sjmcp SSH channel." >&2
+    echo "          Run bin/onboard-mcp-client.sh on this host to set SCRUBJAY_MCP_REMOTE." >&2
+    return 1
+  fi
+  printf '%s' "$SCRUBJAY_MCP_REMOTE"
+}
+
+transport_resolve() {  # transport_resolve <sid|sid8>  -> TSV: <relpath> <lines> <mtime>
+  local alias; alias="$(_wg_mcp_remote)" || return 1
+  ssh -T -o BatchMode=yes -o ConnectTimeout=10 "$alias" "resolve $1" 2>/dev/null
+}
+
+transport_fetch() {    # transport_fetch <relpath> <dst>   (relpath may be a file or a directory)
+  local rel="$1" dst="$2" alias tmp rc=0
+  alias="$(_wg_mcp_remote)" || return 1
+  case "$rel" in /*|*..*) echo "rsync-wg: refusing unsafe archive path '$rel'" >&2; return 2 ;; esac
+  tmp="$(mktemp -d)" || return 1
+  # One tar stream covers both a file and a directory, so the caller doesn't have to know which.
+  if ! ssh -T -o BatchMode=yes -o ConnectTimeout=10 "$alias" "fetch $rel" 2>/dev/null \
+       | tar -C "$tmp" -xf - 2>/dev/null; then rm -rf "$tmp"; return 1; fi
+  if   [ -d "$tmp/$rel" ]; then mkdir -p "$dst" && cp -a "$tmp/$rel/." "$dst/" || rc=1
+  elif [ -f "$tmp/$rel" ]; then mkdir -p "$(dirname "$dst")" && cp -f "$tmp/$rel" "$dst" || rc=1
+  else rc=1; fi
+  rm -rf "$tmp"; return $rc
+}

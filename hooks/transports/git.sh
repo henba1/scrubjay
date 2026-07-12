@@ -33,3 +33,17 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
     fi
   ) >/dev/null 2>&1
 }
+
+# --- read side (session hand-off) -------------------------------------------------------------
+# The clone IS the archive here, so reading back is a copy — but pull first, because the session
+# we want to resume was almost certainly pushed by a *different* machine. (SessionStart already
+# pulls this clone; a hand-off may well be the first thing you do in a session, so don't rely on it.)
+transport_resolve() {  # transport_resolve <sid|sid8>  -> TSV: <relpath> <lines> <mtime>
+  local chats; chats="$(sj_chats)"
+  [ -n "$chats" ] && [ -d "$chats/.git" ] || return 1
+  timeout 30 git -C "$chats" pull --ff-only -q >/dev/null 2>&1 || true
+  sj_archive_resolve "$chats" "$1"
+}
+transport_fetch() {    # transport_fetch <relpath> <dst>   (relpath may be a file or a directory)
+  sj_archive_copy "$(sj_chats)" "$1" "$2"
+}

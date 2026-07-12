@@ -29,8 +29,13 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
 - `skeleton/data/` — the seed for a fresh `scrubjay-data`. `settings/settings.base.json` is
   load-bearing: `claude-sync.sh` requires it, and it registers the SessionStart/SessionEnd hooks.
 - `hooks/` — `sync-session.sh` (SessionStart), `log-session.sh` (SessionEnd), and
-  `transports/<backend>.sh` (`git` / `rsync-wg` / `local`).
+  `transports/<backend>.sh` (`git` / `rsync-wg` / `local`). A backend defines `transport_ship`
+  (write) plus `transport_resolve` / `transport_fetch` (read — used only by session hand-off).
+- `bin/sj-resume.sh` — cross-machine session hand-off: stage another host's archived transcript into
+  this machine's `~/.claude/projects/` so `claude --resume` continues it. See `docs/handoff.md`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
+  `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
+  `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.
 - `commands/` — the generic `/dc*` slash commands shipped with the app.
 - `skeleton/host/` — template copied when registering a new machine.
 - `docs/` — the documentation site (also the source for the published site + `llms.txt`).

@@ -1,7 +1,7 @@
 ---
 description: scrubjay — browse the archive (transcripts / plans / memories) and pull one into context
 argument-hint: [transcript|plan|memory] [host=… project=… since=YYYY-MM-DD]
-allowed-tools: mcp__sjmcp__dc_list, mcp__sjmcp__dc_get, mcp__sjmcp__dc_status
+allowed-tools: mcp__sjmcp__sj_list, mcp__sjmcp__sj_get, mcp__sjmcp__sj_status
 ---
 The user wants to browse the scrubjay archive and pull a chosen item into the session.
 

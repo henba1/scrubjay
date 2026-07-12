@@ -72,6 +72,13 @@ fi
 [ -n "${claude_root:-}" ] && [ -d "$claude_root/tasks/$sid" ] && \
   transport_ship "$claude_root/tasks/$sid" "$host/$slug/$sid/tasks"
 
+# 6b) this session's file history — the pre-edit copies Claude Code keeps so /rewind can undo its
+#     own edits. Without it a session handed off to another machine (bin/sj-resume.sh) can be
+#     resumed but not rewound. Same sensitivity class as the transcript (it holds source files), so
+#     it rides the same P2P backend, never a third party.
+[ -n "${claude_root:-}" ] && [ -d "$claude_root/file-history/$sid" ] && \
+  transport_ship "$claude_root/file-history/$sid" "$host/$slug/$sid/file-history"
+
 # 7) the project's CLAUDE.local.md (personal, gitignored project rules — sensitive: holds private
 #    paths/cluster details, and host-specific, so it's a one-way per-host archive next to the
 #    project's transcripts, NOT merged across machines like memory). Lives in the working tree

@@ -1,7 +1,7 @@
 ---
 description: scrubjay — find where a topic appears *within* a past session/plan/memory
 argument-hint: <topic> in <session-id|topic-words> [context=N]
-allowed-tools: mcp__sjmcp__dc_recall, mcp__sjmcp__dc_search_within, mcp__sjmcp__dc_get
+allowed-tools: mcp__sjmcp__sj_recall, mcp__sjmcp__sj_search_within, mcp__sjmcp__sj_get
 ---
 The user wants the spot(s) inside one specific archived conversation/plan/memory where a topic is
 discussed — the "jump me to where we talked about X" case.

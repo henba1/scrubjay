@@ -27,3 +27,13 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
     cp -f "$src" "$dst" 2>/dev/null; return $?
   fi
 }
+
+# --- read side (session hand-off) -------------------------------------------------------------
+# The archive is a directory on this box, so reading it back is just a copy. Used by
+# bin/sj-resume.sh to pull another host's session down for `claude --resume`.
+transport_resolve() {  # transport_resolve <sid|sid8>  -> TSV: <relpath> <lines> <mtime>
+  sj_archive_resolve "${SCRUBJAY_LOCAL_CHATS:-}" "$1"
+}
+transport_fetch() {    # transport_fetch <relpath> <dst>   (relpath may be a file or a directory)
+  sj_archive_copy "${SCRUBJAY_LOCAL_CHATS:-}" "$1" "$2"
+}
