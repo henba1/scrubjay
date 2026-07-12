@@ -1,5 +1,4 @@
-![scrubjay — cache what · where · when](banner.png#only-light){ width="720" }
-![scrubjay — cache what · where · when](banner-dark.png#only-dark){ width="720" }
+![scrubjay — cache what · where · when](banner.png){ width="720" }
 
 # scrubjay
 
