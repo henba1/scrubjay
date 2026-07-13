@@ -29,7 +29,9 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `bin/claude-sync.sh` for Claude Code.
 - `bin/adapters/<harness>.sh` — **the harness seam.** scrubjay is not Claude-only: an adapter says
   where a coding agent keeps its config, what a session's records are, and how a session is
-  resumed. `claude.sh` is the reference implementation; the contract is in `bin/adapters/README.md`.
+  resumed. `claude.sh` is the reference implementation; `opencode.sh` relays opencode sessions into
+  the same archive (its lifecycle bridge is the plugin `hooks/opencode/scrubjay.js`, its readable
+  renderer `bin/render-opencode.sh`). The contract is in `bin/adapters/README.md`.
   Everything between the two seams — the archive layout, the `logs/` catalogue, memory, the readable
   Markdown layer, sjmcp — is harness-agnostic. Which harnesses a machine syncs is
   `SCRUBJAY_HARNESSES`; which one a hook invocation belongs to is `SCRUBJAY_HARNESS`.

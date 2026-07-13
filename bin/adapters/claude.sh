@@ -12,8 +12,10 @@ sjh_present()    { command -v claude >/dev/null 2>&1; }
 # merge, per-project memory links, MCP registration).
 sjh_apply_config() { "$(sj_app)/bin/claude-sync.sh" "$@"; }
 
-sjh_transcript_ext() { printf 'jsonl'; }
-sjh_resume_cmd()     { printf 'claude --resume %s' "$1"; }
+sjh_transcript_ext()  { printf 'jsonl'; }
+sjh_session_handle()  { printf '%.8s' "$1"; }          # session ids are UUIDs: the first 8 hex
+sjh_resume_cmd()      { printf 'claude --resume %s' "$1"; }   # ($2 = staged file; Claude reads it
+                                                              #  in place, so it needs no import)
 
 # Claude Code stores a session at <root>/projects/<slug>/<sid>.jsonl, where <slug> is the session's
 # absolute cwd with every character outside [A-Za-z0-9-] replaced by '-'. The encoding is LOSSY (a

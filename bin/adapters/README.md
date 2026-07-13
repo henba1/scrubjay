@@ -34,16 +34,21 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_config_dir` | its config root (`~/.claude`, `~/.config/opencode`, `~/.codex`) |
 | `sjh_apply_config [args]` | materialize the synced config into that root; idempotent |
 | `sjh_transcript_ext` | extension an archived transcript carries (`jsonl`, `json`) |
+| `sjh_session_handle <sid>` | the 8-char handle the session is known by (readable name, `/sjrecall`, `/sjresume`) |
 | `sjh_session_slug <transcript> <cwd>` | the `<slug>` this session archives under |
 | `sjh_session_topic <transcript>` | first real user prompt, one line of plain text |
 | `sjh_session_cwd <transcript>` | the working dir recorded inside the transcript |
 | `sjh_render <transcript>` | the readable Markdown rendering, on stdout |
 | `sjh_extra_artifacts <transcript> <sid> <slug> <cwd>` | TSV of the session's *other* records to relay (below) |
-| `sjh_find_live_transcript <cwd>` | the in-progress session's transcript, for a publish-now with no hook payload |
+| `sjh_find_live_transcript <cwd>` | the in-progress session's transcript, for a publish-now with no hook payload (empty if the harness has none on disk) |
 | `sjh_slug <path>` | the harness's own project-dir encoding of an absolute path |
-| `sjh_project_dir <cwd>` | where a transcript for `<cwd>` must land locally to be resumable |
+| `sjh_project_dir <cwd>` | where a fetched session must land locally to be resumable |
 | `sjh_import_side <sid> <dir> <project_dir>` | put fetched sidecar records back where the harness expects them |
-| `sjh_resume_cmd <sid>` | the command a user runs to continue the session |
+| `sjh_resume_cmd <sid> <staged-file>` | the command a user runs to continue the session (a harness that imports rather than reads in place needs the path) |
+
+The readable Markdown rendering is the one artifact every harness produces in the same shape — a
+`# title`, a `_N turns_` line, and `## User` / `## Assistant` blocks. That is what lets `/sjrecall`
+and `/sjbrowse` search across harnesses, and what `mcp/sjmcp_server.py` parses. Keep to it.
 
 ### `sjh_extra_artifacts`
 
@@ -65,3 +70,37 @@ task lists, per-session file history, subagent transcripts. It may normalize fil
    call `bin/ship-transcript.sh <file> <slug> <sid> <host> <cwd>` directly with
    `SCRUBJAY_HARNESS=<name>` in the environment).
 3. Add `<name>` to `SCRUBJAY_HARNESSES`.
+
+## Harnesses
+
+### claude — Claude Code
+
+The reference adapter, and the only one with full config sync (CLAUDE.md, agents, commands,
+settings merge, per-project memory, MCP registration — `bin/claude-sync.sh`) and in-place session
+hand-off (`bin/sj-resume.sh`).
+
+### opencode
+
+Session relay + archive. Add it on a machine that has `opencode`:
+
+```sh
+echo ': "${SCRUBJAY_HARNESSES:=claude opencode}"' >> ~/.config/scrubjay/config
+bin/sync-config.sh          # registers the bridge plugin in ~/.config/opencode/opencode.json
+```
+
+From then on every opencode session is logged to the `logs/` catalogue and relayed to the archive
+(transcript + readable rendering), and shows up in `/sjrecall` / `/sjbrowse` alongside Claude's.
+
+What it does **not** do yet: sync config *into* opencode (AGENTS.md, agents, commands), register
+the sjmcp server so `/sjrecall` works *from inside* opencode, or run the hand-off import for you —
+`bin/sj-resume.sh` stages the export into an inbox and prints the `opencode import … && opencode
+--session …` to run.
+
+Two things worth knowing about how it works:
+
+* **It publishes on `session.idle`, not at session end** — opencode has no "session ended" event
+  (a killed TUI sends nothing). So the bridge publishes after every turn, skipping an export that
+  is byte-identical to the last one shipped. A crashed opencode session is therefore already
+  archived up to its last turn, which Claude's SessionEnd cannot promise.
+* **The archived transcript is `opencode export` output**, which `opencode import` reads back — so
+  the archive holds a natively re-importable session, not a scrubjay-specific dump.

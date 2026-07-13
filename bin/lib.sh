@@ -117,7 +117,16 @@ sj_readable_relpath() {  # sj_readable_relpath <transcript> <session_id> [cwd] [
             | sed -E "s/^-+//; s/-+$//" | cut -c1-40 | sed -E "s/-+$//")"
   [ -n "$topic" ] || topic="session"
   d="$(date -r "$src" +%F 2>/dev/null || date +%F)"
-  printf '%s/%s_%s__%s' "$project" "$d" "$topic" "${sid:0:8}"
+  printf '%s/%s_%s__%s' "$project" "$d" "$topic" "$(sj_session_handle "$sid")"
+}
+
+# The 8-character handle a session is known by: what the readable filename ends with, what /sjrecall
+# shows, and what you hand to /sjresume. The first 8 characters of the id, unless the harness gives
+# something better — opencode ids are `ses_<base62>`, where the first 8 would be mostly the prefix.
+# Adapter-aware but not adapter-dependent: backfill has no adapter loaded and still gets a handle.
+sj_session_handle() {  # sj_session_handle <session_id>
+  if declare -F sjh_session_handle >/dev/null 2>&1; then sjh_session_handle "$1"
+  else printf '%.8s' "$1"; fi
 }
 
 # Give plan files meaningful, date-prefixed names *in place*, so the relay tree (and the local
@@ -194,10 +203,15 @@ sj_log_catalogue() {  # sj_log_catalogue [limit]
 # Both transcript extensions are matched: .jsonl (Claude Code, Codex) and .json (a harness whose
 # session export is a single document, e.g. opencode) — see sjh_transcript_ext. The glob is pinned
 # to <host>/<slug>/ so the .json records *inside* a session's sidecar dirs can never match.
-sj_archive_resolve() {  # sj_archive_resolve <root> <sid|sid8>
+#
+# <sid> matches anywhere in the filename, not just as a prefix, so the 8-char handle finds its
+# session whatever the id looks like: `66a71b6f` resolves `ses_66a71b6f….json` the same way it
+# resolves a UUID. Several matches are expected and handled by the caller (a handed-off session
+# exists under every host it ran on, and an ambiguous handle is rejected rather than guessed).
+sj_archive_resolve() {  # sj_archive_resolve <root> <sid|handle>
   local root="$1" sid="$2" f rel
   [ -n "$root" ] && [ -d "$root" ] || return 1
-  for f in "$root"/*/*/"$sid"*.jsonl "$root"/*/*/"$sid"*.json; do
+  for f in "$root"/*/*/*"$sid"*.jsonl "$root"/*/*/*"$sid"*.json; do
     [ -f "$f" ] || continue
     rel="${f#"$root"/}"
     printf '%s\t%s\t%s\n' "$rel" "$(wc -l < "$f" 2>/dev/null || echo 0)" \

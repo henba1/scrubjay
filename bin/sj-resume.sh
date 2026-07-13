@@ -143,7 +143,7 @@ transport_fetch "$relpath" "$tmp/session.jsonl" || die "fetch failed: $relpath"
 esc_pat() { printf '%s' "$1" | sed 's/[][\.*^$]/\\&/g'; }
 esc_rep() { printf '%s' "$1" | sed 's/[\&]/\\&/g'; }
 
-old_cwd="$(jq -rs '[ .[] | select(.cwd != null) | .cwd ][0] // ""' "$tmp/session.jsonl")"
+old_cwd="$(sjh_session_cwd "$tmp/session.jsonl")"
 
 # The recorded cwd is not always the path Claude actually slugged: on a symlinked home (snellius
 # records /home/jvrijn/… but its project dir is -gpfs-home2-jvrijn-…) the transcript BODY holds the
@@ -229,7 +229,7 @@ fi
 echo
 echo "  ready — continue the conversation from '$src_host' with:"
 echo
-echo "      $(sjh_resume_cmd "$full_sid")"
+echo "      $(sjh_resume_cmd "$full_sid" "$dest")"
 echo
 echo "  (or, inside a session in this directory, run /resume and pick ${full_sid:0:8}.)"
 if [ "$(sj_harness)" = claude ]; then

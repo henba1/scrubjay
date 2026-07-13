@@ -71,7 +71,10 @@ def roots() -> Roots:
 #   plan:                <date>_<topic>.md
 #   memory:              <project>/<name>.md   (+ a MEMORY.md index per project)
 
-_READABLE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<topic>.+)__(?P<sid8>[0-9a-f]{8})$")
+# The handle is 8 chars of the session id — hex for a Claude/Codex UUID, base62 for an opencode
+# `ses_…` id (bin/lib.sh: sj_session_handle). Topics are slugified to [a-z0-9-], so they can never
+# contain the `__` that separates them from the handle.
+_READABLE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<topic>.+)__(?P<sid8>[0-9A-Za-z_-]{8})$")
 _PLAN = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})_(?P<topic>.+)$")
 
 
@@ -288,8 +291,13 @@ def resolve_ref(ref: str, r: Roots) -> Path | None:
 
 
 def _jsonl_for(readable: Path, r: Roots) -> Path | None:
-    # readable: <root>/<host>/readable/<project>/<date>_<topic>__<sid8>.md
-    # canonical: <root>/<host>/<slug>/<sid>.jsonl  (slug != project; find by sid8 prefix)
+    # readable:  <root>/<host>/readable/<project>/<date>_<topic>__<sid8>.md
+    # canonical: <root>/<host>/<slug>/<sid>.<ext>  (slug != project; find by the sid8 handle)
+    #
+    # .jsonl is a Claude/Codex transcript, .json an opencode session export. The handle can sit
+    # anywhere in the id (opencode's is the base62 *after* the `ses_` prefix), so match it as a
+    # substring — the glob is pinned to <host>/<slug>/, so a session's sidecar records, which live
+    # one level deeper, can never be mistaken for the transcript.
     m = _READABLE.match(readable.stem)
     if not (m and r.chats):
         return None
@@ -299,7 +307,7 @@ def _jsonl_for(readable: Path, r: Roots) -> Path | None:
         host_dir = readable.parents[2]
     except IndexError:
         return None
-    hits = list(host_dir.glob(f"*/{sid8}*.jsonl"))
+    hits = [p for ext in ("jsonl", "json") for p in host_dir.glob(f"*/*{sid8}*.{ext}")]
     return hits[0] if hits else None
 
 
