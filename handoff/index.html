@@ -510,6 +510,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-script-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The script, directly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#under-the-hood" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -834,6 +845,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-script-directly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The script, directly
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#under-the-hood" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -992,10 +1014,41 @@ inside the archive can't be used as a way out.</p>
 and <code>/sjresume</code> says so. That script is the fix.</p>
 <p>On the <code>local</code> and <code>git</code> backends none of this applies — the archive is a directory (or a clone) on
 the box already, so reading it back is just a copy.</p>
+<h2 id="the-script-directly">The script, directly<a class="headerlink" href="#the-script-directly" title="Permanent link">&para;</a></h2>
+<p><code>/sjresume</code> is a thin wrapper — it resolves a description to a session id and calls the script. You
+can run it yourself; it must be run <strong>from the project directory on this machine</strong>, since that is
+what the other host's paths get rewritten <em>to</em>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sj-resume.sh<span class="w"> </span>--list<span class="w"> </span><span class="o">[</span>n<span class="o">]</span><span class="w">        </span><span class="c1"># what&#39;s resumable, from other machines (default 15)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sj-resume.sh<span class="w"> </span>&lt;sid<span class="p">|</span>sid8&gt;<span class="w">        </span><span class="c1"># stage it into the project dir you&#39;re standing in</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Why you'd reach for it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--into &lt;dir&gt;</code></td>
+<td>The project lives somewhere else here. Stage against <code>&lt;dir&gt;</code> instead of <code>$PWD</code>.</td>
+</tr>
+<tr>
+<td><code>--force</code></td>
+<td>Import even when the local copy is <strong>longer</strong> than the archive's. The refusal exists to protect unpublished turns — prefer <code>/sjlog</code> on the other machine first. The overwritten file is still backed up to <code>&lt;sid&gt;.jsonl.bak</code>.</td>
+</tr>
+<tr>
+<td><code>--no-rewrite-paths</code></td>
+<td>Install the archive copy <strong>verbatim</strong>. For inspecting a transcript as it was recorded; a session staged this way still points at the other machine's paths.</td>
+</tr>
+</tbody>
+</table>
+<p>An 8-hex prefix is enough, but only if it is unambiguous: if the prefix matches more than one
+<em>distinct</em> session the script lists them and stops, rather than guess which conversation you meant.</p>
 <h2 id="under-the-hood">Under the hood<a class="headerlink" href="#under-the-hood" title="Permanent link">&para;</a></h2>
 <p><code>hooks/transports/&lt;backend&gt;.sh</code> now defines a read side alongside <code>transport_ship</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>transport_resolve<span class="w"> </span>&lt;sid&gt;<span class="w">            </span><span class="c1"># -&gt; TSV: &lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>transport_fetch<span class="w">   </span>&lt;relpath&gt;<span class="w"> </span>&lt;dst&gt;<span class="w">  </span><span class="c1"># file or directory</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>transport_resolve<span class="w"> </span>&lt;sid&gt;<span class="w">            </span><span class="c1"># -&gt; TSV: &lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>transport_fetch<span class="w">   </span>&lt;relpath&gt;<span class="w"> </span>&lt;dst&gt;<span class="w">  </span><span class="c1"># file or directory</span>
 </code></pre></div>
 <p><code>local</code> and <code>git</code> implement both against the filesystem; <code>rsync-wg</code> implements them over the sjmcp
 SSH channel above. <code>bin/sj-resume.sh</code> is the only caller.</p>

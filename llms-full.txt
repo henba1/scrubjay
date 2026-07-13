@@ -492,6 +492,23 @@ If a machine on `rsync-wg` has never run `bin/onboard-mcp-client.sh`, it has no 
 
 On the `local` and `git` backends none of this applies — the archive is a directory (or a clone) on the box already, so reading it back is just a copy.
 
+## The script, directly
+
+`/sjresume` is a thin wrapper — it resolves a description to a session id and calls the script. You can run it yourself; it must be run **from the project directory on this machine**, since that is what the other host's paths get rewritten *to*.
+
+```
+sj-resume.sh --list [n]        # what's resumable, from other machines (default 15)
+sj-resume.sh <sid|sid8>        # stage it into the project dir you're standing in
+```
+
+| Flag                 | Why you'd reach for it                                                                                                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--into <dir>`       | The project lives somewhere else here. Stage against `<dir>` instead of `$PWD`.                                                                                                                                               |
+| `--force`            | Import even when the local copy is **longer** than the archive's. The refusal exists to protect unpublished turns — prefer `/sjlog` on the other machine first. The overwritten file is still backed up to `<sid>.jsonl.bak`. |
+| `--no-rewrite-paths` | Install the archive copy **verbatim**. For inspecting a transcript as it was recorded; a session staged this way still points at the other machine's paths.                                                                   |
+
+An 8-hex prefix is enough, but only if it is unambiguous: if the prefix matches more than one *distinct* session the script lists them and stops, rather than guess which conversation you meant.
+
 ## Under the hood
 
 `hooks/transports/<backend>.sh` now defines a read side alongside `transport_ship`:
