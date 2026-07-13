@@ -45,10 +45,7 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   if ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
     topic=""
     if [ -n "$tpath" ] && [ -f "$tpath" ]; then
-      topic="$(jq -rs '[.[] | select(.type=="user") | .message.content
-                         | select(type=="string")
-                         | select((startswith("<") or startswith("Caveat")) | not)] | .[0] // ""' \
-                "$tpath" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//')"
+      topic="$(sj_session_topic "$tpath")"
     fi
     [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
     printf '%s | %s | %s | "%s" | session=%s\n' "$ts" "$host" "$cwd" "$topic" "$sid" >> "$LOG"

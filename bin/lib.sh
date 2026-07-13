@@ -59,6 +59,23 @@ sj_chats() { sj_load_config; printf '%s' "${SCRUBJAY_CHATS:-}"; }
 sj_memory()        { sj_load_config; printf '%s' "${SCRUBJAY_MEMORY:-$HOME/.scrubjay/scrubjay-memory}"; }
 sj_memory_remote() { sj_load_config; printf '%s' "${SCRUBJAY_MEMORY_REMOTE:-}"; }
 
+# The session's first real user prompt, as one line of plain text ("" if there isn't one).
+#
+# `.message.content` is a string on some records and an ARRAY of content blocks on others — which
+# is the common shape for a typed prompt. Reading only the string form silently drops most
+# sessions, so normalize the array to its joined text blocks first (tool_result / image blocks
+# carry no prompt and are skipped). Then discard the records that are not the user *talking*:
+# the injected `<...>` blocks (system-reminder, command-name, local-command output) and the
+# "Caveat:" preamble.
+sj_session_topic() {  # sj_session_topic <transcript.jsonl>
+  jq -rs '[ .[] | select(.type=="user") | .message.content
+            | if type=="array" then [ .[] | select(.type=="text") | .text ] | join(" ") else . end
+            | select(type=="string")
+            | sub("^\\s+"; "") | sub("\\s+$"; "")
+            | select(. != "" and ((startswith("<") or startswith("Caveat")) | not)) ][0] // ""' \
+    "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
+}
+
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
 #   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
 #   real user prompt, slugified). Derived from the .jsonl itself so it also works for backfill.
@@ -67,9 +84,7 @@ sj_readable_relpath() {  # sj_readable_relpath <transcript.jsonl> <session_id>
   if ! command -v jq >/dev/null 2>&1; then printf 'misc/%s' "${sid:0:8}"; return; fi
   cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
   project="$(basename "${cwd:-misc}")"; [ -n "$project" ] && [ "$project" != "/" ] || project="misc"
-  topic="$(jq -rs '[ .[] | select(.type=="user") | .message.content
-                    | select(type=="string")
-                    | select((startswith("<") or startswith("Caveat"))|not) ][0] // ""' "$src" 2>/dev/null)"
+  topic="$(sj_session_topic "$src")"
   topic="$(printf '%s' "$topic" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
             | sed -E "s/^-+//; s/-+$//" | cut -c1-40 | sed -E "s/-+$//")"
   [ -n "$topic" ] || topic="session"
@@ -183,10 +198,21 @@ sj_archive_resolve() {  # sj_archive_resolve <root> <sid|sid8>
 }
 
 # Copy one archive entry (file or directory) out to <dst>. Read-only w.r.t. the archive.
+#
+# The lexical check is not enough on its own: every other host writes into this archive over the
+# relay, so a symlink can be *inside* it without ever appearing in the path we were handed — and
+# `cp` would follow it straight out of the tree. Resolve the entry and require it to still land
+# under the root, the same way bin/sjmcp-serve.sh's confine() does for the SSH read path.
 sj_archive_copy() {  # sj_archive_copy <root> <relpath> <dst>
-  local root="$1" rel="$2" dst="$3" src="$1/$2"
+  local root="$1" rel="$2" dst="$3" src="$1/$2" real_root real_src
   case "$rel" in /*|*..*) echo "sj: refusing unsafe archive path '$rel'" >&2; return 2 ;; esac
-  if   [ -d "$src" ]; then mkdir -p "$dst" && cp -a "$src/." "$dst/"
-  elif [ -f "$src" ]; then mkdir -p "$(dirname "$dst")" && cp -f "$src" "$dst"
+  real_root="$(realpath -e "$root" 2>/dev/null)" || return 1
+  real_src="$(realpath -e "$src"  2>/dev/null)" || return 1
+  case "$real_src" in
+    "$real_root"/*) ;;
+    *) echo "sj: '$rel' escapes the archive root" >&2; return 2 ;;
+  esac
+  if   [ -d "$real_src" ]; then mkdir -p "$dst" && cp -a "$real_src/." "$dst/"
+  elif [ -f "$real_src" ]; then mkdir -p "$(dirname "$dst")" && cp -f "$real_src" "$dst"
   else return 1; fi
 }
