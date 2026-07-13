@@ -52,22 +52,103 @@ sjh_render() { bash "$(sj_app)/bin/render-opencode.sh" "$1"; }
 sjh_extra_artifacts() { :; }
 
 # --- config ------------------------------------------------------------------------------------
-# Phase 1 registers the plugin and nothing else: opencode loads plugins from the `plugin` array in
-# its config, and a spec may be an absolute path (packages/opencode/src/plugin/shared.ts). We point
-# it straight at the file IN THE APP REPO rather than copying/symlinking it into the config dir, so
-# `git pull` self-updates the bridge exactly like the hooks/ symlink does for Claude.
+# What we put into opencode's own config dir:
+#   * the lifecycle bridge plugin  (opencode.json `plugin`)
+#   * the sjmcp archive server     (opencode.json `mcp`)   -> /sjrecall & co. work INSIDE opencode
+#   * the /sj* commands            (commands/*.md)
+# NOT yet: AGENTS.md / agents/ / the settings merge — see the roadmap.
 #
-# Full config sync (AGENTS.md, agents/, commands/, the settings merge, MCP registration) is not
-# wired up yet — see the roadmap. This must stay idempotent and must never clobber the user's file.
+# Everything here is idempotent and additive: we never rewrite a key we don't own, and we bail
+# rather than clobber a config we cannot parse.
+
+# opencode loads a plugin from the `plugin` array, and a spec may be an absolute path
+# (packages/opencode/src/plugin/shared.ts). Point it straight at the file IN THE APP REPO rather
+# than copying it into the config dir, so `git pull` self-updates the bridge exactly like the
+# hooks/ symlink does for Claude.
+_sjh_oc_plugin_json() { jq -n --arg p "$(sj_app)/hooks/opencode/scrubjay.js" '[$p]'; }
+
+# The sjmcp archive server, in opencode's `mcp` shape ({type:"local", command:[…], environment:{…}}).
+# Same two modes claude-sync.sh registers, and for the same reasons:
+#   LOCAL  — this box HAS the archive (a NAS mount, or the scrubjay-chats clone on the git backend):
+#            run the stdio server here via uv.
+#   REMOTE — it doesn't: `ssh <target>`, where a forced command (bin/sjmcp-serve.sh) runs the server
+#            on the archive host and pipes MCP stdio back.
+# Prints the server object, or nothing (with a reason on stdout) when neither mode is available.
+_sjh_oc_mcp_json() {
+  local chats remote server clone
+  sj_load_config
+  chats="${SCRUBJAY_LOCAL_CHATS:-}"; remote="${SCRUBJAY_MCP_REMOTE:-}"
+  server="$(sj_app)/mcp/sjmcp_server.py"
+
+  if [ -z "$chats" ] && [ -z "$remote" ] && [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-}" = git ]; then
+    clone="$(sj_chats)"
+    [ -n "$clone" ] && [ -d "$clone/.git" ] && chats="$clone"
+  fi
+
+  if [ -n "$chats" ] && [ -d "$chats" ]; then
+    command -v uv >/dev/null 2>&1 || {
+      echo "  ┌─ MCP archive server NOT registered (/sjrecall, /sjfind, /sjbrowse stay inert)" >&2
+      echo "  └─ reason: no 'uv' runtime on PATH — install uv, reopen your shell, rerun" >&2; return 1; }
+    [ -f "$server" ] || { echo "  SKIP  mcp: server file missing: $server" >&2; return 1; }
+    jq -n --arg s "$server" --arg chats "$chats" --arg mem "$(sj_memory)" --arg data "${SCRUBJAY_DATA:-}" \
+      '{type: "local", command: ["uv", "run", "--script", $s], enabled: true,
+        environment: {SCRUBJAY_LOCAL_CHATS: $chats, SCRUBJAY_MEMORY: $mem, SCRUBJAY_DATA: $data}}'
+  elif [ -n "$remote" ]; then
+    command -v ssh >/dev/null 2>&1 || { echo "  SKIP  mcp: no 'ssh' to reach $remote" >&2; return 1; }
+    # No environment: the far-end forced command supplies the archive pointers. BatchMode so a
+    # missing key fails fast instead of hanging the MCP transport on a password prompt.
+    jq -n --arg t "$remote" \
+      '{type: "local", enabled: true,
+        command: ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", $t]}'
+  else
+    echo "  ┌─ MCP archive server NOT registered (/sjrecall, /sjfind, /sjbrowse stay inert)" >&2
+    echo "  └─ reason: no local archive (SCRUBJAY_LOCAL_CHATS) and no remote (SCRUBJAY_MCP_REMOTE)" >&2
+    return 1
+  fi
+}
+
+# The /sj* commands, translated into opencode's dialect. Same prompts, same files — opencode reads
+# the same markdown-with-frontmatter, takes the same $ARGUMENTS and the same !`shell` injection — so
+# the translation is purely mechanical and the commands stay single-sourced in commands/:
+#   * frontmatter keys opencode has no concept of (argument-hint, allowed-tools) are dropped;
+#   * MCP tools are namespaced <server>_<tool>, not mcp__<server>__<tool>
+#     (packages/opencode/src/mcp/catalog.ts: toolName);
+#   * the app path is resolved here — a Claude command finds it by following the ~/.claude/hooks
+#     symlink, which does not exist for opencode;
+#   * every scrubjay script the command shells out to is prefixed with SCRUBJAY_HARNESS=opencode.
+#     Without it, /sjlog and /sjresume would load the CLAUDE adapter — the scripts take the harness
+#     from the environment, and opencode does not put it there (only the bridge plugin does, for its
+#     own subprocesses). This is the one translation that is about correctness, not dialect.
+# Files are GENERATED (regenerated on every sync), so edit commands/, never the copies.
+_sjh_oc_commands() {
+  local dst="$1" app src name n=0
+  app="$(sj_app)"
+  mkdir -p "$dst" || return 1
+  for src in "$app"/commands/*.md; do
+    [ -f "$src" ] || continue
+    name="$(basename "$src")"
+    sed -E \
+      -e '/^(argument-hint|allowed-tools):/d' \
+      -e 's/mcp__sjmcp__/sjmcp_/g' \
+      -e "s#\"\\\$\(cd .* && pwd\)/bin/#\"$app/bin/#g" \
+      -e "s#~/\.claude/hooks/\.\./bin/#$app/bin/#g" \
+      -e "s#~/\.claude/hooks/#$app/hooks/#g" \
+      -e "s#bash \"$app/#SCRUBJAY_HARNESS=opencode bash \"$app/#g" \
+      -e "s#bash $app/#SCRUBJAY_HARNESS=opencode bash $app/#g" \
+      "$src" > "$dst/$name" || continue
+    n=$((n + 1))
+  done
+  echo "  gen   $n commands -> $dst/"
+}
+
 sjh_apply_config() {
-  local cfgdir plugin cfg tmp
+  local cfgdir cfg tmp mcp
   cfgdir="$(sjh_config_dir)"
-  plugin="$(sj_app)/hooks/opencode/scrubjay.js"
   cfg="$cfgdir/opencode.json"
 
   echo "opencode: $cfgdir"
-  if ! command -v jq >/dev/null 2>&1; then echo "  SKIP  jq not on PATH"; return 0; fi
-  [ -f "$plugin" ] || { echo "  SKIP  bridge plugin missing: $plugin"; return 0; }
+  command -v jq >/dev/null 2>&1 || { echo "  SKIP  jq not on PATH"; return 0; }
+  [ -f "$(sj_app)/hooks/opencode/scrubjay.js" ] || { echo "  SKIP  bridge plugin missing"; return 0; }
 
   mkdir -p "$cfgdir" || return 1
   [ -f "$cfg" ] || echo '{}' > "$cfg"
@@ -77,10 +158,18 @@ sjh_apply_config() {
   fi
 
   tmp="$(mktemp)" || return 1
-  # Add our plugin to the array if it isn't already there; leave every other key untouched.
-  jq --arg p "$plugin" '.plugin = ((.plugin // []) + [$p] | unique)' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
-  if cmp -s "$tmp" "$cfg"; then echo "  ok    plugin registered (scrubjay.js)"; rm -f "$tmp"
-  else mv "$tmp" "$cfg"; echo "  add   plugin -> $plugin"; fi
+  mcp="$(_sjh_oc_mcp_json)" || mcp=""
+  # `plugin` is a union (the user's own plugins survive); `mcp.sjmcp` is ours to own, and is only
+  # touched when we actually have a server to point at.
+  jq --argjson plug "$(_sjh_oc_plugin_json)" --arg mcp "$mcp" '
+      .plugin = ((.plugin // []) + $plug | unique)
+      | if $mcp == "" then . else .mcp = ((.mcp // {}) + {sjmcp: ($mcp | fromjson)}) end
+    ' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
+
+  if cmp -s "$tmp" "$cfg"; then echo "  ok    plugin + mcp registered"; rm -f "$tmp"
+  else mv "$tmp" "$cfg"; echo "  wrote $cfg  (plugin$([ -n "$mcp" ] && echo ' + mcp sjmcp'))"; fi
+
+  _sjh_oc_commands "$cfgdir/commands"
 }
 
 # --- session hand-off --------------------------------------------------------------------------
@@ -95,6 +184,24 @@ sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file>
   printf 'opencode import %s   &&   opencode --session %s' "$2" "$1"
 }
 
-# opencode's transcript is not a file on disk, so there is nothing to point /sjlog at: the plugin
-# exports the live session on demand instead (hooks/opencode/scrubjay.js).
-sjh_find_live_transcript() { :; }
+# /sjlog publishes the session you are IN, but opencode keeps no transcript file to point at — so
+# make one: find the newest session for this directory and export it, exactly as the bridge does on
+# idle. The file is named <sid>.json because publish-now.sh reads the session id back off the name.
+#
+# Note this is rarely needed under opencode: the bridge already publishes after every turn, so
+# /sjlog is a "flush now" rather than the "or these turns are lost" it is for Claude.
+sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd>
+  local cwd="$1" sid dir out
+  command -v opencode >/dev/null 2>&1 || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  sid="$(opencode session list --format json 2>/dev/null \
+         | jq -r --arg d "$cwd" '[ .[] | select(.directory == $d) ] | sort_by(.updated) | last | .id // ""')"
+  [ -n "$sid" ] || return 0
+  # The basename IS the session id — publish-now.sh reads it back off the path — so the export goes
+  # into a directory of its own rather than carrying a disambiguating prefix in its name.
+  dir="${TMPDIR:-/tmp}/scrubjay-opencode"
+  mkdir -p "$dir" || return 0
+  out="$dir/$sid.json"
+  opencode export "$sid" > "$out" 2>/dev/null || return 0
+  [ -s "$out" ] && jq empty "$out" 2>/dev/null && printf '%s' "$out"
+}

@@ -3,16 +3,16 @@ description: scrubjay — continue a session from ANOTHER machine here (hand-off
 argument-hint: [sid8 | search terms | (nothing = pick from recent)]
 allowed-tools: Bash(bash:*), mcp__sjmcp__sj_recall
 ---
-Stage a session that was started on a **different machine** into this one, so Claude Code's own
-`/resume` can continue it here. The transcript, its subagents, its task list and its file history
-come across; the working tree does not.
+Stage a session that was started on a **different machine** into this one, so your harness's own
+resume can continue it here. The transcript, its subagents, its task list and its file history come
+across; the working tree does not.
 
 Target: **$ARGUMENTS**
 
 1. **Work out which session.**
    - Nothing given → run `bash ~/.claude/hooks/../bin/sj-resume.sh --list` (via the app path below)
      and show the user the other machines' recent sessions. Ask which one; do not guess.
-   - An 8-hex id (or a full uuid) → use it directly, no search.
+   - An 8-character handle (or a full session id) → use it directly, no search.
    - Anything else → it's a description, not an id: call `sj_recall` once with it, and take the
      `sid8` of the best hit. Show the user which session you matched before staging it.
 
@@ -28,12 +28,11 @@ Target: **$ARGUMENTS**
    session was working on — **surface that warning, don't bury it**. A hand-off onto a different
    branch means the conversation remembers files that no longer look that way.
 
-3. **Hand back to the user.** You cannot resume the session yourself — a running Claude session
-   can't become a different one. Staging is the whole job; Claude Code's native resume does the
-   rest. Tell them, in one line each:
-   - `/resume` in this session's picker, and choose the staged session, **or**
-   - `claude --resume <sid>` in a terminal;
-   - add `--fork-session` if they want to branch rather than continue.
+3. **Hand back to the user.** You cannot resume the session yourself — a running session can't
+   become a different one. Staging is the whole job; the harness's native resume does the rest.
+   The script ends by printing the exact command to run (it differs per harness — Claude Code reads
+   the staged transcript in place, opencode has to import it first). **Relay that command verbatim;
+   do not compose one yourself.**
 
 Notes worth passing on only if they apply:
 - The archive is only as fresh as the last publish. If the session is still open on the other

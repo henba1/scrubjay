@@ -81,26 +81,40 @@ hand-off (`bin/sj-resume.sh`).
 
 ### opencode
 
-Session relay + archive. Add it on a machine that has `opencode`:
+Add it on a machine that has `opencode`:
 
 ```sh
 echo ': "${SCRUBJAY_HARNESSES:=claude opencode}"' >> ~/.config/scrubjay/config
-bin/sync-config.sh          # registers the bridge plugin in ~/.config/opencode/opencode.json
+bin/sync-config.sh
 ```
 
-From then on every opencode session is logged to the `logs/` catalogue and relayed to the archive
-(transcript + readable rendering), and shows up in `/sjrecall` / `/sjbrowse` alongside Claude's.
+`sync-config.sh` then writes three things into `~/.config/opencode/` — additively, never clobbering
+config it doesn't own:
 
-What it does **not** do yet: sync config *into* opencode (AGENTS.md, agents, commands), register
-the sjmcp server so `/sjrecall` works *from inside* opencode, or run the hand-off import for you —
-`bin/sj-resume.sh` stages the export into an inbox and prints the `opencode import … && opencode
---session …` to run.
+| What | Where | Effect |
+|---|---|---|
+| the lifecycle bridge | `opencode.json` → `plugin[]` | sessions are logged + relayed to the archive |
+| the sjmcp archive server | `opencode.json` → `mcp.sjmcp` | `/sjrecall` & co. can read the archive |
+| the `/sj*` commands | `commands/*.md` (generated) | the slash commands exist in opencode |
 
-Two things worth knowing about how it works:
+So an opencode session is archived (transcript + readable rendering), lands in the `logs/`
+catalogue, and is searchable from *either* harness — a session started in Claude Code on one
+machine is recallable from opencode on another, and vice versa.
+
+Still missing: syncing config *into* opencode (`AGENTS.md`, `agents/`, a base+host settings merge),
+and an automatic import on hand-off — `bin/sj-resume.sh` stages the export into an inbox and prints
+the `opencode import … && opencode --session …` for you to run.
+
+Three things worth knowing about how it works:
 
 * **It publishes on `session.idle`, not at session end** — opencode has no "session ended" event
   (a killed TUI sends nothing). So the bridge publishes after every turn, skipping an export that
   is byte-identical to the last one shipped. A crashed opencode session is therefore already
-  archived up to its last turn, which Claude's SessionEnd cannot promise.
+  archived up to its last turn, which Claude's SessionEnd cannot promise. (`/sjlog` is consequently
+  a "flush now", not a "or these turns are lost".)
 * **The archived transcript is `opencode export` output**, which `opencode import` reads back — so
   the archive holds a natively re-importable session, not a scrubjay-specific dump.
+* **The commands are generated, not written** — `commands/*.md` is the single source, translated on
+  each sync (opencode has no `allowed-tools`, namespaces MCP tools `sjmcp_sj_recall` rather than
+  `mcp__sjmcp__sj_recall`, and cannot find the app by following `~/.claude/hooks`). Edit
+  `commands/`, never the copies in the opencode config dir.
