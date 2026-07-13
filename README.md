@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.png" alt="scrubjay — cache what · where · when" width="100%">
+<img src="docs/banner.png" alt="scrubjay — recall what · where · when" width="100%">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-2094f3.svg)](https://henba1.github.io/scrubjay/)

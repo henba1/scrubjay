@@ -1,4 +1,4 @@
-![scrubjay — cache what · where · when](banner.png){ width="720" }
+![scrubjay — recall what · where · when](banner.png){ width="720" }
 
 # scrubjay
 

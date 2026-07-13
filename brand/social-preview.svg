@@ -9,8 +9,7 @@
 <stop offset="0" stop-color="#4E8FD4" stop-opacity="0"/><stop offset="0.28" stop-color="#4E8FD4" stop-opacity="0.9"/><stop offset="1" stop-color="#7FB6E8" stop-opacity="0"/></linearGradient>
 <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0C1826"/><stop offset="1" stop-color="#14304C"/></linearGradient>
 <radialGradient id="glow" cx="0.5" cy="0.36" r="0.55"><stop offset="0" stop-color="#2E6BA8" stop-opacity="0.5"/><stop offset="1" stop-color="#2E6BA8" stop-opacity="0"/></radialGradient></defs>
-<rect width="1280" height="640" fill="url(#panel)"/>
-<ellipse cx="640" cy="240" rx="520" ry="300" fill="url(#glow)"/>
+<rect width="1280" height="640" fill="url(#panel)"/><ellipse cx="640" cy="240" rx="520" ry="300" fill="url(#glow)"/>
 <g transform="translate(-100,14.8) scale(1.15,1.4)" opacity="0.5"><g fill="none" stroke="url(#gAir)" stroke-linecap="round">
 <path d="M 205 116 C 470 86, 760 90, 1130 114" stroke-width="6"/>
 <path d="M 210 156 C 500 128, 780 130, 1160 152" stroke-width="10"/>
@@ -31,4 +30,4 @@
 <path d="M 398 172 C 372 150, 344 132, 312 118 C 344 140, 372 164, 390 186 Z" fill="#93C6F1" opacity="0.45"/>
 <path d="M 485 152 L 517 159 L 485 167 Z" fill="#28313C"/>
 <circle cx="461" cy="146" r="5.4" fill="#0F1A26"/><circle cx="459.2" cy="144.2" r="1.7" fill="#EAF4FF"/></g></g>
-<text x="640" y="520" text-anchor="middle" font-size="96" font-weight="700" letter-spacing="-2.5" fill="#EAF3FC">scrubjay</text><text x="640" y="558" text-anchor="middle" font-size="21" font-weight="500" letter-spacing="4.5" fill="#8FB2D2">CACHE WHAT · WHERE · WHEN</text></svg>
+<text x="640" y="520" text-anchor="middle" font-size="96" font-weight="700" letter-spacing="-2.5" fill="#EAF3FC">scrubjay</text><text x="640" y="565" text-anchor="middle" font-size="21" font-weight="500" letter-spacing="4.5" fill="#8FB2D2">RECALL WHAT · WHERE · WHEN</text></svg>
