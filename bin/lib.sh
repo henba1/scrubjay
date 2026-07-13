@@ -59,7 +59,31 @@ sj_chats() { sj_load_config; printf '%s' "${SCRUBJAY_CHATS:-}"; }
 sj_memory()        { sj_load_config; printf '%s' "${SCRUBJAY_MEMORY:-$HOME/.scrubjay/scrubjay-memory}"; }
 sj_memory_remote() { sj_load_config; printf '%s' "${SCRUBJAY_MEMORY_REMOTE:-}"; }
 
+# --- the harness seam (bin/adapters/<harness>.sh) ---------------------------------------------
+# scrubjay's other pluggable half. The transport answers "where do a session's records go?"; an
+# adapter answers "which coding agent produced them, and where does IT keep config, transcripts and
+# resumable sessions?". Everything between the two — the archive layout, the logs catalogue, the
+# memory repo, the readable layer, the sjmcp server — is harness-agnostic. See bin/adapters/README.md.
+#
+#   sj_harnesses   every harness this machine syncs config into (bin/sync-config.sh walks these)
+#   sj_harness     the ONE harness a given hook invocation belongs to — set by whatever fired it
+sj_harnesses() { sj_load_config; printf '%s' "${SCRUBJAY_HARNESSES:-claude}"; }
+sj_harness()   { sj_load_config; printf '%s' "${SCRUBJAY_HARNESS:-claude}"; }
+
+# Source one adapter into the caller's shell. The sjh_* functions share a namespace, so a caller
+# that walks SEVERAL harnesses must do each in a subshell.
+sj_load_adapter() {  # sj_load_adapter [harness]
+  local h="${1:-}" f
+  [ -n "$h" ] || h="$(sj_harness)"
+  f="$(sj_app)/bin/adapters/$h.sh"
+  [ -f "$f" ] || { echo "scrubjay: unknown harness '$h' (no $f)" >&2; return 1; }
+  # shellcheck source=/dev/null  # harness chosen at runtime; see bin/adapters/<harness>.sh
+  . "$f"
+}
+
 # The session's first real user prompt, as one line of plain text ("" if there isn't one).
+# Reads the Claude Code / JSONL record shape; a harness that stores sessions differently supplies
+# its own extractor as sjh_session_topic (bin/adapters/<harness>.sh).
 #
 # `.message.content` is a string on some records and an ARRAY of content blocks on others — which
 # is the common shape for a typed prompt. Reading only the string form silently drops most
@@ -78,13 +102,17 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl>
 
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
 #   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
-#   real user prompt, slugified). Derived from the .jsonl itself so it also works for backfill.
-sj_readable_relpath() {  # sj_readable_relpath <transcript.jsonl> <session_id>
-  local src="$1" sid="$2" cwd project topic d
+#   real user prompt, slugified).
+#
+# <cwd> and <topic> are optional: a caller that has a harness adapter loaded passes what the
+# adapter extracted (transcripts are not all JSONL). Omitted, they are read from the file itself in
+# the Claude/JSONL shape — which is what makes this work for backfill, where there is no session.
+sj_readable_relpath() {  # sj_readable_relpath <transcript> <session_id> [cwd] [topic]
+  local src="$1" sid="$2" cwd="${3:-}" topic="${4:-}" project d
   if ! command -v jq >/dev/null 2>&1; then printf 'misc/%s' "${sid:0:8}"; return; fi
-  cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
+  [ -n "$cwd" ] || cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
   project="$(basename "${cwd:-misc}")"; [ -n "$project" ] && [ "$project" != "/" ] || project="misc"
-  topic="$(sj_session_topic "$src")"
+  [ -n "$topic" ] || topic="$(sj_session_topic "$src")"
   topic="$(printf '%s' "$topic" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
             | sed -E "s/^-+//; s/-+$//" | cut -c1-40 | sed -E "s/-+$//")"
   [ -n "$topic" ] || topic="session"
@@ -133,32 +161,8 @@ sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
 }
 
 # --- session hand-off (bin/sj-resume.sh) ------------------------------------------------------
-# Claude Code stores a session at ~/.claude/projects/<slug>/<sid>.jsonl, where <slug> is the
-# session's absolute cwd with every character outside [A-Za-z0-9-] replaced by '-'. The encoding
-# is LOSSY (a '-' may have been '/', '_', '.' or a space), so scrubjay never decodes a slug — it
-# stores the one Claude used, verbatim, and recomputes a *local* one when importing.
-
-# Claude Code's project-dir encoding. Verified against the archive: '/', '_', '.' and spaces all
-# collapse to '-'; letters, digits and existing '-' pass through with case preserved.
-sj_slug() { printf '%s' "$1" | sed 's/[^A-Za-z0-9-]/-/g'; }
-
-# The ~/.claude/projects/ dir that holds sessions for <cwd> (default: $PWD). Prefer *asking the
-# archive of local sessions* — find the dir whose transcripts record this cwd — because that is
-# exact and survives the edge cases sj_slug() cannot see (e.g. a symlinked home: snellius records
-# cwd=/home/jvrijn/… but Claude slugged the resolved /gpfs/home2/jvrijn/…). Fall back to encoding
-# the resolved path, which is all we can do for a project that has no sessions on this host yet.
-sj_local_project_dir() {  # sj_local_project_dir [cwd]
-  local cwd="${1:-$PWD}" proj d f real
-  proj="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
-  for d in "$proj"/*/; do
-    [ -d "$d" ] || continue
-    f="$(ls -t "$d"*.jsonl 2>/dev/null | head -1)" || continue
-    [ -n "$f" ] || continue
-    if grep -qF "\"cwd\":\"$cwd\"" "$f" 2>/dev/null; then printf '%s' "${d%/}"; return 0; fi
-  done
-  real="$(realpath -e "$cwd" 2>/dev/null || printf '%s' "$cwd")"
-  printf '%s/%s' "$proj" "$(sj_slug "$real")"
-}
+# Where a session lives locally, and how a harness encodes a project into a directory name, are
+# harness-specific — they moved to bin/adapters/<harness>.sh (sjh_project_dir / sjh_slug).
 
 # Every host's sessions, newest first, from the data repo's logs/ — which already carries
 #   <ts> | <host> | <cwd> | "<topic>" | session=<sid>
@@ -186,10 +190,14 @@ sj_log_catalogue() {  # sj_log_catalogue [limit]
 # once it has been handed off (each host ships into its own <host>/ subtree), so this returns all
 # of them and lets the caller pick — bin/sj-resume.sh takes the longest, since a hand-off only ever
 # appends turns. <sid> may be an 8-hex prefix. Emits TSV: <relpath> <lines> <mtime-epoch>.
+#
+# Both transcript extensions are matched: .jsonl (Claude Code, Codex) and .json (a harness whose
+# session export is a single document, e.g. opencode) — see sjh_transcript_ext. The glob is pinned
+# to <host>/<slug>/ so the .json records *inside* a session's sidecar dirs can never match.
 sj_archive_resolve() {  # sj_archive_resolve <root> <sid|sid8>
   local root="$1" sid="$2" f rel
   [ -n "$root" ] && [ -d "$root" ] || return 1
-  for f in "$root"/*/*/"$sid"*.jsonl; do
+  for f in "$root"/*/*/"$sid"*.jsonl "$root"/*/*/"$sid"*.json; do
     [ -f "$f" ] || continue
     rel="${f#"$root"/}"
     printf '%s\t%s\t%s\n' "$rel" "$(wc -l < "$f" 2>/dev/null || echo 0)" \

@@ -2,7 +2,7 @@
 # Manual "publish now" — runs the SessionEnd actions on demand (the /sjlog command) WITHOUT ending
 # the session: log line + chats index + data-repo push + memory push + transcript/plans/history/tasks
 # relay. The SessionEnd hook is normally fed a JSON payload by Claude; here we reconstruct it by
-# finding this session's transcript (the newest .jsonl that records the current working dir).
+# asking the harness adapter for the in-progress session's transcript (sjh_find_live_transcript).
 # Idempotent and best-effort: safe to run repeatedly, and SessionEnd will still fire normally later.
 set -uo pipefail
 
@@ -12,13 +12,11 @@ APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 1
 
 command -v jq >/dev/null 2>&1 || { echo "publish-now: jq required" >&2; exit 0; }
 
-proj="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+sj_load_adapter "$(sj_harness)" || exit 0
 cwd="$PWD"
-# Prefer the newest transcript that records THIS working dir; fall back to the newest overall.
-tpath="$(grep -lF "\"cwd\":\"$cwd\"" "$proj"/*/*.jsonl 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)"
-[ -n "$tpath" ] || tpath="$(ls -t "$proj"/*/*.jsonl 2>/dev/null | head -1)"
+tpath="$(sjh_find_live_transcript "$cwd")"
 [ -n "$tpath" ] && [ -f "$tpath" ] || { echo "publish-now: no transcript found for $cwd" >&2; exit 0; }
-sid="$(basename "$tpath" .jsonl)"
+f="$(basename "$tpath")"; sid="${f%.*}"
 
 # Feed log-session.sh the same shape Claude would, and run it synchronously (--detached skips its
 # self-relaunch), so the status line below reflects a completed publish.

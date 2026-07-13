@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# SessionStart hook — fires once when a Claude Code session begins.
+# SessionStart hook — fires once when a coding session begins (any harness: Claude Code fires it
+# from settings.json; another harness's adapter is responsible for calling it — see bin/adapters/).
 # Keeps this machine's config fresh with zero manual steps:
 #   1) git pull --ff-only the data repo (so config edited on another machine arrives)
-#   2) claude-sync.sh  -> re-materialize ~/.claude/settings.json + fix any missing symlinks
+#   2) sync-config.sh  -> re-materialize settings + fix any missing symlinks, per harness
 # Symlinked scopes (CLAUDE.md, commands, agents, hooks) go live on pull alone; sync only
 # has real work when settings.base.json / the host overlay changed.
 # Never blocks the session: always exits 0.
@@ -43,8 +44,8 @@ fi
 #     BEFORE claude-sync links the per-project memory dirs at it, so others' memory is present.
 "$APP/bin/memory-sync.sh" pull >/dev/null 2>&1 || true
 
-# 2) apply into ~/.claude (idempotent; mostly a no-op thanks to symlinks)
-"$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+# 2) apply into each harness's config root (idempotent; mostly a no-op thanks to symlinks)
+"$APP/bin/sync-config.sh" >/dev/null 2>&1 || true
 
 # 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
 #    primary push fails; the relay swallows its own errors (best-effort, must never block a

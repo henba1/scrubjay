@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# SessionEnd hook — fires once when a Claude Code session ends.
+# SessionEnd hook — fires once when a coding session ends (any harness; see bin/adapters/).
 #   1) append one human-readable line to <data>/logs/<host>.log  (commit + push)
-#   2) relay the full transcript via ship-transcript.sh (pluggable backend)
+#   2) relay the session's records via ship-transcript.sh (pluggable backend)
 # Never blocks the session: always exits 0.
 #
 # Env knobs:  SCRUBJAY_LOG_NOGIT=1  (append log, skip its git)   CLAUDE_HOST=<name>
@@ -29,6 +29,12 @@ self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
 APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 
+# Which coding harness ended a session. Claude Code and Codex both hand a hook this same payload
+# (session_id / transcript_path / cwd); a harness that doesn't (opencode) sets SCRUBJAY_HARNESS and
+# synthesizes one. Everything harness-shaped below — the topic, the slug — comes from the adapter.
+harness="$(sj_harness)"
+sj_load_adapter "$harness" || exit 0
+
 sid="$(printf '%s' "$input"  | jq -r '.session_id // empty')"
 cwd="$(printf '%s' "$input"  | jq -r '.cwd // empty')"
 tpath="$(printf '%s' "$input"| jq -r '.transcript_path // empty')"
@@ -45,14 +51,15 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   if ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
     topic=""
     if [ -n "$tpath" ] && [ -f "$tpath" ]; then
-      topic="$(sj_session_topic "$tpath")"
+      topic="$(sjh_session_topic "$tpath")"
     fi
     [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
     printf '%s | %s | %s | "%s" | session=%s\n' "$ts" "$host" "$cwd" "$topic" "$sid" >> "$LOG"
   fi
 
-  # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended)
-  "$APP/bin/claude-index-chats.sh" >/dev/null 2>&1 || true
+  # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended). It indexes
+  #     ~/.claude/projects/, so it only means anything for the claude harness.
+  [ "$harness" = claude ] && "$APP/bin/claude-index-chats.sh" >/dev/null 2>&1 || true
 
   # 1c) commit + push EVERYTHING in the data repo so nothing needs a manual sync:
   #     log line, chat index, plus any memory/ templates/ hosts/ settings/ edits.
@@ -109,10 +116,11 @@ fi
 # from the data repo above. No-op if memory sync isn't configured on this machine.
 "$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
 
-# ---- 2) relay the full transcript (pluggable backend) ----
+# ---- 2) relay the full transcript + the session's other records (pluggable backend) ----
 if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
-  slug="$(basename "$(dirname "$tpath")")"
-  "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true
+  slug="$(sjh_session_slug "$tpath" "$cwd")"
+  SCRUBJAY_HARNESS="$harness" \
+    "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true
 fi
 
 exit 0

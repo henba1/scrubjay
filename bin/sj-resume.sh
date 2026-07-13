@@ -25,6 +25,11 @@ set -uo pipefail
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$APP/bin/lib.sh"; sj_load_config
 
+# Where a session must land to be resumable, and how this harness encodes a project dir, are the
+# adapter's business (bin/adapters/<harness>.sh). The archive itself is harness-neutral.
+sj_load_adapter "$(sj_harness)" || exit 1
+ext="$(sjh_transcript_ext)"
+
 die()  { echo "sj-resume: $*" >&2; exit 1; }
 warn() { echo "  !  $*" >&2; }
 ok()   { echo "  ✓  $*"; }
@@ -78,11 +83,11 @@ cands="$(transport_resolve "$sid")" || die "could not reach the archive"
 # A prefix can match several DIFFERENT sessions, not just the same one on several hosts — and
 # silently resuming the wrong conversation would be far worse than making you retype a few hex
 # digits. Only proceed when every candidate is the same session id.
-sids="$(printf '%s\n' "$cands" | cut -f1 | sed 's#.*/##; s#\.jsonl$##' | sort -u)"
+sids="$(printf '%s\n' "$cands" | cut -f1 | sed 's#.*/##; s#\.[^.]*$##' | sort -u)"
 if [ "$(printf '%s\n' "$sids" | wc -l)" -gt 1 ]; then
   echo "sj-resume: '$sid' is ambiguous — it matches several sessions:" >&2
   printf '%s\n' "$cands" | while IFS=$'\t' read -r r l _; do
-    printf '    %-40s  %s lines  (%s)\n' "$(basename "$r" .jsonl)" "$l" "${r%%/*}" >&2
+    printf '    %-40s  %s lines  (%s)\n' "$(basename "$r" ".$ext")" "$l" "${r%%/*}" >&2
   done
   die "give more of the id."
 fi
@@ -94,7 +99,7 @@ relpath="$(printf '%s' "$best" | cut -f1)"
 lines="$(printf '%s'  "$best" | cut -f2)"
 src_host="${relpath%%/*}"
 rest="${relpath#*/}"; src_slug="${rest%%/*}"
-full_sid="$(basename "$relpath" .jsonl)"
+full_sid="$(basename "$relpath")"; full_sid="${full_sid%.*}"
 
 if [ "$(printf '%s\n' "$cands" | wc -l)" -gt 1 ]; then
   info "session exists on several hosts; taking the longest copy:"
@@ -108,8 +113,8 @@ ok "found on '$src_host' ($lines lines)"
 dest_cwd="${into:-$PWD}"
 [ -d "$dest_cwd" ] || die "target dir does not exist: $dest_cwd"
 dest_cwd="$(realpath -e "$dest_cwd")"
-proj_dir="$(sj_local_project_dir "$dest_cwd")"
-dest="$proj_dir/$full_sid.jsonl"
+proj_dir="$(sjh_project_dir "$dest_cwd")"
+dest="$proj_dir/$full_sid.$ext"
 
 # Refuse to silently destroy local work: a longer local copy means turns happened HERE that the
 # archive has never seen (a session that was never shipped, or shipped before its last turns).
@@ -145,10 +150,10 @@ old_cwd="$(jq -rs '[ .[] | select(.cwd != null) | .cwd ][0] // ""' "$tmp/session
 # resolved path. We can recover it exactly — the slug is a pure function of the real root, so walk
 # the absolute paths in the file and find the ancestor whose slug is the archived one.
 real_root=""
-if [ -n "$old_cwd" ] && [ "$(sj_slug "$old_cwd")" != "$src_slug" ]; then
+if [ -n "$old_cwd" ] && [ "$(sjh_slug "$old_cwd")" != "$src_slug" ]; then
   while IFS= read -r p; do
     while [ "$p" != "/" ] && [ -n "$p" ]; do
-      if [ "$(sj_slug "$p")" = "$src_slug" ]; then real_root="$p"; break 2; fi
+      if [ "$(sjh_slug "$p")" = "$src_slug" ]; then real_root="$p"; break 2; fi
       p="$(dirname "$p")"
     done
   done < <(grep -o '"/[^"]\{4,\}"' "$tmp/session.jsonl" | tr -d '"' | sort -u | head -2000)
@@ -197,23 +202,10 @@ cp -f "$tmp/session.jsonl" "$dest" || die "could not write $dest"
 ok "staged $dest"
 
 # The session's siblings: subagent transcripts + tool-results live in <sid>/, and ship-transcript.sh
-# tucks tasks/ and file-history/ in there too. Split them back to where Claude Code expects them.
-CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+# tucks tasks/ and file-history/ in there too. The adapter splits them back to wherever this harness
+# expects to find them (the mirror image of sjh_extra_artifacts).
 if transport_fetch "$src_host/$src_slug/$full_sid" "$tmp/side" 2>/dev/null && [ -d "$tmp/side" ]; then
-  if [ -d "$tmp/side/tasks" ]; then
-    mkdir -p "$CLAUDE_DIR/tasks/$full_sid" && cp -a "$tmp/side/tasks/." "$CLAUDE_DIR/tasks/$full_sid/" \
-      && ok "restored task list"
-  fi
-  if [ -d "$tmp/side/file-history" ]; then
-    mkdir -p "$CLAUDE_DIR/file-history/$full_sid" \
-      && cp -a "$tmp/side/file-history/." "$CLAUDE_DIR/file-history/$full_sid/" \
-      && ok "restored file history (/rewind will work)"
-  fi
-  rm -rf "$tmp/side/tasks" "$tmp/side/file-history"
-  if [ -n "$(ls -A "$tmp/side" 2>/dev/null)" ]; then
-    mkdir -p "$proj_dir/$full_sid" && cp -a "$tmp/side/." "$proj_dir/$full_sid/" \
-      && ok "restored subagent transcripts + tool results"
-  fi
+  sjh_import_side "$full_sid" "$tmp/side" "$proj_dir"
 fi
 
 # --- the part that does NOT travel ------------------------------------------------------------
@@ -237,7 +229,10 @@ fi
 echo
 echo "  ready — continue the conversation from '$src_host' with:"
 echo
-echo "      claude --resume $full_sid"
+echo "      $(sjh_resume_cmd "$full_sid")"
 echo
-echo "  (or, inside a Claude session in this directory, run /resume and pick ${full_sid:0:8}.)"
-echo "  To branch instead of continue:  claude --resume $full_sid --fork-session"
+echo "  (or, inside a session in this directory, run /resume and pick ${full_sid:0:8}.)"
+if [ "$(sj_harness)" = claude ]; then
+  echo "  To branch instead of continue:  claude --resume $full_sid --fork-session"
+fi
+exit 0

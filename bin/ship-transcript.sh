@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# Transport-agnostic entry point for relaying a Claude session's artifacts:
-#   1) the transcript                     -> <host>/<slug>/<session>.jsonl
-#   2) this session's subagent dir (if any: subagent transcripts, tool-results)
-#                                          -> <host>/<slug>/<session>/
-#   3) all plan files for this host       -> <host>/plans/
-#   …plus readable rendering, prompt history, this session's tasks, and the
-#      project's CLAUDE.local.md (see numbered steps below).
-# These are full conversation / sensitive content, so they ride the same
-# (P2P) backend as the transcript — never a separate third-party path.
+# Transport-agnostic AND harness-agnostic entry point for relaying a session's records:
+#   1) the transcript                     -> <host>/<slug>/<session>.<ext>
+#   2) everything else the harness keeps  -> per sjh_extra_artifacts (subagent transcripts,
+#      tool-results, plans, prompt history, this session's tasks + file-history, CLAUDE.local.md)
+#   3) a human-readable Markdown rendering -> <host>/readable/<project>/<date>_<topic>__<sid8>.md
+# These are full conversation / sensitive content, so they all ride the same (P2P) backend as the
+# transcript — never a separate third-party path.
+#
 #   usage: ship-transcript.sh <transcript_path> <slug> <session_id> [host] [cwd]
-# Selects $SCRUBJAY_TRANSCRIPT_BACKEND (default: git). Each backend lives in
-# hooks/transports/<backend>.sh and must define:  transport_ship <src> <relpath>
-# (src may be a file or a directory).
+#
+# Two seams meet here:
+#   * WHERE it goes — $SCRUBJAY_TRANSCRIPT_BACKEND (default: git). Backends live in
+#     hooks/transports/<backend>.sh and define  transport_ship <src> <relpath> [mirror].
+#   * WHAT there is to ship — $SCRUBJAY_HARNESS (default: claude). Adapters live in
+#     bin/adapters/<harness>.sh; see bin/adapters/README.md.
+# A harness whose transcript is not already a file on disk (opencode) exports it first and hands us
+# the export — this script only ever wants a path.
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,61 +32,34 @@ impl="$APP/hooks/transports/$backend.sh"
 # shellcheck source=/dev/null  # backend chosen at runtime; see hooks/transports/<backend>.sh
 . "$impl"
 
-# 1) the transcript itself: <host>/<project-slug>/<session>.jsonl. This push is the canonical
-#    "is the relay working?" signal — record its outcome as a machine-local breadcrumb so a silent
-#    failure (e.g. an unauthorized relay key) is flagged at the next SessionStart, not days later.
-transport_ship "$src" "$host/$slug/$sid.jsonl"; ship_rc=$?
+harness="$(sj_harness)"
+sj_load_adapter "$harness" || exit 0
+
+# 1) the transcript itself. This push is the canonical "is the relay working?" signal — record its
+#    outcome as a machine-local breadcrumb so a silent failure (e.g. an unauthorized relay key) is
+#    flagged at the next SessionStart, not days later.
+transport_ship "$src" "$host/$slug/$sid.$(sjh_transcript_ext)"; ship_rc=$?
 if [ "$ship_rc" -eq 0 ]; then sj_record_ship ok "$sid" "$backend"
 else sj_record_ship fail "$sid" "$backend" "$ship_rc"; fi
 
-# 2) this session's subagent artifacts (subagent transcripts, tool-results), if present.
-#    They sit in a sibling dir named after the session id, next to <session>.jsonl.
-sess_dir="$(dirname "$src")/$sid"
-[ -d "$sess_dir" ] && transport_ship "$sess_dir" "$host/$slug/$sid"
+# The session cwd: given by the hook payload, else recovered from the transcript.
+[ -n "$cwd" ] || cwd="$(sjh_session_cwd "$src")"
 
-# 3) plan files (sensitive; not session-keyed) — first give them meaningful <date>_<topic>.md
-#    names in place (Claude Code names plans with three random words), then mirror the whole
-#    small plans/ dir. Renaming is idempotent, so already-dated names survive across ships.
-#    Derive the Claude config root from the transcript path (…/<root>/projects/<slug>/…).
-claude_root="${src%/projects/*}"
-if [ "$claude_root" != "$src" ] && [ -d "$claude_root/plans" ]; then
-  sj_normalize_plans "$claude_root/plans"
-  # `mirror`: the relay copy is an *exact* mirror of the (normalized) local plans/, so a plan
-  #  that was shipped under its old random-word name and then renamed in place doesn't linger
-  #  as a stale duplicate on the NAS.
-  transport_ship "$claude_root/plans" "$host/plans" mirror
-fi
+# 2) the session's other records. The adapter names them; we just relay them. It may normalize
+#    files in place first (Claude's plans get <date>_<topic>.md names), and may ask for `mirror`
+#    to make the relay copy authoritative. A record that doesn't exist is skipped.
+while IFS=$'\t' read -r a_src a_rel a_mode; do
+  [ -n "$a_src" ] && [ -n "$a_rel" ] && [ -e "$a_src" ] || continue
+  transport_ship "$a_src" "$host/$a_rel" ${a_mode:+"$a_mode"}
+done < <(sjh_extra_artifacts "$src" "$sid" "$slug" "$cwd")
 
-# 4) human-readable rendering (clean conversation) → <host>/readable/<project>/<date>_<topic>__<sid8>.md
-#    Additive: machine .jsonl tree above is untouched; this is the browsable layer.
-rel="$(sj_readable_relpath "$src" "$sid")"
+# 3) human-readable rendering (clean conversation). Additive: the machine-format tree above is
+#    untouched; this is the browsable layer — and the one thing every harness has in common, which
+#    is why /sjrecall and /sjbrowse can search across all of them.
+rel="$(sj_readable_relpath "$src" "$sid" "$cwd" "$(sjh_session_topic "$src")")"
 tmpmd="$(mktemp 2>/dev/null)" || tmpmd=""
 if [ -n "$tmpmd" ]; then
-  bash "$APP/bin/render-transcript.sh" "$src" > "$tmpmd" 2>/dev/null
+  sjh_render "$src" > "$tmpmd" 2>/dev/null
   [ -s "$tmpmd" ] && transport_ship "$tmpmd" "$host/readable/$rel.md"
   rm -f "$tmpmd"
 fi
-
-# 5) prompt history (sensitive — every prompt typed across all projects) → per-host archive.
-#    One growing file; latest copy wins. claude_root was derived in step 3.
-[ -n "${claude_root:-}" ] && [ -f "$claude_root/history.jsonl" ] && \
-  transport_ship "$claude_root/history.jsonl" "$host/history.jsonl"
-
-# 6) this session's task list (TaskCreate items), if any → alongside the session's artifacts.
-[ -n "${claude_root:-}" ] && [ -d "$claude_root/tasks/$sid" ] && \
-  transport_ship "$claude_root/tasks/$sid" "$host/$slug/$sid/tasks"
-
-# 6b) this session's file history — the pre-edit copies Claude Code keeps so /rewind can undo its
-#     own edits. Without it a session handed off to another machine (bin/sj-resume.sh) can be
-#     resumed but not rewound. Same sensitivity class as the transcript (it holds source files), so
-#     it rides the same P2P backend, never a third party.
-[ -n "${claude_root:-}" ] && [ -d "$claude_root/file-history/$sid" ] && \
-  transport_ship "$claude_root/file-history/$sid" "$host/$slug/$sid/file-history"
-
-# 7) the project's CLAUDE.local.md (personal, gitignored project rules — sensitive: holds private
-#    paths/cluster details, and host-specific, so it's a one-way per-host archive next to the
-#    project's transcripts, NOT merged across machines like memory). Lives in the working tree
-#    root, not under ~/.claude, so we need the session cwd. Fall back to the transcript's own cwd.
-[ -n "$cwd" ] || cwd="$(jq -r 'select(.cwd!=null) | .cwd' "$src" 2>/dev/null | head -1)"
-[ -n "$cwd" ] && [ -f "$cwd/CLAUDE.local.md" ] && \
-  transport_ship "$cwd/CLAUDE.local.md" "$host/$slug/CLAUDE.local.md"

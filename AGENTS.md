@@ -25,12 +25,20 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
 
 - `bin/` — the shell logic. Entry point for setup is `bin/onboard.sh`; `bin/sj-bootstrap.sh`
   creates + seeds the user's private repos; `bin/lib.sh` holds shared helpers;
-  `bin/claude-sync.sh` applies data-repo config into `~/.claude`.
+  `bin/sync-config.sh` applies data-repo config into every harness this machine uses, via
+  `bin/claude-sync.sh` for Claude Code.
+- `bin/adapters/<harness>.sh` — **the harness seam.** scrubjay is not Claude-only: an adapter says
+  where a coding agent keeps its config, what a session's records are, and how a session is
+  resumed. `claude.sh` is the reference implementation; the contract is in `bin/adapters/README.md`.
+  Everything between the two seams — the archive layout, the `logs/` catalogue, memory, the readable
+  Markdown layer, sjmcp — is harness-agnostic. Which harnesses a machine syncs is
+  `SCRUBJAY_HARNESSES`; which one a hook invocation belongs to is `SCRUBJAY_HARNESS`.
 - `skeleton/data/` — the seed for a fresh `scrubjay-data`. `settings/settings.base.json` is
   load-bearing: `claude-sync.sh` requires it, and it registers the SessionStart/SessionEnd hooks.
 - `hooks/` — `sync-session.sh` (SessionStart), `log-session.sh` (SessionEnd), and
-  `transports/<backend>.sh` (`git` / `rsync-wg` / `local`). A backend defines `transport_ship`
-  (write) plus `transport_resolve` / `transport_fetch` (read — used only by session hand-off).
+  `transports/<backend>.sh` (`git` / `rsync-wg` / `local`) — **the transport seam.** A backend
+  defines `transport_ship` (write) plus `transport_resolve` / `transport_fetch` (read — used only
+  by session hand-off).
 - `bin/sj-resume.sh` — cross-machine session hand-off: stage another host's archived transcript into
   this machine's `~/.claude/projects/` so `claude --resume` continues it. See `docs/handoff.md`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
