@@ -39,6 +39,10 @@ sid="$(printf '%s' "$input"  | jq -r '.session_id // empty')"
 cwd="$(printf '%s' "$input"  | jq -r '.cwd // empty')"
 tpath="$(printf '%s' "$input"| jq -r '.transcript_path // empty')"
 [ -n "$sid" ] || exit 0
+
+# Codex declares transcript_path NULLABLE, and a harness may not keep a transcript file at all
+# (opencode). When the payload doesn't name one, ask the adapter to find (or produce) it.
+[ -n "$tpath" ] || tpath="$(sjh_find_live_transcript "$cwd" "$sid" 2>/dev/null)"
 host="$(sj_host)"
 DATA="$(sj_data 2>/dev/null || true)"
 

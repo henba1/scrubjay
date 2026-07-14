@@ -190,11 +190,11 @@ sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file>
 #
 # Note this is rarely needed under opencode: the bridge already publishes after every turn, so
 # /sjlog is a "flush now" rather than the "or these turns are lost" it is for Claude.
-sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd>
-  local cwd="$1" sid dir out
+sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd> [sid]
+  local cwd="$1" sid="${2:-}" dir out
   command -v opencode >/dev/null 2>&1 || return 0
   command -v jq >/dev/null 2>&1 || return 0
-  sid="$(opencode session list --format json 2>/dev/null \
+  [ -n "$sid" ] || sid="$(opencode session list --format json 2>/dev/null \
          | jq -r --arg d "$cwd" '[ .[] | select(.directory == $d) ] | sort_by(.updated) | last | .id // ""')"
   [ -n "$sid" ] || return 0
   # The basename IS the session id — publish-now.sh reads it back off the path — so the export goes

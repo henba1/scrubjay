@@ -117,10 +117,15 @@ sjh_import_side() {  # sjh_import_side <sid> <dir> <project_dir>
 }
 
 # The transcript of the session running RIGHT NOW in <cwd> — for /sjlog, which publishes without a
-# hook payload to tell it. Newest transcript recording this cwd; newest overall as a fallback.
-sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd>
-  local cwd="$1" proj t
+# hook payload to tell it. An exact hit on the session id when we have one; otherwise the newest
+# transcript recording this cwd, and the newest overall as a last resort.
+sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd> [sid]
+  local cwd="$1" sid="${2:-}" proj t
   proj="$(sjh_config_dir)/projects"
+  if [ -n "$sid" ]; then
+    t="$(ls -t "$proj"/*/"$sid".jsonl 2>/dev/null | head -1)"
+    [ -n "$t" ] && [ -f "$t" ] && { printf '%s' "$t"; return 0; }
+  fi
   t="$(grep -lF "\"cwd\":\"$cwd\"" "$proj"/*/*.jsonl 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)"
   [ -n "$t" ] || t="$(ls -t "$proj"/*/*.jsonl 2>/dev/null | head -1)"
   [ -n "$t" ] && [ -f "$t" ] && printf '%s' "$t"

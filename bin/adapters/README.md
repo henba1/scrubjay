@@ -118,3 +118,30 @@ Three things worth knowing about how it works:
   each sync (opencode has no `allowed-tools`, namespaces MCP tools `sjmcp_sj_recall` rather than
   `mcp__sjmcp__sj_recall`, and cannot find the app by following `~/.claude/hooks`). Edit
   `commands/`, never the copies in the opencode config dir.
+
+### codex
+
+Session relay + archive. Add it on a machine that has `codex`:
+
+```sh
+echo ': "${SCRUBJAY_HARNESSES:=claude codex}"' >> ~/.config/scrubjay/config
+bin/sync-config.sh          # registers the hooks in ~/.codex/hooks.json
+```
+
+Codex needs **no bridge at all** — it is the only other harness whose hooks hand a command the same
+payload Claude's do (`session_id` / `cwd` / `transcript_path`, in
+`codex-rs/hooks/schema/generated/*.command.input.schema.json`), so `hooks/sync-session.sh` and
+`hooks/log-session.sh` run against it unchanged. All the adapter supplies is the config dir, the
+rollout's record schema, and a renderer.
+
+Worth knowing:
+
+* **It publishes on `Stop`, which is per-turn** — codex has no SessionEnd either. Costs nothing: the
+  transports are idempotent, and the `git` backend only commits when content actually changed.
+* **`transcript_path` is nullable.** When it comes through null the adapter finds the rollout itself,
+  by session id (exact) or by the session's cwd (fallback).
+* **The rollout's parent directory is a DATE** (`sessions/2026/07/14/`), not a project — so the
+  archive slug comes from the session's cwd, like opencode's.
+
+Not yet: sjmcp + the `/sj*` commands (codex config is TOML — see the roadmap), and hand-off *into*
+codex (`codex resume` resolves a session through codex's own index, so staging a file is not enough).

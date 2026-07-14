@@ -6,10 +6,10 @@ harness-blind `ship-transcript.sh` / `log-session.sh` / `sj-resume.sh`).
 
 | | claude | opencode | codex |
 |---|---|---|---|
-| relay sessions to the archive | ✅ | ✅ | ⬜ P1 |
-| readable rendering (cross-harness search) | ✅ | ✅ | ⬜ P1 |
+| relay sessions to the archive | ✅ | ✅ | ✅ |
+| readable rendering (cross-harness search) | ✅ | ✅ | ✅ |
 | read the archive from inside (sjmcp + `/sj*`) | ✅ | ✅ | ⬜ P3 |
-| session hand-off (`/sjresume`) | ✅ | 🟡 two-step (stage, then `opencode import`) | ⬜ P2 |
+| session hand-off (`/sjresume`) | ✅ | 🟡 two-step (stage, then `opencode import`) | ⬜ P2 (harder than it looked) |
 | config sync *into* the harness | ✅ | ⬜ P3 | ⬜ P3 |
 
 ---
@@ -40,52 +40,69 @@ file — but its config is **TOML**, where scrubjay's whole settings story is a 
   Project-local `.codex/config.toml` *ignores* provider/telemetry keys (`notify`, `model_providers`,
   `profile`, …) — those must go in the user-level file.
 
-### Verify first (needs a real codex install — do not guess)
+### ✅ P1 — write path (done)
 
-1. **The rollout record schema.** The renderer and the topic extractor are the only real work in P1,
-   and both need actual `RolloutItem`/`ResponseItem` lines. Capture one rollout and read it.
-2. **Is `transcript_path` populated** on `SessionStart` and `Stop`, and does it point at the rollout?
-   (It is documented as nullable.) If it is null, derive the newest rollout for the cwd instead.
-3. **Do `~/.codex/prompts/*.md` support `$ARGUMENTS` / `$1` and `` !`shell` `` injection?** The
-   opencode command generator (`_sjh_oc_commands`) assumes both; codex may support neither, in which
-   case the shell-injecting commands (`/sjlog`, `/sjsync`, `/sjmemory`) need a different shape.
-4. **The `[mcp_servers]` schema** — `command` + `args` + `env`, and whether stdio is the default.
+`bin/adapters/codex.sh` + `bin/render-codex.sh`. Codex sessions are relayed to the archive, land in
+the `logs/` catalogue, and are searchable from any harness.
 
-### P1 — write path
+The prediction held: **`hooks/log-session.sh` needed no codex-specific change at all.** The only
+edit was harness-neutral — fall back to `sjh_find_live_transcript` when the payload carries no
+transcript path — which is exactly the seam doing its job.
 
-* `bin/adapters/codex.sh`:
-  * `sjh_config_dir` → `${CODEX_HOME:-~/.codex}`; `sjh_transcript_ext` → `jsonl`;
-    `sjh_session_handle` → first 8 (ids are UUIDs).
-  * `sjh_session_slug` → `sjh_slug(cwd)`. **Not** the transcript's parent dir — that is `…/07/`, a
-    date, not a project.
-  * `sjh_session_topic` / `sjh_session_cwd` / `sjh_render` → new, over the rollout schema.
-    `bin/render-codex.sh` must emit the **same** Markdown shape as the other two renderers
-    (`# title`, `_N turns_`, `## User` / `## Assistant`, folded tool stream) — that shared shape is
-    what makes `/sjrecall` work across harnesses.
-  * `sjh_extra_artifacts` → `~/.codex/history.jsonl` → `history.jsonl`. (No plans/tasks/file-history
-    equivalents to ship.)
-  * `sjh_apply_config` → install the hooks (below). Config sync proper is P3.
-* Register the lifecycle in `~/.codex/hooks.json`: `SessionStart` → `hooks/sync-session.sh`,
-  `Stop` → `hooks/log-session.sh`, both with `SCRUBJAY_HARNESS=codex` in the command. Because `Stop`
-  is per-turn, add the same dedupe the opencode bridge has (skip when the transcript hasn't changed
-  since the last ship) — otherwise the `git` backend commits once per turn.
-* Because the payload matches Claude's, `hooks/log-session.sh` should need **no changes at all**.
-  That is the test of whether the Phase 0 seam was cut in the right place.
+Settled while building it (all verified against `openai/codex`, July 2026):
 
-### P2 — hand-off (nearly free; do it with P1)
+* A rollout line is `{"timestamp", "type", "payload"}` (`RolloutLine`, flattened `RolloutItem`).
+  Only `response_item` payloads are conversation: `message` (role + `content[]` of
+  `input_text`/`output_text`), `function_call` (whose `arguments` is a JSON **string**),
+  `function_call_output` (whose `output` is a string **or** an array of content items),
+  `local_shell_call`, `custom_tool_call`. `session_meta` opens every rollout and carries the `cwd`.
+* Codex injects `<environment_context>` / `<user_instructions>` as *user* messages, so the topic
+  extractor drops user text opening with `<` — the same cut Claude's `<system-reminder>` needs.
+* Shell calls arrive as `{"command": ["bash", "-lc", "<script>"]}`; the renderer unwraps the argv so
+  a codex session reads like a Claude one.
+* `hooks.json` takes `{"hooks": {"<Event>": [{"hooks": [{"type": "command", "command": …}]}]}}` —
+  Claude's shape — plus a useful `"async": true`, which `Stop` uses so publishing never delays a turn.
+* Per-turn `Stop` needs **no** ship dedupe: the git transport already skips a commit when content
+  is unchanged, and the other transports are plain idempotent copies.
 
-`codex resume` reads a rollout file, so `sj-resume.sh` works as-is: it fetches, rewrites the foreign
-machine's absolute paths, and validates (the JSONL line-count + `jq -c` check already applies).
-Only the adapter's placement functions are new:
+### P2 — hand-off INTO codex (harder than it looked)
 
-* `sjh_project_dir` → `~/.codex/sessions/<YYYY>/<MM>/<DD>/` (today's dir; codex finds a session by
-  id, not by path, so the date dir only has to exist).
-* `sjh_resume_cmd` → `codex resume <sid>`.
-* `sjh_import_side` → no-op (nothing sidecar to restore).
+The earlier plan assumed `codex resume` could be pointed at a file. It cannot:
+**`experimental_resume` no longer exists**, and `codex resume <SESSION_ID>` resolves a session
+through codex's own index (there is a `state_db` / session index alongside the rollout files). So
+dropping a rewritten rollout into `~/.codex/sessions/YYYY/MM/DD/` is probably *not* enough for codex
+to see it.
 
-Caveat to check: the archived file is named `<sid>.jsonl`, but codex names rollouts
-`rollout-<ts>-<uuid>.jsonl`. If codex indexes sessions by **filename** rather than by reading the
-file, the staged copy must be renamed to that pattern — establish which before writing P2.
+`bin/sj-resume.sh` therefore stages the rollout into an inbox and says plainly that hand-off is not
+wired up, rather than printing a command that will not find the session. To finish it, establish —
+against a real install — **how codex discovers a session it did not create**:
+
+1. Does `codex resume <uuid>` fall back to scanning `sessions/**` when the id is absent from the
+   index, or is the index authoritative?
+2. If the index is authoritative: is it rebuildable (some `codex doctor` / re-index path — see
+   `codex-rs/cli/src/doctor/thread_inventory.rs`), or must a row be inserted?
+3. Does the filename have to match `rollout-<ts>-<uuid>.jsonl` for discovery? (Staging currently
+   writes `<sid>.jsonl`, so if the name matters, the contract needs an `sjh_staged_name`.)
+
+`codex-rs/external-agent-migration/src/sessions/` is worth reading first — it imports *other*
+agents' sessions into codex, so it already solves this problem the supported way.
+
+### P3 — config sync + MCP (the TOML problem)
+
+Unchanged from the original plan, and still the blocker:
+
+* `settings.base.json` + host overlay is a `jq` merge; codex config is TOML. Either (a) add a tiny
+  TOML merge helper (`uv run --script` with `tomlkit` — `uv` is already a hard dependency for
+  sjmcp), or (b) ship a whole per-host `config.toml` from the data repo and give up base+overlay
+  merging. (a) is more work but keeps one config model across harnesses; prefer it.
+* MCP: write `[mcp_servers.sjmcp]` into `config.toml` — same local/remote split as the other two
+  adapters. **Verify the schema** (`command` + `args` + `env`; whether stdio is the default).
+* Commands: generate `~/.codex/prompts/*.md` from `commands/` the way `_sjh_oc_commands` generates
+  opencode's — **but first verify** that codex prompts support `$ARGUMENTS`/`$1` and `` !`shell` ``
+  injection. If they don't, the shell-injecting commands (`/sjlog`, `/sjsync`, `/sjmemory`) need a
+  different shape. Factor the generator out of `bin/adapters/opencode.sh` into a shared helper at
+  that point, rather than copy-pasting it.
+* Instructions: `AGENTS.md` symlink from the data repo (shared with opencode's, once P3 lands there).
 
 ### P3 — config sync + MCP (the TOML problem)
 
