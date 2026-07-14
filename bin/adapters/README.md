@@ -112,6 +112,10 @@ Three things worth knowing about how it works:
   is byte-identical to the last one shipped. A crashed opencode session is therefore already
   archived up to its last turn, which Claude's SessionEnd cannot promise. (`/sjlog` is consequently
   a "flush now", not a "or these turns are lost".)
+* **The plugin only *launches* the publish; it never awaits it.** `hooks/opencode/publish.sh` does
+  the work, and detaches itself first. This is not fastidiousness: `opencode run` exits ~70ms after
+  emitting `session.idle` and does not wait for plugin event handlers, so anything the plugin awaits
+  — an export takes ~1s — is killed mid-flight and the session is silently never archived.
 * **The archived transcript is `opencode export` output**, which `opencode import` reads back — so
   the archive holds a natively re-importable session, not a scrubjay-specific dump.
 * **The commands are generated, not written** — `commands/*.md` is the single source, translated on

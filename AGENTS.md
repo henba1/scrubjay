@@ -31,7 +31,7 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   where a coding agent keeps its config, what a session's records are, and how a session is
   resumed. `claude.sh` is the reference implementation; `opencode.sh` and `codex.sh` relay those
   harnesses' sessions into the same archive (opencode's lifecycle bridge is the plugin
-  `hooks/opencode/scrubjay.js`; codex reuses the hook scripts as-is). Each brings its own readable
+  `hooks/opencode/scrubjay.js` + `publish.sh`; codex reuses the hook scripts as-is). Each brings its own readable
   renderer (`bin/render-{transcript,opencode,codex}.sh`) emitting one shared Markdown shape — that
   is what makes `/sjrecall` search across harnesses. The contract is in `bin/adapters/README.md`,
   the remaining work in `bin/adapters/ROADMAP.md`.

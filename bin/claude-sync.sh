@@ -36,7 +36,15 @@ echo "host: $HOST  ->  $CLAUDE_DIR   (data: $DATA)"
 
 link() {  # link <src> <dst>
   local src="$1" dst="$2"
-  [ -e "$src" ] || return 0
+  # Source gone (e.g. you deleted CLAUDE.md from the data repo): retract OUR symlink instead of
+  # leaving it dangling. Only ever removes a link we made — one that still points at <src> — so a
+  # real file, or a link the user aimed somewhere else, is never touched.
+  if [ ! -e "$src" ]; then
+    if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
+      rm -f "$dst"; echo "  rm    $dst (source no longer in the data repo)"
+    fi
+    return 0
+  fi
   if [ -L "$dst" ]; then
     [ "$(readlink "$dst")" = "$src" ] && { echo "  ok    $dst"; return 0; }
     rm -f "$dst"
