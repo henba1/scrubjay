@@ -47,6 +47,15 @@ sjh_session_topic() {  # sjh_session_topic <export.json>
 
 sjh_render() { bash "$(sj_app)/bin/render-opencode.sh" "$1"; }
 
+# Is <file> an opencode session export? One JSON *document* (not JSONL) that opens with the `info`
+# object — `{"info":{"id":"ses_…`. Anchored on the head so a huge transcript is never parsed, with a
+# whole-file parse as a fallback in case the key order ever changes.
+sjh_detect() {  # sjh_detect <file>
+  head -c 4096 "$1" 2>/dev/null | tr -d '[:space:]' | grep -q '^{"info":{' && return 0
+  [ "$(wc -c < "$1" 2>/dev/null || echo 0)" -lt 5000000 ] || return 1
+  jq -e '.info.id | startswith("ses_")' "$1" >/dev/null 2>&1
+}
+
 # Nothing yet. opencode keeps no plans/, no per-session task list and no file-history tree of its
 # own, so the export IS the session. (Its snapshots live in git, not in a sidecar dir.)
 sjh_extra_artifacts() { :; }
@@ -174,14 +183,34 @@ sjh_apply_config() {
 
 # --- session hand-off --------------------------------------------------------------------------
 # A session is a row in opencode's database, so it cannot simply be dropped into place the way a
-# Claude transcript can. `opencode import <file>` is the supported way in — it reads exactly the
-# export we archive and re-homes it onto the current project. So the hand-off stages the (path-
-# rewritten) export into an inbox, and the resume command imports it. See the roadmap: making
-# sj-resume run the import itself is the remaining polish.
+# Claude transcript can. `opencode import <file>` is the supported way in: it reads exactly the
+# export we archive and re-homes it onto the CURRENT project (it rewrites projectID/directory —
+# packages/opencode/src/cli/cmd/import.ts), which is why the import must run in the destination cwd.
+# The staged file therefore lands in an inbox rather than in opencode's own storage.
 sjh_project_dir() { printf '%s' "${XDG_DATA_HOME:-$HOME/.local/share}/scrubjay/inbox/opencode"; }
 sjh_import_side() { :; }   # no sidecar records to restore — the export is self-contained
-sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file>
-  printf 'opencode import %s   &&   opencode --session %s' "$2" "$1"
+
+# Install a staged session into opencode for real, so the user is left with ONE command to run
+# instead of a copy-pasted two-step.
+sjh_install_session() {  # sjh_install_session <staged-file> <cwd> <sid>
+  local f="$1" cwd="$2" oc
+  oc="${SCRUBJAY_OPENCODE_BIN:-opencode}"
+  command -v "$oc" >/dev/null 2>&1 || return 1
+  [ -d "$cwd" ] || return 1
+  ( cd "$cwd" && "$oc" import "$f" >/dev/null 2>&1 )
+}
+
+sjh_resume_cmd() {  # sjh_resume_cmd <sid> <staged-file> [installed]
+  if [ "${3:-0}" = "1" ]; then printf 'opencode --session %s' "$1"
+  else printf 'opencode import %s   &&   opencode --session %s' "$2" "$1"; fi
+}
+
+# Cross-harness carry-over: the session came from a DIFFERENT agent, so there is no native session
+# to resume — we hand the conversation over as context instead. See bin/adapters/ROADMAP.md for the
+# open issue on translating a session into this harness's own format.
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
+  printf 'opencode run "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
+    "$3" "$2" "$1"
 }
 
 # /sjlog publishes the session you are IN, but opencode keeps no transcript file to point at — so

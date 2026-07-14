@@ -30,9 +30,13 @@ Target: **$ARGUMENTS**
 
 3. **Hand back to the user.** You cannot resume the session yourself — a running session can't
    become a different one. Staging is the whole job; the harness's native resume does the rest.
-   The script ends by printing the exact command to run (it differs per harness — Claude Code reads
-   the staged transcript in place, opencode has to import it first). **Relay that command verbatim;
-   do not compose one yourself.**
+   The script ends by printing the exact command to run (it differs per harness, and by whether the
+   session could be imported for you). **Relay that command verbatim; do not compose one yourself.**
+
+   If the session came from a **different harness** than the one you're running in, the script says
+   so and hands the conversation over as *context* instead — a new session seeded with the old
+   transcript. Pass that on honestly: the content carries over, the session id and tool history do
+   not. Do not describe it as a resume.
 
 Notes worth passing on only if they apply:
 - The archive is only as fresh as the last publish. If the session is still open on the other

@@ -53,6 +53,12 @@ sjh_session_topic() {  # sjh_session_topic <rollout.jsonl>
 
 sjh_render() { bash "$(sj_app)/bin/render-codex.sh" "$1"; }
 
+# Is <file> a codex rollout? Every rollout opens with a `session_meta` RolloutLine — a marker no
+# other harness writes.
+sjh_detect() {  # sjh_detect <file>
+  head -3 "$1" 2>/dev/null | grep -q '"type"[[:space:]]*:[[:space:]]*"session_meta"'
+}
+
 # Codex keeps no plans/, task list or file-history tree. What it does keep is the cross-session
 # prompt history — same record, same sensitivity, as Claude's.
 sjh_extra_artifacts() {  # sjh_extra_artifacts <transcript> <sid> <slug> <cwd>
@@ -135,6 +141,13 @@ sjh_apply_config() {
 # and say so, rather than print a command that will not find it.
 sjh_project_dir() { printf '%s' "${XDG_DATA_HOME:-$HOME/.local/share}/scrubjay/inbox/codex"; }
 sjh_import_side() { :; }
-sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file>
+sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file> [installed]
   printf 'the rollout is staged at %s — but hand-off INTO codex is not wired up yet (it indexes\n      sessions itself, so a file alone is not enough): see bin/adapters/ROADMAP.md, codex P2' "$2"
+}
+
+# Cross-harness carry-over: hand the conversation over as context, since there is no native session
+# to resume. See bin/adapters/ROADMAP.md for the open issue on true translation.
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
+  printf 'codex "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
+    "$3" "$2" "$1"
 }

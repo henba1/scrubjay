@@ -14,8 +14,17 @@ sjh_apply_config() { "$(sj_app)/bin/claude-sync.sh" "$@"; }
 
 sjh_transcript_ext()  { printf 'jsonl'; }
 sjh_session_handle()  { printf '%.8s' "$1"; }          # session ids are UUIDs: the first 8 hex
-sjh_resume_cmd()      { printf 'claude --resume %s' "$1"; }   # ($2 = staged file; Claude reads it
-                                                              #  in place, so it needs no import)
+sjh_resume_cmd()      { printf 'claude --resume %s' "$1"; }   # ($2 = staged file, $3 = installed?;
+                                                              #  Claude reads the transcript in
+                                                              #  place, so it never needs an import)
+
+# Cross-harness carry-over: the session came from a DIFFERENT agent, so there is no native session
+# to resume — hand the conversation over as context instead. See bin/adapters/ROADMAP.md for the
+# open issue on translating a session into this harness's own format.
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
+  printf 'claude "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
+    "$3" "$2" "$1"
+}
 
 # Claude Code stores a session at <root>/projects/<slug>/<sid>.jsonl, where <slug> is the session's
 # absolute cwd with every character outside [A-Za-z0-9-] replaced by '-'. The encoding is LOSSY (a
@@ -47,6 +56,16 @@ sjh_project_dir() {  # sjh_project_dir [cwd]
 sjh_session_topic() { sj_session_topic "$1"; }
 sjh_session_cwd()   { jq -rs '[ .[] | select(.cwd != null) | .cwd ][0] // ""' "$1" 2>/dev/null; }
 sjh_render()        { bash "$(sj_app)/bin/render-transcript.sh" "$1"; }
+
+# Is <file> a Claude Code transcript? JSONL whose records carry Claude's own `sessionId` (which
+# neither a codex rollout — it nests session_id under .payload — nor an opencode export has at the
+# top level). Only the head is read: a transcript can be tens of MB.
+sjh_detect() {  # sjh_detect <file>
+  head -20 "$1" 2>/dev/null \
+    | jq -es 'any(.[]; (.sessionId? != null) or ((.type? // "") as $t
+                        | ($t == "user" or $t == "assistant") and (.message? != null)))' \
+      >/dev/null 2>&1
+}
 
 # The session records that are NOT the transcript. Emitted as TSV so the caller stays
 # harness-blind: <src> <relpath under <host>/> <mode>.

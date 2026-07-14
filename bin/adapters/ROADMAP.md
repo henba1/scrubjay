@@ -9,8 +9,63 @@ harness-blind `ship-transcript.sh` / `log-session.sh` / `sj-resume.sh`).
 | relay sessions to the archive | ✅ | ✅ | ✅ |
 | readable rendering (cross-harness search) | ✅ | ✅ | ✅ |
 | read the archive from inside (sjmcp + `/sj*`) | ✅ | ✅ | ⬜ P3 |
-| session hand-off (`/sjresume`) | ✅ | 🟡 two-step (stage, then `opencode import`) | ⬜ P2 (harder than it looked) |
+| session hand-off, **same harness** | ✅ | ✅ (auto-`import`) | ⬜ P2 (harder than it looked) |
+| session hand-off, **cross-harness** | 🟡 carry-over only — see the open issue below | | |
 | config sync *into* the harness | ✅ | ⬜ P3 | ⬜ P3 |
+
+---
+
+# OPEN ISSUE — true cross-harness session translation
+
+**Status: not implemented, and deliberately not faked.**
+
+Today a hand-off between *different* harnesses (a Claude session resumed in opencode, or the
+reverse) does **not** produce a native session. `bin/sj-resume.sh` detects the source harness
+(`sjh_detect`), sees that it differs from the target, and carries the **conversation** over instead:
+it renders the source session's readable Markdown and prints a command that starts a *new* session
+seeded with it (`sjh_context_cmd`). You keep the content; you lose the session id, the tool-call
+history, and — for Claude — `/rewind`.
+
+That is a floor, not a ceiling. The real thing is **translation**: rewrite the session into the
+target harness's own record format so its native resume adopts it, tool history and all.
+
+### Why it isn't done
+
+It is a format-to-format transform between three genuinely different models, and each direction has
+its own trap:
+
+* **Claude → opencode.** Feasible, and the most valuable direction. `opencode import` already accepts
+  exactly the export shape we archive (`{info, messages: [{info, parts}]}`) and re-homes it onto the
+  current project, so a translated Claude transcript would become a *real* resumable opencode
+  session. The open question is **id validation**: opencode ids are `ses_`/`msg_`/`prt_` + base62 and
+  are decoded through an Effect `Schema` on import (`packages/opencode/src/cli/cmd/import.ts`).
+  Establish whether synthesized ids pass that schema before committing to this.
+* **opencode → Claude.** Needs a synthesized `uuid` per record *and* the `parentUuid` chain that
+  Claude threads a conversation with — plus `tool_use`/`tool_result` pairing by `call_id`. Doable,
+  fiddlier, and easy to get subtly wrong in a way that only shows up as a broken `/resume`.
+* **codex ↔ anything.** Blocked behind codex P2 anyway (codex resolves sessions through its own
+  index, so even a *native* file dropped into `~/.codex/sessions/` may be invisible to it).
+
+Both directions are lossy on tool internals no matter what — a Claude `Bash` tool_use and an opencode
+`bash` tool part carry different metadata, and neither harness will honour the other's file-history
+snapshots. So translation buys *native resume*, not fidelity.
+
+### Decide before building
+
+Is native resume across harnesses actually worth it, or is carry-over enough? In practice "give the
+new agent the whole conversation as context" is what people mean 90% of the time, and it works today
+in every direction. Build translation only if continuing the *same session id* with its tool history
+turns out to matter in real use.
+
+### If it is built
+
+Add `sjh_translate_from <src-harness> <file> <out>` to the adapter contract — the **target** adapter
+owns the transform, because it is the one that knows what it can ingest. `bin/sj-resume.sh` would
+then try translation first and fall back to the carry-over path above when the source harness has no
+translator. The carry-over path stays either way: it is the only thing that works when a translator
+does not exist.
+
+---
 
 ---
 

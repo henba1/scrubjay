@@ -41,10 +41,30 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_render <transcript>` | the readable Markdown rendering, on stdout |
 | `sjh_extra_artifacts <transcript> <sid> <slug> <cwd>` | TSV of the session's *other* records to relay (below) |
 | `sjh_find_live_transcript <cwd>` | the in-progress session's transcript, for a publish-now with no hook payload (empty if the harness has none on disk) |
+| `sjh_detect <file>` | 0 if this file is *this harness's* transcript format (see below) |
 | `sjh_slug <path>` | the harness's own project-dir encoding of an absolute path |
 | `sjh_project_dir <cwd>` | where a fetched session must land locally to be resumable |
 | `sjh_import_side <sid> <dir> <project_dir>` | put fetched sidecar records back where the harness expects them |
-| `sjh_resume_cmd <sid> <staged-file>` | the command a user runs to continue the session (a harness that imports rather than reads in place needs the path) |
+| `sjh_resume_cmd <sid> <staged-file> [installed]` | the command a user runs to continue the session (`installed=1` when `sjh_install_session` already ingested it) |
+| `sjh_context_cmd <primer.md> <src_host> <src_harness>` | the command that starts a NEW session seeded with another harness's session (cross-harness carry-over) |
+| `sjh_install_session <staged-file> <cwd> <sid>` | **optional.** Ingest a staged session (opencode: `opencode import`). Omit it when the harness reads the staged transcript in place (Claude). |
+
+### `sjh_detect` — and why a session has no label
+
+The archive is deliberately harness-neutral: one `<host>/<slug>/<sid>.<ext>` layout for every agent.
+Nothing in the path says *which* agent produced a session — so a hand-off works it out from the
+records (`sj_detect_harness` in `bin/lib.sh` asks each adapter in turn). That also means the entire
+existing back-catalogue is covered without a migration.
+
+Detections must be mutually exclusive and cheap — read the head of the file, never the whole thing;
+a transcript can be tens of MB. Today: opencode = a single JSON document opening `{"info":{`;
+codex = JSONL whose first line is a `session_meta` RolloutLine; Claude = JSONL carrying `sessionId`.
+
+**A hand-off has two harnesses**, and `bin/sj-resume.sh` keeps them apart: the **source** (which
+produced the session — owns reading it: cwd, slug, renderer) and the **target** (where you are
+resuming — owns installing and continuing it). Conflating them is what once handed a Claude `.jsonl`
+to `opencode import`. Where they differ there is no native resume, so scrubjay carries the
+*conversation* over instead (`sjh_context_cmd`) rather than staging a file the target cannot load.
 
 The readable Markdown rendering is the one artifact every harness produces in the same shape — a
 `# title`, a `_N turns_` line, and `## User` / `## Assistant` blocks. That is what lets `/sjrecall`

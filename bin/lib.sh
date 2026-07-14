@@ -81,6 +81,37 @@ sj_load_adapter() {  # sj_load_adapter [harness]
   . "$f"
 }
 
+# Every adapter that EXISTS (not just the ones this machine syncs): an archived session can come
+# from a harness this host has never run.
+sj_known_harnesses() {
+  local f
+  for f in "$(sj_app)"/bin/adapters/*.sh; do
+    [ -f "$f" ] && basename "$f" .sh
+  done
+}
+
+# Call one adapter's function while a DIFFERENT adapter is loaded in the caller's shell. The sjh_*
+# namespace is shared, so the only safe way to touch two harnesses at once — which a cross-harness
+# hand-off must — is a subshell per call.
+sj_adapter_call() {  # sj_adapter_call <harness> <sjh_fn> [args...]
+  local h="$1"; shift
+  ( sj_load_adapter "$h" >/dev/null 2>&1 || exit 1; "$@" )
+}
+
+# Which harness PRODUCED this session file? The archive is deliberately harness-neutral — one
+# <host>/<slug>/<sid>.<ext> layout for every agent — so a session carries no label, and a hand-off
+# has to work it out from the records themselves. Each adapter recognizes its own format
+# (sjh_detect), which also means the whole existing back-catalogue is covered without a migration.
+# Prints the harness name; fails (1) if nothing claims the file.
+sj_detect_harness() {  # sj_detect_harness <transcript>
+  local f="$1" h
+  [ -s "$f" ] || return 1
+  for h in $(sj_known_harnesses); do
+    if sj_adapter_call "$h" sjh_detect "$f" 2>/dev/null; then printf '%s' "$h"; return 0; fi
+  done
+  return 1
+}
+
 # The session's first real user prompt, as one line of plain text ("" if there isn't one).
 # Reads the Claude Code / JSONL record shape; a harness that stores sessions differently supplies
 # its own extractor as sjh_session_topic (bin/adapters/<harness>.sh).
@@ -174,18 +205,24 @@ sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
 # harness-specific — they moved to bin/adapters/<harness>.sh (sjh_project_dir / sjh_slug).
 
 # Every host's sessions, newest first, from the data repo's logs/ — which already carries
-#   <ts> | <host> | <cwd> | "<topic>" | session=<sid>
+#   <ts> | <host> | <cwd> | "<topic>" | session=<sid> | harness=<name>
 # for every session ever ended, and rides the data repo to every machine. This is the *catalogue*
 # (what can I resume, and what was it about); the archive itself stays authoritative for the path,
-# via transport_resolve. Emits TSV: <ts> <host> <sid> <cwd> <topic>.
+# via transport_resolve. Emits TSV: <ts> <host> <sid> <cwd> <topic> <harness>.
+#
+# `harness=` only exists on lines written since scrubjay went multi-harness; older ones report "-".
 sj_log_catalogue() {  # sj_log_catalogue [limit]
   local limit="${1:-0}" data
   data="$(sj_data)" || return 1
   awk -F' *\\| *' '
-    { sid=""; for (i=1; i<=NF; i++) if ($i ~ /^session=/) { sid=substr($i, 9) }
+    { sid=""; harness="-"
+      for (i=1; i<=NF; i++) {
+        if ($i ~ /^session=/) sid=substr($i, 9)
+        if ($i ~ /^harness=/) harness=substr($i, 9)
+      }
       if (sid == "") next
       topic=$4; gsub(/^"|"$/, "", topic)
-      printf "%s\t%s\t%s\t%s\t%s\n", $1, $2, sid, $3, topic }
+      printf "%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, sid, $3, topic, harness }
   ' "$data"/logs/*.log 2>/dev/null | sort -r | { [ "$limit" -gt 0 ] && head -n "$limit" || cat; }
 }
 

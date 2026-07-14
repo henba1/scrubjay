@@ -58,7 +58,10 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
       topic="$(sjh_session_topic "$tpath")"
     fi
     [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
-    printf '%s | %s | %s | "%s" | session=%s\n' "$ts" "$host" "$cwd" "$topic" "$sid" >> "$LOG"
+    # `harness=` is appended last so the field is additive: lines written before scrubjay went
+    # multi-harness simply lack it, and sj_log_catalogue reports them as "-".
+    printf '%s | %s | %s | "%s" | session=%s | harness=%s\n' \
+      "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" >> "$LOG"
   fi
 
   # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended). It indexes
