@@ -57,6 +57,7 @@ plugins:
         Overview:
           - index.md
           - concepts.md
+          - harnesses.md
         Setup & operation:
           - onboarding.md
           - day-to-day.md
@@ -74,6 +75,7 @@ plugins:
 nav:
   - Home: index.md
   - Concepts: concepts.md
+  - Harnesses: harnesses.md
   - Onboarding: onboarding.md
   - Day-to-day: day-to-day.md
   - Query the archive (MCP): archive-mcp.md

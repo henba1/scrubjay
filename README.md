@@ -85,6 +85,7 @@ pulling, so an unpacked archive can never update itself. Full walkthrough:
 Full docs — [**henba1.github.io/scrubjay**](https://henba1.github.io/scrubjay/):
 
 - [**Concepts**](https://henba1.github.io/scrubjay/concepts/) — the two-kinds-of-sync model and what lives in the database.
+- [**Harnesses**](https://henba1.github.io/scrubjay/harnesses/) — Claude Code, opencode, codex: what's supported, and what syncs into opencode.
 - [**Onboarding**](https://henba1.github.io/scrubjay/onboarding/) — install on a new machine, the repo layout, and machine-local pointers.
 - [**Day-to-day**](https://henba1.github.io/scrubjay/day-to-day/) — the hooks that keep it hands-off, finding a past chat, troubleshooting.
 - [**Query the archive (MCP)**](https://henba1.github.io/scrubjay/archive-mcp/) — recall a past session by *topic* from inside a live Claude session.
