@@ -62,10 +62,12 @@ sjh_extra_artifacts() { :; }
 
 # --- config ------------------------------------------------------------------------------------
 # What we put into opencode's own config dir:
+#   * shared + per-host settings   (opencode.json, deep-merged under your own keys)
+#   * the shared instructions      (opencode.json `instructions` -> <data>/shared/AGENTS.md)
 #   * the lifecycle bridge plugin  (opencode.json `plugin`)
 #   * the sjmcp archive server     (opencode.json `mcp`)   -> /sjrecall & co. work INSIDE opencode
-#   * the /sj* commands            (commands/*.md)
-# NOT yet: AGENTS.md / agents/ / the settings merge — see the roadmap.
+#   * the /sj* + personal commands (commands/*.md)
+#   * agents                       (agent/*.md, translated from claude-md/agents + native ones)
 #
 # Everything here is idempotent and additive: we never rewrite a key we don't own, and we bail
 # rather than clobber a config we cannot parse.
@@ -129,31 +131,133 @@ _sjh_oc_mcp_json() {
 #     from the environment, and opencode does not put it there (only the bridge plugin does, for its
 #     own subprocesses). This is the one translation that is about correctness, not dialect.
 # Files are GENERATED (regenerated on every sync), so edit commands/, never the copies.
+#
+# Commands come from TWO sources, in precedence order: the app ships the generic /sj* family, and
+# any extra dirs passed in (the data repo's personal commands) OVERRIDE on a name clash — the same
+# app-then-data precedence link_commands() gives Claude in bin/claude-sync.sh.
 _sjh_oc_commands() {
-  local dst="$1" app src name n=0
+  local dst="$1"; shift
+  local app src name n=0 srcdir
   app="$(sj_app)"
   mkdir -p "$dst" || return 1
-  for src in "$app"/commands/*.md; do
-    [ -f "$src" ] || continue
-    name="$(basename "$src")"
-    sed -E \
-      -e '/^(argument-hint|allowed-tools):/d' \
-      -e 's/mcp__sjmcp__/sjmcp_/g' \
-      -e "s#\"\\\$\(cd .* && pwd\)/bin/#\"$app/bin/#g" \
-      -e "s#~/\.claude/hooks/\.\./bin/#$app/bin/#g" \
-      -e "s#~/\.claude/hooks/#$app/hooks/#g" \
-      -e "s#bash \"$app/#SCRUBJAY_HARNESS=opencode bash \"$app/#g" \
-      -e "s#bash $app/#SCRUBJAY_HARNESS=opencode bash $app/#g" \
-      "$src" > "$dst/$name" || continue
-    n=$((n + 1))
+  for srcdir in "$app/commands" "$@"; do
+    [ -d "$srcdir" ] || continue
+    for src in "$srcdir"/*.md; do
+      [ -f "$src" ] || continue
+      name="$(basename "$src")"
+      sed -E \
+        -e '/^(argument-hint|allowed-tools):/d' \
+        -e 's/mcp__sjmcp__/sjmcp_/g' \
+        -e "s#\"\\\$\(cd .* && pwd\)/bin/#\"$app/bin/#g" \
+        -e "s#~/\.claude/hooks/\.\./bin/#$app/bin/#g" \
+        -e "s#~/\.claude/hooks/#$app/hooks/#g" \
+        -e "s#bash \"$app/#SCRUBJAY_HARNESS=opencode bash \"$app/#g" \
+        -e "s#bash $app/#SCRUBJAY_HARNESS=opencode bash $app/#g" \
+        "$src" > "$dst/$name" || continue
+      n=$((n + 1))
+    done
   done
   echo "  gen   $n commands -> $dst/"
 }
 
+# --- agents ------------------------------------------------------------------------------------
+# scrubjay's agents are authored for Claude (claude-md/agents/*.md). opencode reads the same
+# markdown-with-frontmatter shape, so we TRANSLATE rather than copy — verified against opencode
+# 1.17.20, which loads agents from <config>/agent/ (singular):
+#   * `name:`/`model:` are dropped — opencode takes the name from the filename, and a subagent with
+#     no model inherits the invoking agent's, which is the right default (inventing
+#     anthropic/claude-sonnet-5 would be wrong for anyone driving opencode via Zen/OpenRouter).
+#   * `mode: subagent` is added (Claude agents are all subagents).
+#   * Claude's `tools:` is an ALLOWLIST, so it maps onto opencode's `permission` map: allow the
+#     mapped keys, DENY every other key opencode knows. Without the denies a restricted agent would
+#     silently gain tools it was never granted. No `tools:` line -> no permission block (inherits all).
+# Native opencode agents (data repo's opencode/agent/) are symlinked as-is and win on a name clash.
+# Generated files are regenerated every sync — edit the source, never the copy.
+
+# Emit the `permission:` block body for a Claude `tools:` allowlist. opencode's recognized tool keys
+# (empirically, 1.17.20): bash read grep glob edit write patch list task webfetch websearch
+# todowrite todoread skill. Claude folds file mutation into Edit/Write/MultiEdit/NotebookEdit, so
+# any of those unlocks opencode's whole edit/write/patch family; TodoWrite unlocks todowrite+todoread.
+_sjh_oc_agent_perm() {  # _sjh_oc_agent_perm <claude-tools-csv>
+  local t edit=0 bash=0 read=0 grep=0 glob=0 ls=0 task=0 wf=0 ws=0 todo=0 skill=0
+  local IFS=', '
+  for t in $1; do
+    case "$t" in
+      Bash) bash=1 ;; Read) read=1 ;; Grep) grep=1 ;; Glob) glob=1 ;; LS) ls=1 ;;
+      Edit|Write|MultiEdit|NotebookEdit) edit=1 ;;
+      Task) task=1 ;; WebFetch) wf=1 ;; WebSearch) ws=1 ;; TodoWrite) todo=1 ;; Skill) skill=1 ;;
+      *) : ;;   # unknown Claude tool — denied by omission
+    esac
+  done
+  local pair k v
+  for pair in bash:$bash read:$read grep:$grep glob:$glob edit:$edit write:$edit patch:$edit \
+              list:$ls task:$task webfetch:$wf websearch:$ws todowrite:$todo todoread:$todo skill:$skill; do
+    k="${pair%:*}"; v="${pair#*:}"
+    if [ "$v" = 1 ]; then echo "  $k: allow"; else echo "  $k: deny"; fi
+  done
+}
+
+# Translate one Claude agent file into opencode's dialect.
+_sjh_oc_translate_agent() {  # _sjh_oc_translate_agent <src.md> <dst.md>
+  local src="$1" dst="$2" desc tools
+  desc="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^description:/{sub(/^description:[[:space:]]*/,""); print; exit}' "$src")"
+  tools="$(awk '/^---[[:space:]]*$/{n++; next} n==1 && /^tools:/{sub(/^tools:[[:space:]]*/,""); print; exit}' "$src")"
+  {
+    echo "---"
+    [ -n "$desc" ] && echo "description: $desc"
+    echo "mode: subagent"
+    if [ -n "$tools" ]; then
+      echo "permission:"
+      _sjh_oc_agent_perm "$tools"
+    fi
+    echo "---"
+    # body: everything after the closing (second) `---`
+    awk 'n>=2{print} /^---[[:space:]]*$/{n++}' "$src"
+  } > "$dst"
+}
+
+_sjh_oc_agents() {  # _sjh_oc_agents <dst-agent-dir>
+  local dst="$1" data src name n=0
+  data="$(sj_data 2>/dev/null)" || return 0
+  [ -n "$data" ] || return 0
+  mkdir -p "$dst" || return 1
+  if [ -d "$data/claude-md/agents" ]; then
+    for src in "$data"/claude-md/agents/*.md; do
+      [ -f "$src" ] || continue
+      _sjh_oc_translate_agent "$src" "$dst/$(basename "$src")" && n=$((n + 1))
+    done
+  fi
+  if [ -d "$data/opencode/agent" ]; then      # native opencode agents win on a name clash
+    for src in "$data"/opencode/agent/*.md; do
+      [ -f "$src" ] || continue
+      ln -sf "$src" "$dst/$(basename "$src")" && n=$((n + 1))
+    done
+  fi
+  echo "  gen   $n agents -> $dst/"
+}
+
+# A data-repo config layer (base or host overlay): its JSON object, or {} when absent. An
+# unparseable layer is skipped with a warning rather than aborting the whole apply.
+_sjh_oc_layer() {  # _sjh_oc_layer <file>
+  local f="$1"
+  [ -f "$f" ] || { printf '{}'; return 0; }
+  if jq empty "$f" 2>/dev/null; then cat "$f"
+  else echo "  WARN  ignoring unparseable $f" >&2; printf '{}'; fi
+}
+
+# opencode combines an `instructions` array of file paths with AGENTS.md. Point it at the shared
+# instructions by ABSOLUTE path so a `git pull` of the data repo updates it live — only when the
+# file actually exists, so we never register a dangling path.
+_sjh_oc_instructions_json() {  # _sjh_oc_instructions_json <data>
+  local data="$1" f="$1/shared/AGENTS.md"
+  if [ -n "$data" ] && [ -f "$f" ]; then jq -n --arg p "$f" '[$p]'; else printf '[]'; fi
+}
+
 sjh_apply_config() {
-  local cfgdir cfg tmp mcp
+  local cfgdir cfg tmp mcp data basejson hostjson instr
   cfgdir="$(sjh_config_dir)"
   cfg="$cfgdir/opencode.json"
+  data="$(sj_data 2>/dev/null)" || data=""
 
   echo "opencode: $cfgdir"
   command -v jq >/dev/null 2>&1 || { echo "  SKIP  jq not on PATH"; return 0; }
@@ -166,19 +270,42 @@ sjh_apply_config() {
     return 0
   fi
 
+  # Data-repo layers: shared defaults + this host's overlay. Same model as Claude's
+  # settings.base.json + host overlay.
+  basejson="$(_sjh_oc_layer "$data/opencode/opencode.base.json")"
+  hostjson="$(_sjh_oc_layer "$data/hosts/$(sj_host)/opencode/opencode.json")"
+  instr="$(_sjh_oc_instructions_json "$data")"
+
   tmp="$(mktemp)" || return 1
   mcp="$(_sjh_oc_mcp_json)" || mcp=""
-  # `plugin` is a union (the user's own plugins survive); `mcp.sjmcp` is ours to own, and is only
-  # touched when we actually have a server to point at.
-  jq --argjson plug "$(_sjh_oc_plugin_json)" --arg mcp "$mcp" '
-      .plugin = ((.plugin // []) + $plug | unique)
+  # The merge, keyed to keep exactly what each side owns:
+  #   $user * ($base * $host)   base/host win where they define a key; every key you set that the
+  #                             data repo doesn't mention (theme, model, keybinds, your own plugins/
+  #                             MCP) survives untouched. NOT defaults-only: after the first sync the
+  #                             data-repo keys are in your file, so a later change in the data repo
+  #                             would never take effect again — this keeps sync a sync.
+  #   plugin / instructions     arrays WE contribute to, unioned (the array-union idiom claude-sync
+  #                             uses for permissions.allow/deny) so the user's own entries survive.
+  #   mcp.sjmcp                 ours to own, only when we actually have a server to point at.
+  jq -n \
+      --argjson user "$(cat "$cfg")" \
+      --argjson base "$basejson" \
+      --argjson host "$hostjson" \
+      --argjson plug "$(_sjh_oc_plugin_json)" \
+      --argjson instr "$instr" \
+      --arg     mcp  "$mcp" '
+      ($user * ($base * $host))
+      | .plugin = ((($user.plugin // []) + ($base.plugin // []) + ($host.plugin // []) + $plug) | unique)
+      | .instructions = ((($user.instructions // []) + ($base.instructions // []) + ($host.instructions // []) + $instr) | unique)
+      | if (.instructions | length) == 0 then del(.instructions) else . end
       | if $mcp == "" then . else .mcp = ((.mcp // {}) + {sjmcp: ($mcp | fromjson)}) end
-    ' "$cfg" > "$tmp" || { rm -f "$tmp"; return 1; }
+    ' > "$tmp" || { rm -f "$tmp"; return 1; }
 
-  if cmp -s "$tmp" "$cfg"; then echo "  ok    plugin + mcp registered"; rm -f "$tmp"
-  else mv "$tmp" "$cfg"; echo "  wrote $cfg  (plugin$([ -n "$mcp" ] && echo ' + mcp sjmcp'))"; fi
+  if cmp -s "$tmp" "$cfg"; then echo "  ok    settings + plugin + mcp"; rm -f "$tmp"
+  else mv "$tmp" "$cfg"; echo "  wrote $cfg  (settings + plugin$([ -n "$mcp" ] && echo ' + mcp sjmcp'))"; fi
 
-  _sjh_oc_commands "$cfgdir/commands"
+  _sjh_oc_commands "$cfgdir/commands" "$data/claude-md/commands"
+  _sjh_oc_agents   "$cfgdir/agent"
 }
 
 # --- session hand-off --------------------------------------------------------------------------

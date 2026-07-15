@@ -20,7 +20,7 @@ shared/public without leaking anything:
 | Repo | Role | Visibility |
 |---|---|---|
 | **scrubjay** (this) | scripts, hooks, docs — the logic | public-able |
-| **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private |
+| **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `shared/`, `opencode/`, `templates/`, `memory/`, `logs/` | private |
 | **scrubjay-chats** | full chat transcripts (`.jsonl`), relayed off each machine | private |
 
 ![scrubjay — system overview](docs/overview.svg)

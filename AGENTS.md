@@ -14,7 +14,7 @@ in this checkout:
 | Repo | Role |
 |---|---|
 | **scrubjay** (this) | scripts, hooks, docs — the logic |
-| **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` |
+| **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `shared/`, `opencode/`, `templates/`, `memory/`, `logs/` |
 | **scrubjay-chats** | full chat transcripts (`.jsonl`), relayed off each machine |
 
 Read [`docs/concepts.md`](docs/concepts.md) for the design (the "author-vs-record picks

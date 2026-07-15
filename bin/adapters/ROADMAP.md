@@ -11,7 +11,7 @@ harness-blind `ship-transcript.sh` / `log-session.sh` / `sj-resume.sh`).
 | read the archive from inside (sjmcp + `/sj*`) | ✅ | ✅ | ⬜ P3 |
 | session hand-off, **same harness** | ✅ | ✅ (auto-`import`) | ⬜ P2 (harder than it looked) |
 | session hand-off, **cross-harness** | 🟡 carry-over only — see the open issue below | | |
-| config sync *into* the harness | ✅ | ⬜ P3 | ⬜ P3 |
+| config sync *into* the harness | ✅ | ✅ (settings + instructions + agents + commands) | ⬜ P3 |
 
 ---
 
@@ -174,17 +174,22 @@ Unchanged from the original plan, and still the blocker:
 
 ---
 
+## opencode — done
+
+* **Config sync into opencode** ✅ `bin/adapters/opencode.sh` `sjh_apply_config` merges shared +
+  per-host `opencode.json` under your own keys, registers `instructions` → `<data>/shared/AGENTS.md`,
+  translates `claude-md/agents/*.md` into `<config>/agent/*.md` (drop `model:`, add `mode: subagent`,
+  map the `tools:` allowlist onto opencode's `permission` map — verified against opencode 1.17.20),
+  symlinks native `<data>/opencode/agent/*.md`, and generates personal commands from
+  `<data>/claude-md/commands/`. **Additive** — no `claude-md/` layout change and no `sj-migrate.sh`
+  step; the new dirs (`shared/`, `opencode/`) sit alongside what exists.
+* **Automatic import on hand-off** ✅ `sj-resume.sh --import` (default) runs `opencode import` in the
+  destination cwd — see the hand-off section.
+
 ## opencode — remaining
 
-* **Config sync into opencode** (P3): `AGENTS.md`, `agents/`, and a base+host `opencode.json` merge
-  from the data repo. Needs the data-repo layout change (`claude-md/` → `harness/{claude,opencode}/`
-  with a shared `AGENTS.md`) plus a migration in `bin/sj-migrate.sh`.
-* **Automatic import on hand-off** (P4): `sj-resume.sh` currently stages the rewritten export into
-  an inbox and prints `opencode import … && opencode --session …`. It could run the import itself —
-  but only when the target project is the cwd, since `opencode import` re-homes the session onto the
-  *current* project. Worth a `--import` flag rather than doing it silently.
-* **Personal commands** from the data repo (`claude-md/commands/`) are not translated into opencode's
-  command dir — only the app's `/sj*` family is.
+* **Backfill** (`bin/backfill-opencode.sh`): ship the back-catalogue of sessions that predate the
+  bridge — `opencode session list --format json` → `opencode export` → `ship-transcript.sh`.
 
 ## Open, both
 

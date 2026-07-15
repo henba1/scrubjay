@@ -95,9 +95,9 @@ task lists, per-session file history, subagent transcripts. It may normalize fil
 
 ### claude — Claude Code
 
-The reference adapter, and the only one with full config sync (CLAUDE.md, agents, commands,
-settings merge, per-project memory, MCP registration — `bin/claude-sync.sh`) and in-place session
-hand-off (`bin/sj-resume.sh`).
+The reference adapter (CLAUDE.md, agents, commands, settings merge, per-project memory, MCP
+registration — `bin/claude-sync.sh`) and in-place session hand-off (`bin/sj-resume.sh`). Its
+per-project memory linking is still Claude-only.
 
 ### opencode
 
@@ -108,22 +108,26 @@ echo ': "${SCRUBJAY_HARNESSES:=claude opencode}"' >> ~/.config/scrubjay/config
 bin/sync-config.sh
 ```
 
-`sync-config.sh` then writes three things into `~/.config/opencode/` — additively, never clobbering
-config it doesn't own:
+`sync-config.sh` then writes these into `~/.config/opencode/` — additively, never clobbering config
+it doesn't own (a key you set that the data repo never mentions always survives; an unparseable
+`opencode.json` is refused, not overwritten):
 
 | What | Where | Effect |
 |---|---|---|
+| shared + per-host settings | `opencode.json` (deep-merged under your keys) | `opencode.base.json` + `hosts/<host>/opencode/opencode.json` apply, like Claude's base+overlay |
+| shared instructions | `opencode.json` → `instructions[]` | points at `<data>/shared/AGENTS.md` by absolute path (live on `git pull`) |
 | the lifecycle bridge | `opencode.json` → `plugin[]` | sessions are logged + relayed to the archive |
 | the sjmcp archive server | `opencode.json` → `mcp.sjmcp` | `/sjrecall` & co. can read the archive |
-| the `/sj*` commands | `commands/*.md` (generated) | the slash commands exist in opencode |
+| the `/sj*` + personal commands | `commands/*.md` (generated) | slash commands exist in opencode (data-repo ones override on a name clash) |
+| agents | `agent/*.md` (translated + native) | `claude-md/agents/*.md` become opencode subagents; the `tools:` allowlist maps onto opencode's `permission` map |
 
 So an opencode session is archived (transcript + readable rendering), lands in the `logs/`
 catalogue, and is searchable from *either* harness — a session started in Claude Code on one
-machine is recallable from opencode on another, and vice versa.
+machine is recallable from opencode on another, and vice versa — and your setup (settings,
+instructions, agents, commands) follows you into opencode. Same-harness hand-off runs
+`opencode import` for you (`bin/sj-resume.sh --import`, the default).
 
-Still missing: syncing config *into* opencode (`AGENTS.md`, `agents/`, a base+host settings merge),
-and an automatic import on hand-off — `bin/sj-resume.sh` stages the export into an inbox and prints
-the `opencode import … && opencode --session …` for you to run.
+Still missing: a backfill for opencode's pre-bridge back-catalogue (`bin/backfill-opencode.sh`).
 
 Three things worth knowing about how it works:
 
