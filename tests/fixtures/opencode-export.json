@@ -18,6 +18,7 @@
     {
       "info": {
         "id": "msg_02", "sessionID": "ses_66a71b6f4ffeq796jvvOpJQ04m", "role": "assistant",
+        "providerID": "anthropic", "modelID": "claude-opus-4-8",
         "path": { "cwd": "/home/user/widget-api", "root": "/home/user/widget-api" }
       },
       "parts": [

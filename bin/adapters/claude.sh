@@ -57,6 +57,17 @@ sjh_session_topic() { sj_session_topic "$1"; }
 sjh_session_cwd()   { jq -rs '[ .[] | select(.cwd != null) | .cwd ][0] // ""' "$1" 2>/dev/null; }
 sjh_render()        { bash "$(sj_app)/bin/render-transcript.sh" "$1"; }
 
+# Catalogue metadata for the session log line: TSV `<model>\t<turns>`, one jq pass (a transcript
+# can be tens of MB — never read it twice). `model` is the last model Claude actually answered on
+# (it carries it per assistant record); `turns` is the raw user+assistant record count, a cheap
+# size signal. Both degrade to "" when the transcript doesn't carry them.
+sjh_session_meta() {  # sjh_session_meta <transcript.jsonl>
+  jq -rs '([ .[] | select(.type=="assistant") | .message.model // empty | select(. != "") ] | last // "")
+          + "\t" +
+          ([ .[] | select(.type=="user" or .type=="assistant") ] | length | tostring)' \
+    "$1" 2>/dev/null || printf '\t0'
+}
+
 # Is <file> a Claude Code transcript? JSONL whose records carry Claude's own `sessionId` (which
 # neither a codex rollout — it nests session_id under .payload — nor an opencode export has at the
 # top level). Only the head is read: a transcript can be tens of MB.

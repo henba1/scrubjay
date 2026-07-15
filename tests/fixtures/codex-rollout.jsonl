@@ -1,4 +1,5 @@
 {"timestamp":"2026-07-14T09:15:02.100Z","type":"session_meta","payload":{"session_id":"7c4f1a2b-9d3e-4a10-b8c5-1e2f3a4b5c6d","id":"7c4f1a2b-9d3e-4a10-b8c5-1e2f3a4b5c6d","timestamp":"2026-07-14T09:15:02.100Z","cwd":"/home/user/widget-api","originator":"codex_cli_rs","cli_version":"0.140.0","source":"cli"}}
+{"timestamp":"2026-07-14T09:15:02.200Z","type":"turn_context","payload":{"cwd":"/home/user/widget-api","model":"gpt-5-codex","approval_policy":"on-request","sandbox_policy":"workspace-write","effort":"medium","summary":"auto"}}
 {"timestamp":"2026-07-14T09:15:02.300Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context><cwd>/home/user/widget-api</cwd></environment_context>"}]}}
 {"timestamp":"2026-07-14T09:15:05.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"the retry backoff fires twice per failure — find out why"}]}}
 {"timestamp":"2026-07-14T09:15:07.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"look for the retry decorator"}],"encrypted_content":null}}

@@ -11,9 +11,9 @@ section "every adapter implements the contract"
 # The functions bin/ship-transcript.sh, hooks/log-session.sh and bin/sj-resume.sh actually call.
 # An adapter missing one of these fails at runtime, inside a hook, where nobody sees the error.
 REQUIRED="sjh_config_dir sjh_present sjh_apply_config sjh_transcript_ext sjh_session_handle
-          sjh_session_slug sjh_session_topic sjh_session_cwd sjh_render sjh_extra_artifacts
-          sjh_find_live_transcript sjh_slug sjh_project_dir sjh_import_side sjh_resume_cmd
-          sjh_context_cmd sjh_detect"
+          sjh_session_slug sjh_session_topic sjh_session_cwd sjh_session_meta sjh_render
+          sjh_extra_artifacts sjh_find_live_transcript sjh_slug sjh_project_dir sjh_import_side
+          sjh_resume_cmd sjh_context_cmd sjh_detect"
 
 for h in $(sj_known_harnesses); do
   missing=""
@@ -75,5 +75,22 @@ assert_eq "opencode topic skips the synthetic part" \
 assert_eq "codex topic skips the injected <environment_context>" \
   "the retry backoff fires twice per failure — find out why" \
   "$(sj_adapter_call codex sjh_session_topic "$FIXTURES/codex-rollout.jsonl")"
+
+# Catalogue metadata (model + turns) feeds the session-log columns that /sjbrowse shows. Each
+# harness reads model from a different place — Claude's per-message model, opencode's
+# providerID/modelID, codex's turn_context — but all emit the same TSV shape.
+section "catalogue metadata (sjh_session_meta → model, turns)"
+assert_eq "claude model is the answering model" "claude-opus-4-8" \
+  "$(sj_adapter_call claude sjh_session_meta "$FIXTURES/claude-session.jsonl" | cut -f1)"
+assert_eq "claude turns count" "5" \
+  "$(sj_adapter_call claude sjh_session_meta "$FIXTURES/claude-session.jsonl" | cut -f2)"
+assert_eq "opencode model is provider/model" "anthropic/claude-opus-4-8" \
+  "$(sj_adapter_call opencode sjh_session_meta "$FIXTURES/opencode-export.json" | cut -f1)"
+assert_eq "opencode turns count" "2" \
+  "$(sj_adapter_call opencode sjh_session_meta "$FIXTURES/opencode-export.json" | cut -f2)"
+assert_eq "codex model from turn_context" "gpt-5-codex" \
+  "$(sj_adapter_call codex sjh_session_meta "$FIXTURES/codex-rollout.jsonl" | cut -f1)"
+assert_eq "codex turns count" "4" \
+  "$(sj_adapter_call codex sjh_session_meta "$FIXTURES/codex-rollout.jsonl" | cut -f2)"
 
 finish

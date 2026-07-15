@@ -53,15 +53,26 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
 
   # 1a) append the human-readable session line (once per session)
   if ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
-    topic=""
+    # Topic: prefer a model-authored one-sentence essence passed in by /sjlog (SCRUBJAY_TOPIC).
+    # The automatic SessionEnd path has no model in the loop, so it falls back to the first real
+    # user prompt (sjh_session_topic) — good enough, and never misleading.
+    topic="${SCRUBJAY_TOPIC:-}"
+    model=""; turns=""
     if [ -n "$tpath" ] && [ -f "$tpath" ]; then
-      topic="$(sjh_session_topic "$tpath")"
+      [ -n "$topic" ] || topic="$(sjh_session_topic "$tpath")"
+      # model + turns in one pass (the transcript can be tens of MB); TSV, empty fields are fine.
+      IFS=$'\t' read -r model turns < <(sjh_session_meta "$tpath")
     fi
     [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
-    # `harness=` is appended last so the field is additive: lines written before scrubjay went
-    # multi-harness simply lack it, and sj_log_catalogue reports them as "-".
-    printf '%s | %s | %s | "%s" | session=%s | harness=%s\n' \
-      "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" >> "$LOG"
+    # Keep the line parseable: the topic is quoted, but a stray " or | inside it would derail both
+    # readers (sjmcp's regex and sj_log_catalogue's pipe-split), so neutralize those two chars.
+    topic="${topic//\"/}"; topic="${topic//|//}"
+    size="$(stat -c%s "$tpath" 2>/dev/null || echo 0)"
+    # Everything after `harness=` is an additive `key=value` field: a line written before a field
+    # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
+    # for a later pass — the readers already tolerate trailing fields they don't know.
+    printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s\n' \
+      "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" >> "$LOG"
   fi
 
   # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended). It indexes

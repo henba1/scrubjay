@@ -53,6 +53,18 @@ sjh_session_topic() {  # sjh_session_topic <rollout.jsonl>
 
 sjh_render() { bash "$(sj_app)/bin/render-codex.sh" "$1"; }
 
+# Catalogue metadata for the session log line: TSV `<model>\t<turns>`, one jq pass. Codex records the
+# model in a `turn_context` line (and, on some versions, the opening `session_meta`); take the last
+# one that names it. `turns` is the count of user+assistant `message` records. Both degrade to "".
+sjh_session_meta() {  # sjh_session_meta <rollout.jsonl>
+  jq -rs '([ .[] | select(.type=="turn_context" or .type=="session_meta")
+             | .payload.model // empty | select(. != "") ] | last // "")
+          + "\t" +
+          ([ .[] | select(.type=="response_item") | .payload
+             | select(.type=="message" and (.role=="user" or .role=="assistant")) ] | length | tostring)' \
+    "$1" 2>/dev/null || printf '\t0'
+}
+
 # Is <file> a codex rollout? Every rollout opens with a `session_meta` RolloutLine — a marker no
 # other harness writes.
 sjh_detect() {  # sjh_detect <file>

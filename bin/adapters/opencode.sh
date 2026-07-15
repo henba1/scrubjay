@@ -47,6 +47,18 @@ sjh_session_topic() {  # sjh_session_topic <export.json>
 
 sjh_render() { bash "$(sj_app)/bin/render-opencode.sh" "$1"; }
 
+# Catalogue metadata for the session log line: TSV `<model>\t<turns>`, one jq pass. opencode records
+# the provider + model on each assistant message's `info`; we join them as `<provider>/<model>` so
+# the catalogue can tell `anthropic/claude-opus-4-8` from `openai/gpt-5`. `turns` is the message
+# count. Both degrade to "" when a field is absent (older exports, or a model that went unrecorded).
+sjh_session_meta() {  # sjh_session_meta <export.json>
+  jq -r '([ .messages[]? | select(.info.role=="assistant") | .info
+            | (.providerID // .provider // "") as $p | (.modelID // .model // "") as $m
+            | select($m != "") | (if $p != "" then $p + "/" + $m else $m end) ] | last // "")
+          + "\t" +
+          ((.messages | length) | tostring)' "$1" 2>/dev/null || printf '\t0'
+}
+
 # Is <file> an opencode session export? One JSON *document* (not JSONL) that opens with the `info`
 # object — `{"info":{"id":"ses_…`. Anchored on the head so a huge transcript is never parsed, with a
 # whole-file parse as a fallback in case the key order ever changes.

@@ -183,7 +183,11 @@ def _all_artifacts(r: Roots) -> list[Artifact]:
 
 # ── session-log catalogue ──────────────────────────────────────────────────────────────────
 # <data>/logs/<host>.log carries ONE line per session, appended by the SessionEnd hook:
-#   "YYYY-MM-DD HH:MM | host | cwd | "first user prompt (topic)" | session=<uuid>"
+#   "YYYY-MM-DD HH:MM | host | cwd | "topic" | session=<uuid> | harness=<h> | model=<m> | …"
+# Everything from `session=` on is a sequence of additive `key=value` fields — `harness=`, then
+# `model=`/`turns=`/`size=`, and whatever is added later (a `token=` is reserved). Older lines have
+# fewer of them; the parser must tolerate any trailing set (before this it anchored `session=<sid>$`
+# and silently dropped every modern line — the harness= regression this fixes).
 # This is the *complete* cross-machine index — it includes sessions whose full transcript never
 # reached this archive (other machines, un-relayed runs). Recall folds it in: a topic match here
 # links to the transcript when present, else stands alone as a "look on <host>" pointer.
@@ -191,9 +195,22 @@ def _all_artifacts(r: Roots) -> list[Artifact]:
 _LOG = re.compile(
     r'^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}) \| '
     r'(?P<host>[^|]*?) \| (?P<cwd>[^|]*?) \| '
-    r'"(?P<topic>.*)" \| session=(?P<sid>[0-9a-fA-F][0-9a-fA-F-]+)\s*$'
+    r'"(?P<topic>.*)" \| session=(?P<sid>[0-9a-fA-F][0-9a-fA-F-]+)'
+    r'(?P<extra>(?: \| [^|]*)*)\s*$'
 )
 _NOISE_TOPICS = {"", "(no text)"}
+
+
+def _parse_extra(extra: str) -> dict[str, str]:
+    """The trailing ` | key=value | key=value` fields → dict. Unknown keys are kept, so a field
+    added to the log later (e.g. token=) is readable here without a code change."""
+    out: dict[str, str] = {}
+    for field in extra.split(" | "):
+        field = field.strip()
+        if "=" in field:
+            k, v = field.split("=", 1)
+            out[k.strip()] = v.strip()
+    return out
 
 
 @dataclass
@@ -204,6 +221,10 @@ class LogEntry:
     cwd: str
     topic: str
     sid: str  # full uuid as logged
+    harness: str = ""
+    model: str = ""
+    turns: str = ""
+    size: str = ""
 
     @property
     def sid8(self) -> str:
@@ -221,8 +242,11 @@ def _parse_log_line(line: str) -> LogEntry | None:
     topic = m.group("topic").lstrip("❯>").strip()  # drop stray prompt markers
     if topic in _NOISE_TOPICS:  # empty / "(no text)" sessions carry nothing to recall on
         return None
+    extra = _parse_extra(m.group("extra") or "")
     return LogEntry(m.group("date"), m.group("time"), m.group("host").strip(),
-                    m.group("cwd").strip(), topic, m.group("sid").strip())
+                    m.group("cwd").strip(), topic, m.group("sid").strip(),
+                    harness=extra.get("harness", ""), model=extra.get("model", ""),
+                    turns=extra.get("turns", ""), size=extra.get("size", ""))
 
 
 def _logs_dir(r: Roots) -> Path | None:
@@ -328,7 +352,9 @@ def core_list(type=None, host=None, project=None, since=None, until=None, limit=
             if until and e.date > until:
                 continue
             rows.append({"type": "log", "host": e.host, "project": e.project, "date": e.date,
-                         "time": e.time, "topic": e.topic, "sid": e.sid8, "cwd": e.cwd})
+                         "time": e.time, "topic": e.topic, "sid": e.sid8, "cwd": e.cwd,
+                         "harness": e.harness, "model": e.model, "turns": e.turns,
+                         "size": e.size})
         rows.sort(key=lambda d: (d["date"], d["time"]), reverse=True)
         total = len(rows)
         rows = rows[: int(limit)] if limit else rows
