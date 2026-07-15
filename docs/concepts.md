@@ -37,6 +37,10 @@ setup puts it in a separate private `scrubjay-memory` repo — wired for you by 
 the same "your file paths now sit with a third party" trade-off you accepted for transcripts.
 See [memory](memory-sync.md).)
 
+Keeping records out of git doesn't mean giving up recovery: on the NAS backends, point-in-time
+history comes from **filesystem snapshots** of `scrubjay-storage`, not git — cheap for append-only
+data, and the reason transcripts don't belong in a repo. See [durability](durability.md).
+
 ## What is scrubjay?
 
 [Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/`

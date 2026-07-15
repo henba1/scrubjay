@@ -69,6 +69,7 @@ plugins:
         Transcript relay:
           - transports.md
           - transcript-transport.md
+          - durability.md
           - memory-sync.md
           - mirror-host.md
 
@@ -85,5 +86,6 @@ nav:
   - Reference: reference.md
   - Deep dives:
       - Transcript transport: transcript-transport.md
+      - Archive durability: durability.md
       - Memory sync: memory-sync.md
       - Mirror host (git backend): mirror-host.md
