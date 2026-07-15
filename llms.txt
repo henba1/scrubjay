@@ -26,6 +26,7 @@ scrubjay is the app/logic for syncing Claude Code across machines: a git-based c
 
 - [Transcripts: relay + NAS](https://henba1.github.io/scrubjay/transports/index.md)
 - [Transcript transport](https://henba1.github.io/scrubjay/transcript-transport/index.md)
+- [Archive durability](https://henba1.github.io/scrubjay/durability/index.md)
 - [Memory sync](https://henba1.github.io/scrubjay/memory-sync/index.md)
 - [Mirror host (git backend)](https://henba1.github.io/scrubjay/mirror-host/index.md)
 

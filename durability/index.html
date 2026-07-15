@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://henba1.github.io/scrubjay/transcript-transport/">
+        <link rel="canonical" href="https://henba1.github.io/scrubjay/durability/">
       
       
-        <link rel="prev" href="../reference/">
+        <link rel="prev" href="../transcript-transport/">
       
       
-        <link rel="next" href="../durability/">
+        <link rel="next" href="../memory-sync/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Transcript transport - scrubjay</title>
+        <title>Archive durability - scrubjay</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#transcript-transport-pluggable" class="md-skip">
+        <a href="#archive-durability-nas-snapshots-not-git-history" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Transcript transport
+              Archive durability
             
           </span>
         </div>
@@ -581,6 +581,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../transcript-transport/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transcript transport
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -600,7 +628,7 @@
   <span class="md-ellipsis">
     
   
-    Transcript transport
+    Archive durability
   
 
     
@@ -618,7 +646,7 @@
   <span class="md-ellipsis">
     
   
-    Transcript transport
+    Archive durability
   
 
     
@@ -644,10 +672,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-its-wired" class="md-nav__link">
+  <a href="#setup-run-on-the-nas-with-root" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How it's wired
+        Setup — run on the NAS, with root
       
     </span>
   </a>
@@ -655,10 +683,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#backend-git-github-zero-infrastructure" class="md-nav__link">
+  <a href="#restore" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Backend: git (GitHub — zero infrastructure)
+        Restore
       
     </span>
   </a>
@@ -666,21 +694,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#backend-rsync-wg-peer-to-peer-no-third-party" class="md-nav__link">
+  <a href="#snapshots-are-not-a-backup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Backend: rsync-wg (peer-to-peer, no third party)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#backend-local-the-box-that-is-the-nas" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Backend: local (the box that is the NAS)
+        Snapshots are not a backup
       
     </span>
   </a>
@@ -691,34 +708,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../durability/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Archive durability
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -814,10 +803,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-its-wired" class="md-nav__link">
+  <a href="#setup-run-on-the-nas-with-root" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How it's wired
+        Setup — run on the NAS, with root
       
     </span>
   </a>
@@ -825,10 +814,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#backend-git-github-zero-infrastructure" class="md-nav__link">
+  <a href="#restore" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Backend: git (GitHub — zero infrastructure)
+        Restore
       
     </span>
   </a>
@@ -836,21 +825,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#backend-rsync-wg-peer-to-peer-no-third-party" class="md-nav__link">
+  <a href="#snapshots-are-not-a-backup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Backend: rsync-wg (peer-to-peer, no third party)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#backend-local-the-box-that-is-the-nas" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Backend: local (the box that is the NAS)
+        Snapshots are not a backup
       
     </span>
   </a>
@@ -877,96 +855,53 @@
   
 
 
-<h1 id="transcript-transport-pluggable">Transcript transport (pluggable)<a class="headerlink" href="#transcript-transport-pluggable" title="Permanent link">&para;</a></h1>
-<p>The <code>SessionEnd</code> hook relays a session's artifacts off each machine. The <em>how</em> is abstracted
-so the backend can change without touching the hook. Three things are shipped, all via the
-same backend (so sensitive content never takes a separate third-party path):</p>
-<table>
-<thead>
-<tr>
-<th>Artifact</th>
-<th>Source</th>
-<th>Lands at</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>transcript</td>
-<td><code>~/.claude/projects/&lt;slug&gt;/&lt;session&gt;.jsonl</code></td>
-<td><code>&lt;host&gt;/&lt;slug&gt;/&lt;session&gt;.jsonl</code></td>
-</tr>
-<tr>
-<td>subagents (subagent transcripts, tool-results)</td>
-<td><code>~/.claude/projects/&lt;slug&gt;/&lt;session&gt;/</code></td>
-<td><code>&lt;host&gt;/&lt;slug&gt;/&lt;session&gt;/</code></td>
-</tr>
-<tr>
-<td>plans (sensitive; not session-keyed)</td>
-<td><code>~/.claude/plans/</code></td>
-<td><code>&lt;host&gt;/plans/&lt;date&gt;_&lt;topic&gt;.md</code></td>
-</tr>
-<tr>
-<td><code>CLAUDE.local.md</code> (personal project rules; host-specific)</td>
-<td><code>&lt;project working tree&gt;/CLAUDE.local.md</code></td>
-<td><code>&lt;host&gt;/&lt;slug&gt;/CLAUDE.local.md</code></td>
-</tr>
-</tbody>
-</table>
-<p>The layout is uniform: <strong><code>&lt;host&gt;/</code> + the same path Claude uses locally.</strong> (Memory is the one
-exception — it drops the host prefix because it's <em>shared</em> across machines, not archived per-host;
-see <code>memory-sync.md</code>.) <code>CLAUDE.local.md</code> is host-specific, so it's a one-way per-host archive, not
-merged like memory.</p>
-<p><code>transport_ship &lt;src&gt; &lt;relpath&gt;</code> accepts a file <em>or</em> a directory. (Memory is <strong>not</strong> shipped
-here — it rides the <code>scrubjay-data</code> git sync.)</p>
-<h2 id="how-its-wired">How it's wired<a class="headerlink" href="#how-its-wired" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>SessionEnd hook (hooks/log-session.sh)
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>   └─ bin/ship-transcript.sh &lt;transcript&gt; &lt;slug&gt; &lt;session&gt; &lt;host&gt;
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>         └─ hooks/transports/&lt;backend&gt;.sh   ::  transport_ship &lt;src&gt; &lt;host/slug/session.jsonl&gt;
+<h1 id="archive-durability-nas-snapshots-not-git-history">Archive durability — NAS snapshots, not git history<a class="headerlink" href="#archive-durability-nas-snapshots-not-git-history" title="Permanent link">&para;</a></h1>
+<p>scrubjay's <a href="../concepts/">author-vs-record split</a> is the whole design in one sentence:
+<strong>things you <em>author</em></strong> (config, memory) ride <strong>git</strong>, where history is the point; <strong>records</strong>
+(transcripts, plans, <code>readable/</code>, <code>history.jsonl</code>) ride <strong>rsync/copy</strong> to the NAS, where you want
+cheap append and no version bloat.</p>
+<p>That raises a fair question: if the records don't live in git, how do you get them <em>back</em> after a
+fat-fingered <code>rm</code> or a corrupted write? The answer is the NAS's own filesystem, not git:
+<strong>point-in-time snapshots</strong> of <code>scrubjay-storage</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Why not just put the archive in git?</p>
+<p>Transcripts are large, append-only, and grow without bound. Committing them would balloon the
+repo, pack poorly, and buy you a history you'll never <code>git blame</code> — while snapshots give the
+same point-in-time recovery for near-free on a copy-on-write filesystem. Git is for the content
+you <em>edit</em>; snapshots are for the records you only ever <em>append</em>.</p>
+</div>
+<h2 id="setup-run-on-the-nas-with-root">Setup — run on the NAS, with root<a class="headerlink" href="#setup-run-on-the-nas-with-root" title="Permanent link">&para;</a></h2>
+<p><code>scrubjay-storage</code> lives on the box that holds the archive (the <code>local</code> backend's mount, or the
+<code>rsync-wg</code> receiver). Snapshotting is configured <strong>there, with root</strong> — so, like the
+<code>authorized_keys</code> line and the other receiver-side steps, it stays yours: onboard never does it.
+The helper is <a href="https://github.com/henba1/scrubjay/blob/main/bin/sj-snapshot.sh"><code>bin/sj-snapshot.sh</code></a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># on the NAS, as root — auto-detects zfs or btrfs under the storage path</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sudo<span class="w"> </span>bin/sj-snapshot.sh<span class="w"> </span>--now<span class="w">                 </span><span class="c1"># take one snapshot now, prune to --keep</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sudo<span class="w"> </span>bin/sj-snapshot.sh<span class="w"> </span>--schedule<span class="w">            </span><span class="c1"># install a systemd timer (default: hourly, keep 48)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>sudo<span class="w"> </span>bin/sj-snapshot.sh<span class="w"> </span>--list<span class="w">                </span><span class="c1"># list scrubjay-* snapshots</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>sudo<span class="w"> </span>bin/sj-snapshot.sh<span class="w"> </span>--dry-run<span class="w"> </span>--now<span class="w">       </span><span class="c1"># print what it would do, touch nothing</span>
 </code></pre></div>
-<p>Backend is chosen by <code>SCRUBJAY_TRANSCRIPT_BACKEND</code> in <code>~/.config/scrubjay/config</code>.
-A backend is one file defining <code>transport_ship &lt;src&gt; &lt;relpath&gt;</code>.</p>
-<h2 id="backend-git-github-zero-infrastructure">Backend: <code>git</code>  (GitHub — zero infrastructure)<a class="headerlink" href="#backend-git-github-zero-infrastructure" title="Permanent link">&para;</a></h2>
-<p>Copies the transcript into the <code>scrubjay-chats</code> private repo (<code>SCRUBJAY_CHATS</code>) and pushes
-it. This is the parallel to the peer-to-peer path for anyone who'd rather not run a NAS:
-GitHub <em>is</em> the shared store, and no WireGuard or receiver is involved. Optionally, a
-mirror host can <em>also</em> pull the repo down to a NAS (<code>mirror-host.md</code>), but that's an add-on
-— the private repo is a fine permanent home on its own.</p>
-<p>⚠️ Tradeoff: transcripts transit and live on GitHub's servers. The repo is private, but
-it's still a third party — that's the price of not running your own storage. If that
-matters to you, use <code>rsync-wg</code>/<code>local</code> instead.</p>
-<h2 id="backend-rsync-wg-peer-to-peer-no-third-party">Backend: <code>rsync-wg</code>  (peer-to-peer, no third party)<a class="headerlink" href="#backend-rsync-wg-peer-to-peer-no-third-party" title="Permanent link">&para;</a></h2>
-<p>Each machine holds a per-machine SSH key and rsyncs <strong>over a WireGuard/SSH tunnel</strong> directly
-to the NAS receiver. No data on any third-party server.</p>
-<p>Set in <code>~/.config/scrubjay/config</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">SCRUBJAY_TRANSCRIPT_BACKEND</span><span class="o">=</span><span class="s2">&quot;rsync-wg&quot;</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">SCRUBJAY_WG_TARGET</span><span class="o">=</span><span class="s2">&quot;scrubjay-rx@scrubjay-receiver&quot;</span><span class="w">            </span><span class="c1"># ssh destination ONLY — no remote path</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nv">SCRUBJAY_WG_SSHKEY</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.ssh/scrubjay_transcripts_ed25519&quot;</span>
-</code></pre></div>
-<p>⚠️ <strong>No remote path in <code>SCRUBJAY_WG_TARGET</code>.</strong> The receiver authorizes the key with a forced
-<code>command="&lt;APP&gt;/bin/sj-receive.sh &lt;root&gt;"</code> (which runs <code>rrsync -wo &lt;root&gt;</code> then chmods the
-landed files group-readable — see below), which pins the destination root; everything the client sends is
-taken <strong>relative</strong> to it. Including <code>:/srv/scrubjay-chats</code> would make <code>rrsync</code> re-root it <em>under</em>
-itself (<code>/srv/scrubjay-chats/srv/scrubjay-chats/…</code>). Per-machine reachability — <code>HostName</code>, the
-(often non-standard) SSH <strong><code>Port</code></strong>, <code>User</code> — lives in a <code>~/.ssh/config</code> <code>scrubjay-receiver</code>
-alias, so this config line is identical on every machine. <code>bin/onboard.sh</code> writes both.</p>
-<p>Receiver requirements (see the private <code>runbooks/wireguard-transcripts.md</code>):
-- a restricted <code>command="&lt;APP&gt;/bin/sj-receive.sh &lt;root&gt;",restrict</code> line per machine key —
-  <code>sj-receive.sh</code> wraps <code>rrsync -wo &lt;root&gt;</code> (write-only, no shell) and, after each push, chmods
-  the new files group-readable so the archive owner (human + MCP server) can read what the relay
-  account wrote (the relay writes <code>0600</code>; setgid stamps the shared group, this adds group-read);
-- the <code>rrsync</code> user must be able to <strong>traverse</strong> to the NAS root (e.g. <code>setfacl -m u:scrubjay-rx:x</code>
-  on a <code>0750</code> parent like <code>/media/&lt;user&gt;</code>);
-- <code>rsync ≥ 3.2.3</code> on both ends (for <code>--mkpath</code>).</p>
-<h2 id="backend-local-the-box-that-is-the-nas">Backend: <code>local</code>  (the box that <em>is</em> the NAS)<a class="headerlink" href="#backend-local-the-box-that-is-the-nas" title="Permanent link">&para;</a></h2>
-<p>The receiver itself (the machine with the NAS mounted) shouldn't rsync to itself over WG.
-The <code>local</code> backend just copies the transcript straight into the NAS chats root:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">SCRUBJAY_TRANSCRIPT_BACKEND</span><span class="o">=</span><span class="s2">&quot;local&quot;</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">SCRUBJAY_LOCAL_CHATS</span><span class="o">=</span><span class="s2">&quot;/mnt/nas1/scrubjay-storage&quot;</span><span class="w">   </span><span class="c1"># the NAS storage root</span>
-</code></pre></div>
-<p>Layout matches every other backend (<code>&lt;host&gt;/&lt;slug&gt;/&lt;session&gt;.jsonl</code>), so a <code>local</code> sender and
-the WG receivers all write into one tree. Lives in <code>hooks/transports/local.sh</code>.</p>
-<p>Adding any other transport (e.g. S3, syncthing) is just another
-<code>hooks/transports/&lt;name&gt;.sh</code> defining <code>transport_ship</code>.</p>
+<p>Flags: <code>--path &lt;dir&gt;</code> (defaults to <code>$SCRUBJAY_LOCAL_CHATS</code> or <code>/mnt/nas1/scrubjay-storage</code>),
+<code>--keep N</code>, <code>--oncalendar &lt;systemd spec&gt;</code>.</p>
+<p>For the cleanest snapshots, put <code>scrubjay-storage</code> on <strong>its own</strong> btrfs subvolume or zfs dataset so
+it can be snapshotted (and rolled back) independently of everything else on the NAS. If it's on
+ext4 or any non-CoW filesystem, <code>sj-snapshot.sh</code> says so and points you at LVM snapshots or restic
+instead of failing silently.</p>
+<h2 id="restore">Restore<a class="headerlink" href="#restore" title="Permanent link">&para;</a></h2>
+<p>Restore is destructive and filesystem-specific, so <code>sj-snapshot.sh --restore &lt;snap&gt;</code> <strong>prints</strong> the
+exact commands rather than running them — review, then run them yourself:</p>
+<ul>
+<li><strong>zfs</strong> — <code>zfs rollback -r &lt;dataset&gt;@&lt;snap&gt;</code> (discards everything since), or <code>zfs clone</code> the
+  snapshot elsewhere and copy out just what you need.</li>
+<li><strong>btrfs</strong> — the read-only snapshot is a full tree under <code>.scrubjay-snapshots/</code>; <code>rsync</code> the files
+  you want back into place.</li>
+</ul>
+<h2 id="snapshots-are-not-a-backup">Snapshots are not a backup<a class="headerlink" href="#snapshots-are-not-a-backup" title="Permanent link">&para;</a></h2>
+<p>A snapshot lives on the <strong>same disk</strong> as the archive — it protects against accidental deletion and
+corruption, not against disk failure. For that, replicate snapshots <strong>off the box</strong>:
+<code>zfs send | ssh</code>, <a href="https://digint.ch/btrbk/"><code>btrbk</code></a>, or <code>restic</code> to another machine or object
+store. scrubjay doesn't automate off-box replication — set it up with whatever you already use for
+the rest of the NAS.</p>
 
 
 

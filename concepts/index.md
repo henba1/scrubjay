@@ -20,6 +20,8 @@ The *record* half above is where a NAS shines, but a NAS isn't required. The tra
 
 Same records, two destinations — choose by whether you'd rather manage your own storage or none. (Config always rides GitHub either way. Cross-machine *memory* rides its own repo and follows the same fork: the NAS backends self-host it on your hardware, while a GitHub-only setup puts it in a separate private `scrubjay-memory` repo — wired for you by `/sjmemory`, with the same "your file paths now sit with a third party" trade-off you accepted for transcripts. See [memory](https://henba1.github.io/scrubjay/memory-sync/index.md).)
 
+Keeping records out of git doesn't mean giving up recovery: on the NAS backends, point-in-time history comes from **filesystem snapshots** of `scrubjay-storage`, not git — cheap for append-only data, and the reason transcripts don't belong in a repo. See [durability](https://henba1.github.io/scrubjay/durability/index.md).
+
 ## What is scrubjay?
 
 [Claude Code](https://claude.ai/code) reads its configuration from a `~/.claude/` directory on whatever machine you run it on: which rules it must follow, which custom commands and sub-agents exist, what it's allowed to do, and so on. If you work on several machines (a laptop, a desktop, an HPC cluster) you'd normally set all of that up by hand, separately, on each one — and they'd drift apart over time.

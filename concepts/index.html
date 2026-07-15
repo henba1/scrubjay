@@ -729,6 +729,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../durability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Archive durability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../memory-sync/" class="md-nav__link">
         
   
@@ -955,6 +983,9 @@ follows the same fork: the NAS backends self-host it on your hardware, while a G
 setup puts it in a separate private <code>scrubjay-memory</code> repo — wired for you by <code>/sjmemory</code>, with
 the same "your file paths now sit with a third party" trade-off you accepted for transcripts.
 See <a href="../memory-sync/">memory</a>.)</p>
+<p>Keeping records out of git doesn't mean giving up recovery: on the NAS backends, point-in-time
+history comes from <strong>filesystem snapshots</strong> of <code>scrubjay-storage</code>, not git — cheap for append-only
+data, and the reason transcripts don't belong in a repo. See <a href="../durability/">durability</a>.</p>
 <h2 id="what-is-scrubjay">What is scrubjay?<a class="headerlink" href="#what-is-scrubjay" title="Permanent link">&para;</a></h2>
 <p><a href="https://claude.ai/code">Claude Code</a> reads its configuration from a <code>~/.claude/</code>
 directory on whatever machine you run it on: which rules it must follow, which custom
