@@ -34,7 +34,7 @@ jq -rs '
             elif ([ $c[]? | select(.type=="tool_result") ] | length) > 0
             then ( [ $c[]? | select(.type=="tool_result") | render_result(.) ] | join("\n\n") )
                  | {role:"assistant", text:.}
-            else ( [ $c[]? | select(.type=="text") | .text ] | join("\n\n") ) as $t
+            else ( [ $c[]? | select(.type=="text") | .text | select(keepstr(.)) ] | join("\n\n") ) as $t
                  | (if ($t|gsub("\\s";"")) != "" then {role:"user", text:$t} else empty end)
             end )
       elif .type=="assistant" then
@@ -47,11 +47,14 @@ jq -rs '
   ] as $turns
   | ([ $turns[] | select(.role=="user") | .text ][0] // "(no prompt)") as $topic
   | ($topic | gsub("\\s+";" ") | .[0:80]) as $title
-  | "# " + $title + "\n\n_" + ($turns | length | tostring) + " turns_\n"
-    + ( reduce $turns[] as $f ( {out:[], last:""};
-          if $f.role == .last
-          then .out[-1] += "\n\n" + $f.text
-          else .out += [ "\n" + hdr($f.role) + "\n\n" + $f.text ] | .last = $f.role
-          end )
-        | .out | join("") )
+  # count the rendered blocks, not the pre-merge records: consecutive same-role turns and folded
+  # tool output collapse into one block, and that block count is what sjmcp reports as session size.
+  | ( reduce $turns[] as $f ( {out:[], last:""};
+        if $f.role == .last
+        then .out[-1] += "\n\n" + $f.text
+        else .out += [ "\n" + hdr($f.role) + "\n\n" + $f.text ] | .last = $f.role
+        end )
+      | .out ) as $blocks
+  | "# " + $title + "\n\n_" + ($blocks | length | tostring) + " turns_\n"
+    + ( $blocks | join("") )
 ' "$src"

@@ -48,11 +48,13 @@ jq -r '
   ] as $turns
   | ( [ $turns[] | select(.role == "user") | .text ][0] // .info.title // "(no prompt)" ) as $topic
   | ($topic | gsub("\\s+"; " ") | .[0:80]) as $title
-  | "# " + $title + "\n\n_" + ($turns | length | tostring) + " turns_\n"
-    + ( reduce $turns[] as $f ( {out: [], last: ""};
-          if $f.role == .last
-          then .out[-1] += "\n\n" + $f.text
-          else .out += [ "\n" + hdr($f.role) + "\n\n" + $f.text ] | .last = $f.role
-          end )
-        | .out | join("") )
+  # count the rendered blocks, not the pre-merge records — same shape/semantics as the other renderers.
+  | ( reduce $turns[] as $f ( {out: [], last: ""};
+        if $f.role == .last
+        then .out[-1] += "\n\n" + $f.text
+        else .out += [ "\n" + hdr($f.role) + "\n\n" + $f.text ] | .last = $f.role
+        end )
+      | .out ) as $blocks
+  | "# " + $title + "\n\n_" + ($blocks | length | tostring) + " turns_\n"
+    + ( $blocks | join("") )
 ' "$src"

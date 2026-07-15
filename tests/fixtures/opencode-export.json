@@ -1,0 +1,42 @@
+{
+  "info": {
+    "id": "ses_66a71b6f4ffeq796jvvOpJQ04m",
+    "projectID": "prj_3f2a1b",
+    "directory": "/home/user/widget-api",
+    "title": "add a healthcheck to the compose file",
+    "version": "1.17.20",
+    "time": { "created": 1752400000000, "updated": 1752400600000 }
+  },
+  "messages": [
+    {
+      "info": { "id": "msg_01", "sessionID": "ses_66a71b6f4ffeq796jvvOpJQ04m", "role": "user", "time": { "created": 1752400000000 } },
+      "parts": [
+        { "id": "prt_00", "type": "text", "synthetic": true, "text": "<project-context>injected rules the user never typed</project-context>" },
+        { "id": "prt_01", "type": "text", "text": "add a healthcheck to the compose file" }
+      ]
+    },
+    {
+      "info": {
+        "id": "msg_02", "sessionID": "ses_66a71b6f4ffeq796jvvOpJQ04m", "role": "assistant",
+        "path": { "cwd": "/home/user/widget-api", "root": "/home/user/widget-api" }
+      },
+      "parts": [
+        { "id": "prt_02", "type": "reasoning", "text": "thinking that should not be rendered" },
+        { "id": "prt_03", "type": "step-start", "snapshot": "abc123" },
+        { "id": "prt_04", "type": "text", "text": "Let me look at the compose file first." },
+        {
+          "id": "prt_05", "type": "tool", "callID": "call_1", "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": { "command": "cat docker-compose.yml" },
+            "output": "services:\n  web:\n    image: nginx:alpine",
+            "title": "cat docker-compose.yml",
+            "metadata": {},
+            "time": { "start": 1752400010000, "end": 1752400011000 }
+          }
+        },
+        { "id": "prt_06", "type": "text", "text": "Added a curl-based healthcheck to the web service." }
+      ]
+    }
+  ]
+}

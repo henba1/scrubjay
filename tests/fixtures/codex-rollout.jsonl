@@ -1,0 +1,9 @@
+{"timestamp":"2026-07-14T09:15:02.100Z","type":"session_meta","payload":{"session_id":"7c4f1a2b-9d3e-4a10-b8c5-1e2f3a4b5c6d","id":"7c4f1a2b-9d3e-4a10-b8c5-1e2f3a4b5c6d","timestamp":"2026-07-14T09:15:02.100Z","cwd":"/home/user/widget-api","originator":"codex_cli_rs","cli_version":"0.140.0","source":"cli"}}
+{"timestamp":"2026-07-14T09:15:02.300Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context><cwd>/home/user/widget-api</cwd></environment_context>"}]}}
+{"timestamp":"2026-07-14T09:15:05.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"the retry backoff fires twice per failure — find out why"}]}}
+{"timestamp":"2026-07-14T09:15:07.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"look for the retry decorator"}],"encrypted_content":null}}
+{"timestamp":"2026-07-14T09:15:08.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Let me look at how retry is applied."}]}}
+{"timestamp":"2026-07-14T09:15:09.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","call_id":"call_a1","arguments":"{\"command\":[\"bash\",\"-lc\",\"grep -rn 'def retry' src/\"]}"}}
+{"timestamp":"2026-07-14T09:15:10.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_a1","output":"src/http/client.py:44:    return retry(retry(self._send))(req)"}}
+{"timestamp":"2026-07-14T09:15:15.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Found it: client.py:44 double-wraps retry."}]}}
+{"timestamp":"2026-07-14T09:15:16.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":8120,"output_tokens":430}}}}

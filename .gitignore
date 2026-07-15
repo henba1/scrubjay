@@ -4,6 +4,8 @@
 .credentials.json
 .claude.json
 *.jsonl
+# ...except the synthetic, public-safe session fixtures the test suite renders (no real transcripts).
+!tests/fixtures/*.jsonl
 projects/
 
 # editor / OS noise
