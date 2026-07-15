@@ -196,4 +196,6 @@ Unchanged from the original plan, and still the blocker:
 * `bin/claude-index-chats.sh` and `bin/backfill-*.sh` are still Claude-only (they walk
   `~/.claude/projects/`). Harmless — `log-session.sh` skips the index for other harnesses — but a
   backfill for opencode/codex sessions does not exist.
-* `bin/onboard.sh` never asks which harnesses to sync; `SCRUBJAY_HARNESSES` has to be set by hand.
+* ~~`bin/onboard.sh` never asks which harnesses to sync~~ — **done:** it auto-detects installed
+  harnesses (each adapter's `sjh_present`), records `SCRUBJAY_HARNESSES`, and applies config into
+  all of them via `sync-config.sh`.

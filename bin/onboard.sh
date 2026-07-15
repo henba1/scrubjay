@@ -2,6 +2,8 @@
 # Interactive onboarding for a new machine. Condenses the README "Onboard a new machine"
 # steps into one guided run:
 #   - check deps (git, jq) and Claude Code — offer to install Claude if missing
+#   - detect which coding harnesses are installed (Claude Code / opencode / codex) and record
+#     which ones to sync config into (SCRUBJAY_HARNESSES)
 #   - clone the sibling data repos (scrubjay-data, and scrubjay-chats only for the git backend)
 #   - write ~/.config/scrubjay/{config,host}
 #   - register the host + apply config into ~/.claude
@@ -68,6 +70,23 @@ else
       || warn "uv install reported an error — continuing; install it manually later."
   fi
 fi
+
+# ---- 1c) which coding harnesses this machine syncs config into ------------------------
+# scrubjay is not Claude-only. Detect the agents actually installed here — each adapter's
+# sjh_present (PATH-based) — and default to syncing your config into all of them, so a machine
+# with opencode gets your settings/instructions/agents/commands there with no extra step. Narrow
+# it at the prompt, or preset SCRUBJAY_HARNESSES=... (space-separated) to run unattended.
+if [ -z "${SCRUBJAY_HARNESSES:-}" ]; then
+  detected=""
+  for _h in $(sj_known_harnesses); do
+    sj_adapter_call "$_h" sjh_present 2>/dev/null && detected="${detected:+$detected }$_h"
+  done
+  [ -n "$detected" ] || detected="claude"          # nothing on PATH yet → the reference harness
+  [ "$detected" = "claude" ] || info "harnesses detected on PATH: $detected"
+  ask SCRUBJAY_HARNESSES "coding harnesses to sync config into (space-separated)" "$detected"
+fi
+export SCRUBJAY_HARNESSES
+ok "harnesses: $SCRUBJAY_HARNESSES"
 
 # ---- 2) where the repos live + who owns YOUR private data repos -----------------------
 # Deliberately NOT inferred from this clone's origin. The app repo is public and you may run it
@@ -141,6 +160,7 @@ else
   {
     echo ": \"\${SCRUBJAY_DATA:=$DATA_DIR}\""
     echo ": \"\${SCRUBJAY_CHATS:=$CHATS_DIR}\""
+    echo ": \"\${SCRUBJAY_HARNESSES:=$SCRUBJAY_HARNESSES}\""
     echo ": \"\${SCRUBJAY_TRANSCRIPT_BACKEND:=$BACKEND}\""
     [ "$BACKEND" = local ]    && echo ": \"\${SCRUBJAY_LOCAL_CHATS:=$LOCAL_CHATS}\""
     [ "$BACKEND" = rsync-wg ] && { echo ": \"\${SCRUBJAY_WG_TARGET:=$WG_TARGET}\""
@@ -165,11 +185,16 @@ if [ "$GEN_KEY" = 1 ]; then
   fi
 fi
 
-# ---- 7) register host + apply config --------------------------------------------------
+# ---- 7) register host + apply config into every selected harness ----------------------
+# sync-config.sh walks $SCRUBJAY_HARNESSES and runs each adapter's apply (claude-sync.sh for
+# Claude, the opencode.json/agents/commands merge for opencode). The Claude host dir is a
+# hard requirement of claude-sync.sh, so register it only when Claude is actually selected.
 export CLAUDE_HOST="$HOST"
-info "registering host '$HOST' and applying config…"
-"$APP/bin/claude-register-host.sh" --host "$HOST" || die "host registration failed"
-"$APP/bin/claude-sync.sh"          --host "$HOST" || die "claude-sync failed"
+info "registering host '$HOST' and applying config into: $SCRUBJAY_HARNESSES …"
+case " $SCRUBJAY_HARNESSES " in
+  *" claude "*) "$APP/bin/claude-register-host.sh" --host "$HOST" || die "host registration failed" ;;
+esac
+"$APP/bin/sync-config.sh" --host "$HOST" || die "sync-config failed"
 
 # ---- 7b) cross-machine memory ---------------------------------------------------------
 # Its own git repo, hosted the same way you host transcripts: self-hosted on the NAS for the

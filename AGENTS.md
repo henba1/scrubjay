@@ -72,17 +72,22 @@ Steps:
    (`SCRUBJAY_OWNER` — default `gh api user`); stable host name; relay backend (`rsync-wg` /
    `local` / `git` / `off` — present them as peer options, no default) and its settings — for
    `rsync-wg`/`git` the receiver `user` / `host` / `port` / rrsync-`path`; for `local` the NAS
-   mount path; and whether to enable cross-machine memory (on the `git` backend this puts real
-   filesystem paths in a private GitHub repo — surface that trade-off, don't just enable it).
+   mount path; which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
+   auto-detects installed ones via each adapter's PATH-based `sjh_present`, so you usually only
+   set this to override, e.g. an opencode that isn't on PATH yet); and whether to enable
+   cross-machine memory (on the `git` backend this puts real filesystem paths in a private GitHub
+   repo — surface that trade-off, don't just enable it).
 2. **Confirm, then run non-interactively** from the clone, e.g.:
 
    ```sh
    SCRUBJAY_OWNER=<gh-user> SCRUBJAY_HOST=<host> SCRUBJAY_BACKEND=<backend> \
+   SCRUBJAY_HARNESSES="claude opencode" \
    RECV_USER=<user> RECV_HOST=<host-or-ip> RECV_PORT=<port> RECV_PATH=<rrsync-root> \
    bash ./bin/onboard.sh </dev/null
    ```
 
-   (Omit the `RECV_*` for `local`/`off`; use `LOCAL_CHATS=<path>` for `local`.)
+   (Omit the `RECV_*` for `local`/`off`; use `LOCAL_CHATS=<path>` for `local`. Omit
+   `SCRUBJAY_HARNESSES` to accept auto-detection.)
 3. **Report what changed** and surface the manual step below.
 
 If `gh` is absent, `sj-bootstrap.sh` prints the exact `gh repo create` commands and stops. Relay
