@@ -71,8 +71,10 @@ Steps:
 1. **Gather choices in chat:** the GitHub account that will own their private repos
    (`SCRUBJAY_OWNER` — default `gh api user`); stable host name; relay backend (`rsync-wg` /
    `local` / `git` / `off` — present them as peer options, no default) and its settings — for
-   `rsync-wg`/`git` the receiver `user` / `host` / `port` / rrsync-`path`; for `local` the NAS
-   mount path; which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
+   `rsync-wg`/`git` the receiver `user` / `host` / `port` / rrsync-`path`; for `local` either the
+   already-mounted NAS storage path (`LOCAL_CHATS`) **or** the share details so onboard mounts it
+   for you (`SCRUBJAY_NAS_SERVER` / `_EXPORT` / `_PROTO=nfs|cifs` / `_MOUNTPOINT`, via
+   `bin/sj-mount.sh` — see below); which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
    auto-detects installed ones via each adapter's PATH-based `sjh_present`, so you usually only
    set this to override, e.g. an opencode that isn't on PATH yet); and whether to enable
    cross-machine memory (on the `git` backend this puts real filesystem paths in a private GitHub
@@ -86,7 +88,10 @@ Steps:
    bash ./bin/onboard.sh </dev/null
    ```
 
-   (Omit the `RECV_*` for `local`/`off`; use `LOCAL_CHATS=<path>` for `local`. Omit
+   (Omit the `RECV_*` for `local`/`off`. For `local`: `LOCAL_CHATS=<path>` if the NAS is already
+   mounted, else preset `SCRUBJAY_NAS_SERVER=<nas> SCRUBJAY_NAS_EXPORT=<share> SCRUBJAY_ASSUME_YES=1`
+   so onboard runs `sj-mount.sh` and installs the mount (systemd `.mount` unit, sudo) unattended —
+   for `cifs` it prints how to place a mode-600 credentials file, which stays yours to create. Omit
    `SCRUBJAY_HARNESSES` to accept auto-detection.)
 3. **Report what changed** and surface the manual step below.
 

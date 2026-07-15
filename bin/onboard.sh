@@ -139,7 +139,21 @@ case "$BACKEND" in
     [ -f "$WG_KEY" ] || confirm "generate the dedicated relay SSH key now?" Y && GEN_KEY=1
     ;;
   local)
-    ask LOCAL_CHATS "NAS storage root (this box's mount)" "/mnt/nas1/scrubjay-storage"
+    # If the NAS share details are given (or the user opts in), provision + verify the mount via
+    # sj-mount.sh (which creates <mountpoint>/scrubjay-storage and prints it); otherwise assume the
+    # box already has the NAS mounted and just take the storage path. For an unattended run, preset
+    # SCRUBJAY_NAS_SERVER (+ SCRUBJAY_ASSUME_YES=1 so it installs the mount without prompting).
+    if [ -n "${SCRUBJAY_NAS_SERVER:-}" ] || confirm "set up the NAS mount now (this box isn't mounted yet)?" N; then
+      ask SCRUBJAY_NAS_PROTO      "NAS protocol (nfs|cifs)"       "nfs"
+      ask SCRUBJAY_NAS_SERVER     "NAS host/IP"                   ""
+      ask SCRUBJAY_NAS_EXPORT     "export/share path on the NAS"  "/export/scrubjay"
+      ask SCRUBJAY_NAS_MOUNTPOINT "local mountpoint"              "/mnt/nas1"
+      export SCRUBJAY_NAS_PROTO SCRUBJAY_NAS_SERVER SCRUBJAY_NAS_EXPORT SCRUBJAY_NAS_MOUNTPOINT
+      LOCAL_CHATS="$("$APP/bin/sj-mount.sh")" \
+        || die "NAS mount setup failed — mount it by hand, then re-run bin/onboard.sh."
+    else
+      ask LOCAL_CHATS "NAS storage root (this box's mount)" "/mnt/nas1/scrubjay-storage"
+    fi
     ;;
 esac
 
