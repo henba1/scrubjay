@@ -863,8 +863,10 @@ either by hand (both idempotent); the hooks just mean you don't have to:</p>
 The full toggle list is in the <a href="../reference/#toggle-behaviour">Reference cheatsheet</a>.</p>
 <h2 id="find-a-past-chat">Find a past chat<a class="headerlink" href="#find-a-past-chat" title="Permanent link">&para;</a></h2>
 <p>Every session is logged by the <code>SessionEnd</code> hook to <code>scrubjay-data/logs/&lt;host&gt;.log</code>
-(one line: <code>time | host | cwd | "first prompt" | session=id</code>) and pushed, so all
-machines' histories are searchable from any clone of the data repo:</p>
+(one line: <code>time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…</code>)
+and pushed, so all machines' histories are searchable from any clone of the data repo. The
+<code>topic</code> is the first real prompt, or — if you publish with <code>/sjlog</code> — a one-sentence essence the
+model writes; the trailing <code>key=value</code> fields are additive, so older lines simply have fewer:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>pull
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>grep<span class="w"> </span>-i<span class="w"> </span>refactor<span class="w"> </span>~/.scrubjay/scrubjay-data/logs/*.log
 </code></pre></div>
