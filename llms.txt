@@ -8,6 +8,7 @@ scrubjay is the app/logic for syncing Claude Code across machines: a git-based c
 
 - [Home](https://henba1.github.io/scrubjay/index.md)
 - [Concepts](https://henba1.github.io/scrubjay/concepts/index.md)
+- [Harnesses](https://henba1.github.io/scrubjay/harnesses/index.md)
 
 ## Setup & operation
 
