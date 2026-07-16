@@ -12,28 +12,46 @@
 
 # scrubjay
 
-The **app/logic** for syncing [Claude Code](https://claude.ai/code) across machines —
-one configuration, applied to every machine, with each session's records relayed to your
-own NAS. Your personal content is kept in *separate* repos so this one can be
-shared/public without leaking anything:
+**Your AI coding sessions and setup, on every machine you own.**
 
-| Repo | Role | Visibility |
+You use a coding agent — [Claude Code](https://claude.ai/code), [opencode](https://opencode.ai),
+[codex](https://developers.openai.com/codex/) — on more than one machine. So you have two problems
+you probably solve by hand today:
+
+1. **Your setup doesn't travel.** The instructions, commands and agents you tuned on the laptop
+   aren't on the workstation.
+2. **Your chats don't travel — and then they're gone.** Yesterday's session, the one where you
+   worked out the tricky thing, is on the other machine. Or it aged out.
+
+scrubjay fixes both, and keeps it all on hardware you own.
+
+- **One config, every machine.** Write your instructions, commands and agents once. Every machine
+  picks them up — and so does every agent, since the same setup lands in Claude Code *and* opencode.
+- **Every session archived, and searchable in plain English.** When a session ends it's copied to
+  your own NAS automatically. Later you ask *"what was that fix for the auth timeout?"* and get the
+  real conversation back — whichever machine and whichever agent it happened on.
+- **Yours.** Your config and chats live in private repos on your own account; transcripts go
+  straight to your own storage. This repo is only the machinery, which is why it can be public.
+
+Three repos, so the machinery can be public without leaking anything you wrote:
+
+| Repo | What's in it | Visibility |
 |---|---|---|
-| **scrubjay** (this) | scripts, hooks, docs — the logic | public-able |
-| **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `shared/`, `opencode/`, `templates/`, `memory/`, `logs/` | private |
-| **scrubjay-chats** | full chat transcripts (`.jsonl`), relayed off each machine | private |
+| **scrubjay** (this) | the scripts, hooks and docs — the logic, no content | public |
+| **scrubjay-data** | your config: instructions, commands, agents, settings, memory, session log | private, your account |
+| **scrubjay-chats** | your full transcripts — only if you pick the GitHub relay instead of a NAS | private, your account |
 
 ![scrubjay — system overview](docs/overview.svg)
 
 <sub>Diagram source: [`docs/overview.dot`](docs/overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.</sub>
 
-> **Flow:** `scrubjay` (logic) + `scrubjay-data` (your config) → applied into each
-> machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line
-> entry to `scrubjay-data/logs/<host>.log` *and* relays the session (transcript, subagents,
-> plans) off the machine via a pluggable backend — either peer-to-peer to your own NAS (over
-> WireGuard), or to a private `scrubjay-chats` repo on GitHub if you'd rather not run storage of
-> your own. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one
-> host's rules for another.
+> **How it flows.** When a session *starts*, scrubjay pulls your config out of `scrubjay-data` and
+> applies it into whichever agents this machine has. When a session *ends*, a hook writes one line
+> to a shared log ("what ran, where, when") and ships the session itself — transcript, subagents,
+> plans — off the machine. Where it ships is your choice: peer-to-peer to your own NAS (over
+> WireGuard or a local mount), or to a private GitHub repo if you'd rather not run storage. The
+> archive is keyed by machine, so each one's history stays its own and your agent can adapt one
+> machine's rules for another.
 
 ## The core idea: two kinds of sync
 
