@@ -53,6 +53,46 @@ Three repos, so the machinery can be public without leaking anything you wrote:
 > archive is keyed by machine, so each one's history stays its own and your agent can adapt one
 > machine's rules for another.
 
+## What you'd actually use it for
+
+**Start on the laptop, finish on the workstation.** You're deep in a debugging session on the couch
+and want the big screen. On the workstation you run `/sjresume` and pick the session out of a list —
+it comes back with every turn, the subagents it spawned, its task list, and its file history, so even
+`/rewind` still works. The conversation travels; your code doesn't, so git still does its job.
+
+```sh
+/sjresume                       # pick from what's resumable on your other machines
+/sjresume the foolbox refactor  # …or just describe it
+```
+
+**Find the thing you already solved.** Three weeks ago you fixed a nasty auth timeout. You don't
+remember which machine, which repo, or which agent. Ask for it by topic and scrubjay searches every
+session it ever archived — across all your machines and all your agents at once — then pulls the
+right conversation into your current one.
+
+```sh
+/sjrecall that auth timeout fix
+```
+
+**Move between agents.** You started in opencode and want to continue in Claude Code (or the other
+way round). `/sjresume` carries the whole conversation across and seeds a fresh session with it.
+Be clear on what this is: same-agent hand-off resumes the *actual* session, id and tool history
+intact; across *different* agents you keep the conversation but start a new session. That's usually
+what people mean anyway, and it works in every direction today.
+
+**Set up a new machine.** Clone this repo, run the onboarder, and the machine has your instructions,
+commands, agents and settings — in each agent you use. Nothing to copy by hand.
+
+**Teams: pick up where a colleague left off.** scrubjay has no concept of a *user* — only of a
+*host*. So if two people point their machines at the same archive, each one's `/sjresume` and
+`/sjrecall` simply see the other's sessions as "another host", and a colleague can continue your
+conversation with its full context instead of asking you to explain it.
+
+> **Honesty note.** That last one falls out of the design rather than being a feature we built and
+> tested — sharing an archive also means sharing the config and memory that ride along with it, and
+> there's no per-person access control. Treat it as a promising trick for a small, trusting team,
+> not a supported multi-tenant mode.
+
 ## The core idea: two kinds of sync
 
 Everything scrubjay moves is one of two things — and which one it is decides the *mechanism*:
