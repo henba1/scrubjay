@@ -153,6 +153,28 @@ Full docs — [**henba1.github.io/scrubjay**](https://henba1.github.io/scrubjay/
 
 The docs also publish an [`llms.txt`](https://henba1.github.io/scrubjay/llms.txt) index for agents.
 
+## Why the name?
+
+Western scrub jays are the textbook case of **episodic-like memory** in animals. They cache food in
+places they control, and later recover it by *what* they buried, *where* they buried it, and *when* —
+including whether it's still worth eating. That was the first solid evidence any non-human animal
+remembers a specific past event, and not just a learned habit ([Clayton & Dickinson,
+1998](https://doi.org/10.1038/26216)).
+
+Which is this system, precisely:
+
+| The bird | scrubjay |
+|---|---|
+| caches food in places it controls | ships records to hardware you own |
+| **what** it cached | the topic — searchable in plain English |
+| **where** it cached | which machine, which project |
+| **when** it cached | the date, and how stale it is |
+
+Hence the tagline: **recall what · where · when.**
+
+The name also has to do a duller job, and does: it's vendor-neutral (nothing here is Claude-only),
+it's a coined compound, so it survives a namespace check, and `sjrecall` reads well in a terminal.
+
 ## License
 
 [MIT](LICENSE) © 2026 Hendrik
