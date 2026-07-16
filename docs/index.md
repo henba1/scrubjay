@@ -34,7 +34,7 @@ without leaking anything:
   chat, and troubleshooting.
 - **[Query the archive (MCP)](archive-mcp.md)** — recall a past session by *topic* from
   inside a live Claude session via the read-only `sjmcp` server.
-- **[Slash commands](slash-commands.md)** — the `/dc*` command reference.
+- **[Slash commands](slash-commands.md)** — the `/sj*` command reference.
 - **[Transcripts: relay + NAS](transports.md)** — how sessions ride peer-to-peer to
   your own NAS, and the two P2P paths (WireGuard / SSH).
 - **[Reference](reference.md)** — the by-hand command cheatsheet and environment toggles.

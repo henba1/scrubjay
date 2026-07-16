@@ -65,7 +65,7 @@ directories. Each one feeds Claude in a specific way:
   always-on instruction file Claude reads at the top of every session (e.g. *"never add a
   `Co-Authored-By` trailer to commits"*). `commands/` holds custom slash-commands you can
   invoke by name — `commands/explain-diff.md` becomes `/explain-diff`, which might tell
-  Claude to summarise your staged git changes. (The generic `/dc*` commands aren't here — they
+  Claude to summarise your staged git changes. (The generic `/sj*` commands aren't here — they
   ship with the app; `claude-sync.sh` merges both into `~/.claude/commands/`.) `agents/` holds
   sub-agents Claude can delegate to — `agents/test-runner.md` defines a focused helper that runs
   your test suite and reports back. `CLAUDE.md` and `agents/` are symlinked straight into
