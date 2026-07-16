@@ -2,7 +2,7 @@
 
 Day-to-day this all runs from hooks; reach for these when you want to do something by hand.
 Paths assume the default `~/.scrubjay/` layout from [Onboarding](onboarding.md) (if you cloned
-elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/dc*` commands, see
+elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/sj*` commands, see
 [Slash commands](slash-commands.md).
 
 ## Apply / refresh config now

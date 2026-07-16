@@ -95,47 +95,49 @@ conversation with its full context instead of asking you to explain it.
 
 ## The core idea: two kinds of sync
 
-Everything scrubjay moves is one of two things — and which one it is decides the *mechanism*:
+Everything scrubjay moves is one of two things, and which one it is decides how it moves:
 
-| Semantic | Mechanism | What it fits |
+| | Things you **write** | Things that **happen** |
 |---|---|---|
-| **Shared / bidirectional** — same content everywhere, edits *merge* | **git** (pull + push) | things you *author*: `CLAUDE.md`, `commands`, `agents`, `settings`, **memory** |
-| **Archive / one-way** — machine → NAS, never read back | **rsync** (peer-to-peer) | *records*: transcripts, subagents, plans, `readable/`, history |
+| *For example* | instructions, commands, agents, settings, memory | transcripts, subagents, plans |
+| *Direction* | every machine, both ways — edits merge | one way only: machine → archive |
+| *So it uses* | **git** | **rsync** (or a NAS mount) |
 
-The orthogonal axis is **privacy**: anything sensitive goes straight to your own NAS, never a
-third party. In one sentence — **author-vs-record picks git-vs-rsync; sensitive-vs-not picks
-NAS-vs-GitHub.** The full design is in [Concepts](https://henba1.github.io/scrubjay/concepts/).
+The second question is privacy: anything sensitive goes straight to storage you own, never a third
+party. That's the whole design in one line — **what you author vs. what got recorded picks git vs.
+rsync; sensitive vs. not picks your NAS vs. GitHub.** The long version is in
+[Concepts](https://henba1.github.io/scrubjay/concepts/).
 
 ## Quick start
 
-**No fork needed.** Clone this repo straight from upstream — it's the app, and it updates itself
-by `git pull`. Your *content* lives in private repos under your **own** GitHub account, which the
-onboarder creates for you (`scrubjay-data`, plus `scrubjay-chats` on the `git` backend).
+**Don't fork.** Clone this repo straight from upstream — it's the app, and it keeps itself current
+with `git pull`. Nothing of yours goes in it. Your content lands in private repos on your **own**
+GitHub account, which the onboarder creates for you.
 
-**With Claude Code** — clone, open Claude in the clone, and ask it to set things up. It reads
-[`AGENTS.md`](AGENTS.md), gathers your choices, and drives the onboarder:
-
-```sh
-git clone git@github.com:henba1/scrubjay.git ~/.scrubjay/scrubjay
-cd ~/.scrubjay/scrubjay && claude
-# then: "set up scrubjay on this machine"
-```
-
-**By hand** — run the interactive onboarder directly:
+**Easiest — let the agent do it.** Clone, open your agent inside the clone, and ask. It reads
+[`AGENTS.md`](AGENTS.md), asks you the handful of questions it needs, and runs the onboarder for you:
 
 ```sh
 git clone git@github.com:henba1/scrubjay.git ~/.scrubjay/scrubjay
-~/.scrubjay/scrubjay/bin/onboard.sh          # asks for your GitHub account (or set SCRUBJAY_OWNER)
+cd ~/.scrubjay/scrubjay && claude      # or: opencode
+# then just say: "set up scrubjay on this machine"
 ```
 
-It creates and seeds your private repos, writes the machine-local pointer, registers the host,
-applies config, and (for the peer-to-peer backends) prints one `authorized_keys` line to paste on
-the receiver — the single manual step, by design.
+**By hand** — run the onboarder yourself; it asks the same questions:
 
-Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub, and the [`gh`](https://cli.github.com) CLI to
-create the private repos (without it, the onboarder prints the exact `gh repo create` commands and
-stops). No root. Install with `git clone`, **not** a source tarball — the app self-updates by
-pulling, so an unpacked archive can never update itself. Full walkthrough:
+```sh
+git clone git@github.com:henba1/scrubjay.git ~/.scrubjay/scrubjay
+~/.scrubjay/scrubjay/bin/onboard.sh    # asks for your GitHub account (or set SCRUBJAY_OWNER)
+```
+
+Either way it creates your private repos, registers this machine, applies your config, and — if you
+chose a peer-to-peer relay — prints one line for you to paste into the receiving machine's
+`authorized_keys`. **That paste is the one step nothing here will do for you**, and that's
+deliberate: a new machine must not be able to grant itself access to your archive.
+
+You'll need `bash`, `jq`, `git`, an SSH key on GitHub, and the [`gh`](https://cli.github.com) CLI —
+without `gh` the onboarder prints the exact `gh repo create` commands and stops, so you can run them
+yourself. No root required. Full walkthrough:
 [Onboarding](https://henba1.github.io/scrubjay/onboarding/).
 
 ## Documentation
@@ -147,7 +149,7 @@ Full docs — [**henba1.github.io/scrubjay**](https://henba1.github.io/scrubjay/
 - [**Onboarding**](https://henba1.github.io/scrubjay/onboarding/) — install on a new machine, the repo layout, and machine-local pointers.
 - [**Day-to-day**](https://henba1.github.io/scrubjay/day-to-day/) — the hooks that keep it hands-off, finding a past chat, troubleshooting.
 - [**Query the archive (MCP)**](https://henba1.github.io/scrubjay/archive-mcp/) — recall a past session by *topic* from inside a live Claude session.
-- [**Slash commands**](https://henba1.github.io/scrubjay/slash-commands/) — the `/dc*` command reference.
+- [**Slash commands**](https://henba1.github.io/scrubjay/slash-commands/) — the `/sj*` command reference.
 - [**Transcripts: relay + NAS**](https://henba1.github.io/scrubjay/transports/) — the peer-to-peer paths (WireGuard / SSH) to your own NAS.
 - [**Reference**](https://henba1.github.io/scrubjay/reference/) — the by-hand command cheatsheet and environment toggles.
 

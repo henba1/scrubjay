@@ -70,7 +70,7 @@ See [memory-sync.md](memory-sync.md) for the bare-repo setup and per-client WG o
 **Not sensitive → git (`scrubjay-data`, GitHub).** Your rules, `settings`, *personal* `commands`,
 `agents`, the `plugins/` marketplace list, host config and `logs/` are low-sensitivity, need
 merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal
-git. (The generic `/dc*` slash commands instead ship with the **app** in `scrubjay/commands/`, so a
+git. (The generic `/sj*` slash commands instead ship with the **app** in `scrubjay/commands/`, so a
 fresh install has them immediately; `claude-sync.sh` merges both sources into `~/.claude/commands/`.
 Memory used to live here too; it now rides its own NAS repo above. Transcripts are *not* part of git.)
 
