@@ -1007,7 +1007,7 @@ directories. Each one feeds Claude in a specific way:</p>
   always-on instruction file Claude reads at the top of every session (e.g. <em>"never add a
   <code>Co-Authored-By</code> trailer to commits"</em>). <code>commands/</code> holds custom slash-commands you can
   invoke by name — <code>commands/explain-diff.md</code> becomes <code>/explain-diff</code>, which might tell
-  Claude to summarise your staged git changes. (The generic <code>/dc*</code> commands aren't here — they
+  Claude to summarise your staged git changes. (The generic <code>/sj*</code> commands aren't here — they
   ship with the app; <code>claude-sync.sh</code> merges both into <code>~/.claude/commands/</code>.) <code>agents/</code> holds
   sub-agents Claude can delegate to — <code>agents/test-runner.md</code> defines a focused helper that runs
   your test suite and reports back. <code>CLAUDE.md</code> and <code>agents/</code> are symlinked straight into

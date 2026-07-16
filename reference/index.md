@@ -1,6 +1,6 @@
 # Reference — useful commands
 
-Day-to-day this all runs from hooks; reach for these when you want to do something by hand. Paths assume the default `~/.scrubjay/` layout from [Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md) (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/dc*` commands, see [Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md).
+Day-to-day this all runs from hooks; reach for these when you want to do something by hand. Paths assume the default `~/.scrubjay/` layout from [Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md) (if you cloned elsewhere, adjust, or run `bin/*` from inside the repo). For the in-session `/sj*` commands, see [Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md).
 
 ## Apply / refresh config now
 

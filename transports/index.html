@@ -923,7 +923,7 @@ See <a href="../memory-sync/">memory-sync.md</a> for the bare-repo setup and per
 <p><strong>Not sensitive → git (<code>scrubjay-data</code>, GitHub).</strong> Your rules, <code>settings</code>, <em>personal</em> <code>commands</code>,
 <code>agents</code>, the <code>plugins/</code> marketplace list, host config and <code>logs/</code> are low-sensitivity, need
 merge/history across machines, and must be reachable to bootstrap a new box — so they ride normal
-git. (The generic <code>/dc*</code> slash commands instead ship with the <strong>app</strong> in <code>scrubjay/commands/</code>, so a
+git. (The generic <code>/sj*</code> slash commands instead ship with the <strong>app</strong> in <code>scrubjay/commands/</code>, so a
 fresh install has them immediately; <code>claude-sync.sh</code> merges both sources into <code>~/.claude/commands/</code>.
 Memory used to live here too; it now rides its own NAS repo above. Transcripts are <em>not</em> part of git.)</p>
 <h2 id="the-two-peer-to-peer-paths-to-your-nas">The two peer-to-peer paths to your NAS<a class="headerlink" href="#the-two-peer-to-peer-paths-to-your-nas" title="Permanent link">&para;</a></h2>
