@@ -26,10 +26,11 @@ die()  { printf '\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 ask() {  # ask VARNAME "prompt" "default"   (keeps an existing env value; falls back to default)
-  local __var="$1" __prompt="$2" __def="${3:-}" __cur="" __ans=""
+  local __var="$1" __prompt="$2" __def="${3:-}" __cur="" __ans="" __disp=""
   eval "__cur=\${$__var:-}"
   if [ -n "$__cur" ]; then printf -v "$__var" '%s' "$__cur"; return 0; fi
-  if [ -t 0 ]; then read -r -p "  $__prompt [${__def}]: " __ans || __ans=""; fi
+  __disp="$(sj_pretty_path "$__def")"    # display only — the real (unabridged) default still wins on empty input
+  if [ -t 0 ]; then read -r -p "  $__prompt [${__disp}]: " __ans || __ans=""; fi
   [ -n "$__ans" ] || __ans="$__def"
   printf -v "$__var" '%s' "$__ans"
 }
@@ -45,12 +46,28 @@ case "${1:-}" in
   -v|--version) echo "scrubjay $(sj_version)"; exit 0;;
 esac
 
-echo; info "scrubjay onboarding  (app: $APP, version: $(sj_version))"
+echo; info "scrubjay onboarding  (app: $(sj_pretty_path "$APP"), version: $(sj_version))"
 
 # ---- 1) dependencies ------------------------------------------------------------------
 have git || die "git not found — install it first (e.g. sudo apt install git)."
 have jq  || die "jq not found — install it first (e.g. sudo apt install jq)."
-if have claude; then ok "Claude Code present ($(command -v claude))"
+# `have` (PATH-only) can't tell "not installed" from "installed but this shell's PATH doesn't
+# include it" — e.g. the official installer's default ~/.local/bin isn't on PATH in a fresh
+# zsh setup. Check the installer's known locations before concluding it's missing.
+CLAUDE_BIN=""
+if have claude; then CLAUDE_BIN="$(command -v claude)"
+else
+  for _c in "$HOME/.local/bin/claude" "$HOME/.claude/local/claude"; do
+    [ -x "$_c" ] && CLAUDE_BIN="$_c" && break
+  done
+fi
+if [ -n "$CLAUDE_BIN" ]; then
+  ok "Claude Code present ($(sj_pretty_path "$CLAUDE_BIN"))"
+  CLAUDE_BINDIR="$(dirname "$CLAUDE_BIN")"
+  case ":$PATH:" in
+    *":$CLAUDE_BINDIR:"*) ;;
+    *) warn "found at $(sj_pretty_path "$CLAUDE_BIN") but $(sj_pretty_path "$CLAUDE_BINDIR") isn't on PATH for this shell — add it to your shell rc." ;;
+  esac
 else
   warn "Claude Code ('claude') not found."
   if confirm "Install it now via the official installer?" Y; then
@@ -180,14 +197,14 @@ else
     [ "$BACKEND" = rsync-wg ] && { echo ": \"\${SCRUBJAY_WG_TARGET:=$WG_TARGET}\""
                                    echo ": \"\${SCRUBJAY_WG_SSHKEY:=$WG_KEY}\""; }
   } > "$CFG"
-  ok "wrote $CFG"
+  ok "wrote $(sj_pretty_path "$CFG")"
 fi
 
 # ---- 6) generate relay key + ssh alias (rsync-wg) ------------------------------------
 if [ "$GEN_KEY" = 1 ]; then
   mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
-  if [ -f "$WG_KEY" ]; then ok "relay key already exists ($WG_KEY)"
-  else ssh-keygen -t ed25519 -N "" -f "$WG_KEY" -C "$HOST transcripts" && ok "generated $WG_KEY"; fi
+  if [ -f "$WG_KEY" ]; then ok "relay key already exists ($(sj_pretty_path "$WG_KEY"))"
+  else ssh-keygen -t ed25519 -N "" -f "$WG_KEY" -C "$HOST transcripts" && ok "generated $(sj_pretty_path "$WG_KEY")"; fi
   SSHCFG="$HOME/.ssh/config"; touch "$SSHCFG"; chmod 600 "$SSHCFG"
   if grep -qE '^[Hh]ost[[:space:]]+scrubjay-receiver$' "$SSHCFG"; then
     ok "ssh alias 'scrubjay-receiver' already present"
@@ -236,7 +253,7 @@ fi
 if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \
       && { git pull --rebase -q 2>/dev/null; git push -q; } ) \
-    && ok "pushed hosts/$HOST" || warn "push skipped/failed — do it manually in $DATA_DIR"
+    && ok "pushed hosts/$HOST" || warn "push skipped/failed — do it manually in $(sj_pretty_path "$DATA_DIR")"
 fi
 
 # ---- 9) what's left -------------------------------------------------------------------
