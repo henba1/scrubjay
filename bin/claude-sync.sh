@@ -32,27 +32,27 @@ HOSTDIR="$DATA/hosts/$HOST"
 }
 
 mkdir -p "$CLAUDE_DIR"
-echo "host: $HOST  ->  $CLAUDE_DIR   (data: $DATA)"
+echo "host: $HOST  ->  $(sj_pretty_path "$CLAUDE_DIR")   (data: $(sj_pretty_path "$DATA"))"
 
 link() {  # link <src> <dst>
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" pdst; pdst="$(sj_pretty_path "$dst")"
   # Source gone (e.g. you deleted CLAUDE.md from the data repo): retract OUR symlink instead of
   # leaving it dangling. Only ever removes a link we made — one that still points at <src> — so a
   # real file, or a link the user aimed somewhere else, is never touched.
   if [ ! -e "$src" ]; then
     if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
-      rm -f "$dst"; echo "  rm    $dst (source no longer in the data repo)"
+      rm -f "$dst"; echo "  rm    $pdst (source no longer in the data repo)"
     fi
     return 0
   fi
   if [ -L "$dst" ]; then
-    [ "$(readlink "$dst")" = "$src" ] && { echo "  ok    $dst"; return 0; }
+    [ "$(readlink "$dst")" = "$src" ] && { echo "  ok    $pdst"; return 0; }
     rm -f "$dst"
   elif [ -e "$dst" ]; then
-    if [ "$FORCE" = 1 ]; then mv "$dst" "$dst.bak.$(date +%s)"; echo "  bak   $dst"
-    else echo "  SKIP  $dst (real file; rerun with --force)"; return 0; fi
+    if [ "$FORCE" = 1 ]; then mv "$dst" "$dst.bak.$(date +%s)"; echo "  bak   $pdst"
+    else echo "  SKIP  $pdst (real file; rerun with --force)"; return 0; fi
   fi
-  ln -s "$src" "$dst"; echo "  link  $dst"
+  ln -s "$src" "$dst"; echo "  link  $pdst"
 }
 
 # Slash commands come from TWO sources: the app repo ships the generic scrubjay commands
@@ -70,12 +70,12 @@ link_commands() {  # link_commands <dst-dir> <src-dir>...
       for src in "$srcdir"/*.md; do
         local name; name="$(basename "$src")"
         if [ -e "$dst/$name" ] && [ ! -L "$dst/$name" ]; then
-          echo "  SKIP  $dst/$name (real file)"; continue
+          echo "  SKIP  $(sj_pretty_path "$dst/$name") (real file)"; continue
         fi
         ln -sf "$src" "$dst/$name"
       done
     done )
-  echo "  link  $dst/  (app + data commands)"
+  echo "  link  $(sj_pretty_path "$dst")/  (app + data commands)"
 }
 
 # Point a project's harness memory dir at the synced repo (<data>/memory/<host>/<project>/).
@@ -83,23 +83,23 @@ link_commands() {  # link_commands <dst-dir> <src-dir>...
 # files live in the data repo (synced) instead of stranded machine-locally. Migrates any
 # existing real dir in first, never clobbering a memory already in the repo.
 link_memory() {  # link_memory <repo-target-dir> <scrubjay-memory-path>
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" pdst; pdst="$(sj_pretty_path "$dst")"
   if [ -L "$dst" ]; then
-    [ "$(readlink "$dst")" = "$src" ] && { echo "  ok    $dst"; return 0; }
+    [ "$(readlink "$dst")" = "$src" ] && { echo "  ok    $pdst"; return 0; }
     rm -f "$dst"                                   # repoint
   elif [ -d "$dst" ]; then                         # real dir from the harness — migrate, then replace
     mkdir -p "$src"
     ( shopt -s dotglob nullglob
       for f in "$dst"/*; do [ -e "$src/$(basename "$f")" ] || mv "$f" "$src/"; done )
     if [ -n "$(ls -A "$dst" 2>/dev/null)" ]; then
-      echo "  WARN  $dst still has files (name clash) — left as-is, not linked"; return 0
+      echo "  WARN  $pdst still has files (name clash) — left as-is, not linked"; return 0
     fi
     rmdir "$dst" 2>/dev/null || rm -rf "$dst"
   elif [ -e "$dst" ]; then
     mv "$dst" "$dst.bak.$(date +%s)"
   fi
   mkdir -p "$src"
-  ln -s "$src" "$dst"; echo "  link  $dst -> $src"
+  ln -s "$src" "$dst"; echo "  link  $pdst -> $(sj_pretty_path "$src")"
 }
 
 # Register the sjmcp read-archive MCP server (the /sjrecall, /sjfind, /sjbrowse engine) at USER
@@ -218,10 +218,10 @@ jq -n --argjson base "$(cat "$BASE")" --argjson host "$OVERJSON" '
   | .permissions.deny  = (($base.permissions.deny  // []) + ($host.permissions.deny  // []) | unique)
 ' > "$tmp"
 if [ -f "$OUT" ] && [ ! -L "$OUT" ] && ! cmp -s "$tmp" "$OUT"; then
-  cp "$OUT" "$OUT.bak.$(date +%s)"; echo "  bak   $OUT"
+  cp "$OUT" "$OUT.bak.$(date +%s)"; echo "  bak   $(sj_pretty_path "$OUT")"
 fi
 if [ -f "$OUT" ] && cmp -s "$tmp" "$OUT"; then echo "  ok    (unchanged)"; rm -f "$tmp"
-else mv "$tmp" "$OUT"; echo "  wrote $OUT"; fi
+else mv "$tmp" "$OUT"; echo "  wrote $(sj_pretty_path "$OUT")"; fi
 
 # Per-project memory: Claude auto-reads/writes ~/.claude/projects/<project>/memory/. We point each
 # at the SHARED, cross-machine memory clone (<mem>/<project>/) — its own git repo self-hosted on the
@@ -234,7 +234,7 @@ mkdir -p "$MEM" 2>/dev/null || true
 # (per-host, on GitHub). Move that content into the shared clone before re-linking, never clobbering.
 OLD="$DATA/memory/$HOST"
 if [ -d "$OLD" ]; then
-  echo "migrating legacy memory  ($OLD -> $MEM):"
+  echo "migrating legacy memory  ($(sj_pretty_path "$OLD") -> $(sj_pretty_path "$MEM")):"
   for od in "$OLD"/*/; do
     [ -d "$od" ] || continue
     proj="$(basename "$od")"; mkdir -p "$MEM/$proj"

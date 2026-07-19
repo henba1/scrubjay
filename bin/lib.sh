@@ -11,6 +11,13 @@ sj_load_config() {
 # Absolute path of the app repo (this file lives in <app>/bin/).
 sj_app() { (cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd); }
 
+# Display-only: collapse a leading $HOME back to ~ so status/prompt output printed to the
+# terminal (and anything copied from it — scrollback, screenshots, pasted bug reports) doesn't
+# carry the OS username. Never use the result for anything but printing — it is not a real path.
+# NOTE: the replacement side of ${../../..} is itself subject to tilde expansion, so a bare ~
+# here would re-expand right back to $HOME — it must stay escaped.
+sj_pretty_path() { printf '%s' "${1/#$HOME/\~}"; }
+
 # Version of the app. VERSION is the release marker; on the supported install (a git clone) the
 # precise commit is appended, so a bug report pins the exact code that ran.
 sj_version() {
