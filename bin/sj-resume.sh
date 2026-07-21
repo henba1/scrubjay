@@ -125,7 +125,7 @@ ok "found on '$src_host' ($lines lines)"
 # --- where it lands here ----------------------------------------------------------------------
 dest_cwd="${into:-$PWD}"
 [ -d "$dest_cwd" ] || die "target dir does not exist: $dest_cwd"
-dest_cwd="$(realpath -e "$dest_cwd")"
+dest_cwd="$(sj_realpath "$dest_cwd")"
 
 # --- fetch ------------------------------------------------------------------------------------
 # The archived name already carries the format (.jsonl / .json) — take the extension from there
@@ -197,7 +197,7 @@ if [ "$rewrite" -eq 1 ] && [ -n "$old_cwd" ]; then
   cp "$raw" "$tmp/rewritten"
   while IFS="$D" read -r from to; do
     [ -n "$from" ] && [ "$from" != "$to" ] || continue
-    sed -i "s${D}$(esc_pat "$from")${D}$(esc_rep "$to")${D}g" "$tmp/rewritten"
+    sj_sed_i "s${D}$(esc_pat "$from")${D}$(esc_rep "$to")${D}g" "$tmp/rewritten"
     info "rewrote  $from  ->  $to"
   done < <(printf '%s' "$maps" | awk -F"$D" '{ print length($1)"\t"$0 }' | sort -rn | cut -f2-)
 

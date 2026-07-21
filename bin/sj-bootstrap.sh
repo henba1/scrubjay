@@ -41,7 +41,7 @@ ssh_url()   { printf 'git@github.com:%s.git' "$1"; }                       # ssh
 # hanging on an interactive passphrase or credential prompt.
 remote_has() {
   GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new' \
-    timeout 20 git ls-remote "$(ssh_url "$1")" >/dev/null 2>&1
+    sj_timeout 20 git ls-remote "$(ssh_url "$1")" >/dev/null 2>&1
 }
 
 # ---- resolve the owner of YOUR private repos ------------------------------------------

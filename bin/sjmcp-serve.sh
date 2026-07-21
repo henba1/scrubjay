@@ -25,7 +25,7 @@
 # Anything else is refused.
 set -euo pipefail
 
-APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$APP/bin/lib.sh"; sj_load_config
 
 # A forced command runs with sshd's minimal PATH; uv usually lives in the owner's ~/.local/bin.
@@ -44,8 +44,8 @@ confine() {  # confine <relpath> -> absolute path under $chats, or exit 1
     "" | /* | -*) echo "sjmcp-serve: refusing path '$rel'" >&2; exit 1 ;;
     *..*)         echo "sjmcp-serve: refusing path '$rel'" >&2; exit 1 ;;
   esac
-  root="$(realpath -e "$chats" 2>/dev/null)" || { echo "sjmcp-serve: bad archive root" >&2; exit 1; }
-  abs="$(realpath -e "$chats/$rel" 2>/dev/null)" || { echo "sjmcp-serve: no such entry '$rel'" >&2; exit 1; }
+  root="$(sj_realpath "$chats")" || { echo "sjmcp-serve: bad archive root" >&2; exit 1; }
+  abs="$(sj_realpath "$chats/$rel")" || { echo "sjmcp-serve: no such entry '$rel'" >&2; exit 1; }
   case "$abs" in
     "$root"/*) printf '%s' "$abs" ;;
     *)         echo "sjmcp-serve: '$rel' escapes the archive root" >&2; exit 1 ;;
@@ -63,8 +63,8 @@ serve_resolve() {  # serve_resolve <sid|sid8>
 }
 
 serve_fetch() {  # serve_fetch <relpath>
-  local abs rel; abs="$(confine "$1")"; rel="${abs#"$(realpath -e "$chats")"/}"
-  tar -C "$(realpath -e "$chats")" -cf - -- "$rel"
+  local abs rel; abs="$(confine "$1")"; rel="${abs#"$(sj_realpath "$chats")"/}"
+  tar -C "$(sj_realpath "$chats")" -cf - -- "$rel"
 }
 
 cmd="${SSH_ORIGINAL_COMMAND:-}"

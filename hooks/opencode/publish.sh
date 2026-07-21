@@ -14,8 +14,11 @@
 # is identical to the last we shipped for this session.
 set -uo pipefail
 
+# Our own absolute path, with symlinked parents resolved (`cd -P`) so the re-exec below and the app
+# root further down agree on where the app repo actually is. Portable where `readlink -f` is not.
+self="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
 if [ "${1:-}" != "--detached" ]; then
-  self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
   # Re-exec through `bash` rather than running $self directly: if the executable bit is ever lost
   # (an odd umask, a noexec mount, a zip download), a bare `setsid "$self"` fails with "permission
   # denied" — straight into /dev/null, so the bridge goes silently dead. Detaching must not depend
@@ -33,8 +36,7 @@ sid="${1:?session id}"; cwd="${2:-$PWD}"
 [ "${SCRUBJAY_NOSHIP:-0}" = "1" ] && exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
-self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-APP="$(cd "$(dirname "$self")/../.." 2>/dev/null && pwd)" || exit 0
+APP="$(cd -P "$(dirname "$self")/../.." 2>/dev/null && pwd)" || exit 0
 
 # The plugin passes opencode's own binary path: it is not necessarily on PATH (the installer puts it
 # in ~/.opencode/bin, which a desktop launcher may never have sourced).
