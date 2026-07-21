@@ -26,8 +26,8 @@ for d in "$PROJDIR"/*/; do
     [ -n "$cwd" ] && break
   done
   size="$(du -sh "$d" 2>/dev/null | cut -f1)"
-  last_epoch="$(find "$d" -maxdepth 1 -name '*.jsonl' -printf '%T@\n' | sort -nr | head -1)"
-  last="$(date -d "@${last_epoch%.*}" +%Y-%m-%d 2>/dev/null || echo unknown)"
+  last_epoch="$(sj_mtime "$(sj_ls_by_mtime "$d" '*.jsonl' 1 | head -1)" 2>/dev/null)"
+  last="$([ -n "$last_epoch" ] && sj_epoch_ymd "${last_epoch%.*}" || echo unknown)"
   tdir="${d%/}"; tdir="${tdir/#$HOME/~}"
   obj="$(jq -n \
     --arg slug "$slug" --arg cwd "$cwd" --argjson sessions "${#jsonls[@]}" \

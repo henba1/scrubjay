@@ -16,7 +16,7 @@ else
   mkdir -p "$DATA/hosts"
   cp -r "$APP/skeleton/host" "$DST"
   OS="$(uname -s -r)"
-  sed -i -e "s|{{HOST}}|$HOST|g" -e "s|{{OS}}|$OS|g" -e "s|{{HOME}}|$HOME|g" "$DST/env.md"
+  sj_sed_i -e "s|{{HOST}}|$HOST|g" -e "s|{{OS}}|$OS|g" -e "s|{{HOME}}|$HOME|g" "$DST/env.md"
   echo "created $DST  (edit env.md to fill in the rest)"
 fi
 

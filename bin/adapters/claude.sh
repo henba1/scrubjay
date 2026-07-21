@@ -49,7 +49,7 @@ sjh_project_dir() {  # sjh_project_dir [cwd]
     [ -n "$f" ] || continue
     if grep -qF "\"cwd\":\"$cwd\"" "$f" 2>/dev/null; then printf '%s' "${d%/}"; return 0; fi
   done
-  real="$(realpath -e "$cwd" 2>/dev/null || printf '%s' "$cwd")"
+  real="$(sj_realpath "$cwd" || printf "%s" "$cwd")"
   printf '%s/%s' "$proj" "$(sjh_slug "$real")"
 }
 
@@ -156,7 +156,11 @@ sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd> [sid]
     t="$(ls -t "$proj"/*/"$sid".jsonl 2>/dev/null | head -1)"
     [ -n "$t" ] && [ -f "$t" ] && { printf '%s' "$t"; return 0; }
   fi
-  t="$(grep -lF "\"cwd\":\"$cwd\"" "$proj"/*/*.jsonl 2>/dev/null | xargs -r ls -t 2>/dev/null | head -1)"
+  # Guard the empty case ourselves rather than with `xargs -r`: -r is a GNU extension, and without
+  # it BSD xargs runs `ls -t` with no arguments on no matches — which lists $PWD and cheerfully
+  # returns a file that is not a transcript at all.
+  local hits; hits="$(grep -lF "\"cwd\":\"$cwd\"" "$proj"/*/*.jsonl 2>/dev/null)"
+  t=""; [ -n "$hits" ] && t="$(printf '%s\n' "$hits" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)"
   [ -n "$t" ] || t="$(ls -t "$proj"/*/*.jsonl 2>/dev/null | head -1)"
   [ -n "$t" ] && [ -f "$t" ] && printf '%s' "$t"
 }

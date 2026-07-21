@@ -116,4 +116,12 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
 - Do not add a `Co-Authored-By: Claude` trailer to commits.
 - The scrubjay repos deploy directly from `main` (commit there is fine).
 - Shell scripts are `bash`, `set -uo pipefail`; match the surrounding style.
+- **Stay portable across GNU and BSD userlands.** Supported platforms are Linux and WSL 2, with
+  macOS best-effort (see the Platforms table in `docs/onboarding.md`). GNU-only spellings —
+  `stat -c`, `find -printf`, `date -d`, bare `sed -i`, `readlink -f`, `realpath -e`, `timeout`,
+  `xargs -r` — fail *quietly* on macOS, usually into a plausible wrong answer. Use the shims at the
+  top of `bin/lib.sh` (`sj_size`, `sj_mtime`, `sj_epoch_ymd`, `sj_sed_i`, `sj_realpath`,
+  `sj_timeout`, `sj_ls_by_mtime`); for a script's own app-root bootstrap use
+  `cd -P "$(dirname "${BASH_SOURCE[0]}")/.."`, never `readlink -f`. `tests/test_portability.sh`
+  pins these contracts.
 - If you change docs, verify with `pip install -r requirements-docs.txt && mkdocs build --strict`.

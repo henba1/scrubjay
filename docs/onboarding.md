@@ -1,5 +1,62 @@
 # Onboarding
 
+## Platforms
+
+scrubjay is a pile of `bash` scripts plus a Python MCP server, so "does it run here?" is really
+"does this machine have a POSIX shell and the usual tools?".
+
+| Platform | Status |
+|---|---|
+| **Linux** | Supported. The daily-driver target — every machine in the reference setup. |
+| **Windows via WSL 2** | Supported. It *is* Linux; see the caveats below. |
+| **macOS** | Should work; not regularly tested. The known GNU-vs-BSD gaps are shimmed in `bin/lib.sh` and pinned by `tests/test_portability.sh`, but no macOS machine runs the suite yet. Reports welcome. |
+| **Native Windows** (PowerShell/CMD, Git Bash) | Not supported, and not close. `bin/claude-sync.sh` applies your config as a tree of symlinks, which Git Bash emulates by *copying* — that quietly breaks the "edit once, live everywhere" property the whole design rests on. `rsync` is also absent, so the `rsync-wg` relay can't run. Use WSL 2. |
+
+Everywhere: `bash`, `git`, `jq`, an SSH key on GitHub, and ideally [`gh`](https://cli.github.com)
+and [`uv`](https://docs.astral.sh/uv/) (the latter powers the `sjmcp` archive server behind
+`/sjrecall` and friends). No root required, except to install a NAS mount for the `local` backend.
+
+### Windows: use WSL 2, and stay inside it
+
+Claude Code runs [natively on Windows *or* inside WSL](https://code.claude.com/docs/en/setup).
+scrubjay only supports the second. Four things are genuinely different from a plain Linux box:
+
+1.  **One side or the other — never both.** This is the mistake that costs people an afternoon.
+    A native-Windows Claude Code keeps its config in `%USERPROFILE%\.claude`; the WSL one uses
+    `~/.claude` *inside the distro*. They are two unrelated installations that happen to share a
+    name. scrubjay onboards into whichever one it was run from, so if you install it in WSL and
+    then launch `claude` from PowerShell out of habit, you get an unconfigured agent and no
+    transcripts reach the archive — with no error, because nothing is wrong. Install Claude Code
+    inside WSL (`curl -fsSL https://claude.ai/install.sh | bash`) and launch it from the WSL
+    terminal, always.
+
+2.  **Keep your projects on the Linux filesystem.** Work out of `~/code/...`, not `/mnt/c/...`.
+    Windows-side paths are slow enough over the 9p bridge to be noticeable on a large repo, and
+    they make the archive's per-project slugs (derived from the working directory) inconsistent
+    with the same project checked out anywhere else — which is what
+    [hand-off](handoff.md) matches on.
+
+3.  **The host name is your Windows machine name** unless you change it. WSL inherits it, so two
+    distros on the same PC would register as the *same* scrubjay host and interleave their session
+    logs. Give each one its own: `SCRUBJAY_HOST=<name> bin/onboard.sh`, or write it to
+    `~/.config/scrubjay/host`.
+
+4.  **`systemd` is off by default.** Only the `local` backend's NAS mount and scheduled snapshots
+    need it. Add it if you use them:
+
+    ```ini
+    # /etc/wsl.conf
+    [boot]
+    systemd=true
+    ```
+
+    then `wsl.exe --shutdown` from Windows and reopen the distro. Without it `bin/sj-mount.sh`
+    falls back to `/etc/fstab` and `bin/sj-snapshot.sh --schedule` tells you to use cron instead.
+    Neither is fatal; both are quieter than you'd like, so check they took.
+
+Everything else — the relay, hooks, memory sync, hand-off, `sjmcp` — behaves exactly as it does on
+Linux, because it *is* Linux.
+
 ## The three repos, and which ones are yours
 
 scrubjay is the **app** — public, and you run it straight from upstream. **You don't fork it.**
