@@ -33,7 +33,7 @@ if [ "$backend" = "git" ]; then
   else
     added="$(git diff --cached --numstat | wc -l)"
     git commit -q -m "backfill: $added transcripts from $HOST"
-    if timeout 180 git push -q; then echo "pushed $added transcripts to scrubjay-chats"
+    if sj_timeout 180 git push -q; then echo "pushed $added transcripts to scrubjay-chats"
     else echo "committed; push failed (goes out on next push)"; fi
   fi
 else

@@ -6,8 +6,9 @@
 # Idempotent and best-effort: safe to run repeatedly, and SessionEnd will still fire normally later.
 set -uo pipefail
 
-self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 1
+# App root — `cd -P` so a symlinked ~/.claude/hooks resolves to the real app repo. See the longer
+# note in hooks/sync-session.sh for why this is not `readlink -f`.
+APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 1
 . "$APP/bin/lib.sh"
 
 command -v jq >/dev/null 2>&1 || { echo "publish-now: jq required" >&2; exit 0; }

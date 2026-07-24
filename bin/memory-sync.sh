@@ -26,7 +26,7 @@ remote="$(sj_memory_remote)"
 # First use: clone the bare repo (creating an empty working tree if the repo has no commits yet).
 if [ ! -d "$mem/.git" ]; then
   mkdir -p "$(dirname "$mem")" 2>/dev/null || exit 0
-  timeout 30 git clone -q "$remote" "$mem" 2>/dev/null || {
+  sj_timeout 30 git clone -q "$remote" "$mem" 2>/dev/null || {
     # remote unreachable, or empty/non-existent: start a local repo pointed at it so a later
     # push can populate the bare repo. (An empty `git clone` of a freshly-init'd bare repo
     # already succeeds, so this mainly covers the unreachable case.)
@@ -48,17 +48,17 @@ track() { git branch --set-upstream-to="origin/$branch" "$branch" >/dev/null 2>&
 
 case "$mode" in
   pull)
-    timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null || true
+    sj_timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null || true
     track
     ;;
   push)
     git add -A 2>/dev/null
     git diff --cached --quiet 2>/dev/null && { track; exit 0; }   # nothing new to publish
     git commit -q -m "memory sync: $(sj_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
-    if ! timeout 30 git push -q origin "$branch" 2>/dev/null; then
+    if ! sj_timeout 30 git push -q origin "$branch" 2>/dev/null; then
       # remote moved on (another machine pushed): tree is clean after commit, so rebase onto it + retry.
-      if timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null \
-         && timeout 30 git push -q origin "$branch" 2>/dev/null; then
+      if sj_timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null \
+         && sj_timeout 30 git push -q origin "$branch" 2>/dev/null; then
         :
       else
         # Genuinely couldn't reconcile (conflict / remote unreachable): surface it instead of

@@ -15,7 +15,7 @@ command -v jq >/dev/null 2>&1 || exit 0
 # So on first entry, re-launch ourselves DETACHED with the same input and return immediately;
 # the detached copy (--detached) finishes the work independently.
 if [ "${1:-}" != "--detached" ]; then
-  self0="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+  self0="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/$(basename "${BASH_SOURCE[0]}")"
   if command -v setsid >/dev/null 2>&1; then
     printf '%s' "$input" | setsid "$self0" --detached >/dev/null 2>&1 &
   else
@@ -25,8 +25,8 @@ if [ "${1:-}" != "--detached" ]; then
 fi
 
 # App root: this script is symlinked into ~/.claude/hooks/ but its real path is in the app repo.
-self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 0
+# `cd -P` resolves that symlink physically — see the note in hooks/sync-session.sh.
+APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 
 # Which coding harness ended a session. Claude Code and Codex both hand a hook this same payload
@@ -67,7 +67,7 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
     # Keep the line parseable: the topic is quoted, but a stray " or | inside it would derail both
     # readers (sjmcp's regex and sj_log_catalogue's pipe-split), so neutralize those two chars.
     topic="${topic//\"/}"; topic="${topic//|//}"
-    size="$(stat -c%s "$tpath" 2>/dev/null || echo 0)"
+    size="$(sj_size "$tpath")" || size=0
     # Everything after `harness=` is an additive `key=value` field: a line written before a field
     # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
     # for a later pass — the readers already tolerate trailing fields they don't know.
@@ -107,7 +107,7 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
       # Never commit a tree carrying conflict markers (unambiguous start/end lines).
       git diff --cached | grep -qE '^\+(<{7} |>{7} )' && exit 0
       git commit -q -m "auto-sync (session end): $host $ts" 2>/dev/null || exit 0
-      if ! timeout 20 git push -q 2>/dev/null; then
+      if ! sj_timeout 20 git push -q 2>/dev/null; then
         # Remote moved on: rebase our commit onto it and retry. What makes this wedge-proof
         # where a bare `git pull --rebase` was not is that nothing here can stop on a conflict:
         #   * append-only logs union both sides (.gitattributes: logs/*.log merge=union);
@@ -118,9 +118,9 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
         #     --rebase aborted on the first such conflict and left the machine's commits stacking
         #     locally forever — the July-2026 hensipi wedge.
         # Belt and suspenders: if anything still fails, abort so the next session starts clean.
-        if timeout 20 git fetch -q origin 2>/dev/null \
-           && timeout 30 git rebase -X ours -q origin/main 2>/dev/null; then
-          timeout 20 git push -q 2>/dev/null || true
+        if sj_timeout 20 git fetch -q origin 2>/dev/null \
+           && sj_timeout 30 git rebase -X ours -q origin/main 2>/dev/null; then
+          sj_timeout 20 git push -q 2>/dev/null || true
         else
           git rebase --abort 2>/dev/null || true
         fi

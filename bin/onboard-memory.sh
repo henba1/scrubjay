@@ -105,7 +105,7 @@ else
       warn "For zero third-party custody, self-host on a NAS instead — costs more wiring (a NAS box + WireGuard + DDNS)."
       # sj-bootstrap.sh --repo scrubjay-memory creates it via `gh`; without gh it must already exist.
       if ! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' \
-             timeout 20 git ls-remote "$remote" >/dev/null 2>&1; then
+             sj_timeout 20 git ls-remote "$remote" >/dev/null 2>&1; then
         slug="${remote#git@github.com:}"; slug="${slug%.git}"
         warn "that repo isn't reachable yet — create it, then re-run:  gh repo create $slug --private"
       fi

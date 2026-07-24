@@ -13,8 +13,12 @@
 [ "${SCRUBJAY_NOSYNC:-0}" = "1" ] && exit 0
 cat >/dev/null 2>&1 || true   # drain hook stdin, ignore
 
-self="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-APP="$(cd "$(dirname "$self")/.." 2>/dev/null && pwd)" || exit 0
+# App root. `cd -P` resolves symlinked path components physically, which is the whole game here:
+# we are invoked as ~/.claude/hooks/<this>, and ~/.claude/hooks is a symlink to <app>/hooks
+# (bin/claude-sync.sh). A logical `cd` would apply ".." to the *link* path and land in ~/.claude,
+# where bin/lib.sh does not exist — every hook would then exit 0 in silence. This used to lean on
+# `readlink -f`, which older macOS/BSD lacks, and whose fallback did exactly that. -P is POSIX.
+APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 DATA="$(sj_data 2>/dev/null || true)"
 
@@ -28,7 +32,7 @@ if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
   sj_is_clone || printf 'scrubjay: the app at %s is not a git clone, so it can never self-update. Source tarballs are not a supported install — reinstall with `git clone`.\n' "$APP"
   for repo in "$DATA" "$APP"; do
     [ -n "$repo" ] && [ -d "$repo/.git" ] && \
-      ( cd "$repo" && timeout 15 git pull --ff-only -q 2>/dev/null ) || true
+      ( cd "$repo" && sj_timeout 15 git pull --ff-only -q 2>/dev/null ) || true
   done
   # git backend only: refresh the scrubjay-chats clone so the local sjmcp archive spans every
   # machine's sessions (not just this one's) before claude-sync registers/serves it. Best-effort;
@@ -36,7 +40,7 @@ if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
   if [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
     chats="$(sj_chats 2>/dev/null || true)"
     [ -n "$chats" ] && [ -d "$chats/.git" ] && \
-      ( cd "$chats" && timeout 20 git pull --ff-only -q 2>/dev/null ) || true
+      ( cd "$chats" && sj_timeout 20 git pull --ff-only -q 2>/dev/null ) || true
   fi
 fi
 

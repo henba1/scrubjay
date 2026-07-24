@@ -8,8 +8,80 @@ sj_load_config() {
   : "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"
 }
 
+# ---- portability: GNU coreutils vs BSD/macOS ---------------------------------------------------
+# scrubjay grew up on Linux, so GNU flags leaked in. Most of them fail *quietly* off GNU — a
+# `2>/dev/null || echo 0` fallback turns "this tool doesn't exist here" into a plausible-looking
+# wrong answer. These shims keep every call site honest on both userlands. Anything added below
+# must degrade loudly or fail closed, never to a made-up value.
+
+sj_has() { command -v "$1" >/dev/null 2>&1; }
+
+# Canonical absolute path, existing paths only (GNU `realpath -e` semantics), with every symlink
+# component resolved.
+#
+# SECURITY: two callers (sj_archive_copy below, confine() in bin/sjmcp-serve.sh) use this to prove
+# an archive entry does not escape its root, and the archive is written by *other* hosts over the
+# relay — so a symlink can sit inside it that never appears in the path we were handed. A shim that
+# only resolved the parent directory would be a confinement bypass. If nothing here can do full
+# resolution we return non-zero and let the caller refuse; we never guess.
+sj_realpath() {  # sj_realpath <path>
+  local p="$1" r
+  [ -e "$p" ] || return 1
+  # GNU realpath. BSD/macOS realpath has no -e but fails on a missing path anyway, so try both.
+  if sj_has realpath; then
+    r="$(realpath -e "$p" 2>/dev/null)" || r="$(realpath "$p" 2>/dev/null)" || r=""
+    [ -n "$r" ] && { printf '%s' "$r"; return 0; }
+  fi
+  # readlink -f: GNU everywhere, macOS only since Ventura. Absent on older BSDs.
+  if r="$(readlink -f "$p" 2>/dev/null)" && [ -n "$r" ]; then printf '%s' "$r"; return 0; fi
+  if sj_has python3; then
+    r="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null)" \
+      && [ -n "$r" ] && { printf '%s' "$r"; return 0; }
+  fi
+  return 1
+}
+
+# Epoch mtime / size in bytes of a file. GNU stat is -c, BSD stat is -f. Both return non-zero
+# rather than a fabricated 0, so callers can tell "empty file" from "couldn't ask".
+sj_mtime() { stat -c%Y "$1" 2>/dev/null || stat -f%m "$1" 2>/dev/null; }
+sj_size()  { stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null; }
+
+# Epoch seconds -> YYYY-MM-DD. GNU takes -d @N, BSD takes -r N.
+sj_epoch_ymd() {  # sj_epoch_ymd <epoch>
+  date -d "@$1" +%Y-%m-%d 2>/dev/null || date -r "$1" +%Y-%m-%d 2>/dev/null
+}
+
+# In-place sed. GNU treats -i's argument as optional; BSD requires an explicit backup suffix, so
+# `sed -i -e …` on macOS silently eats "-e" as the suffix. Passing '' explicitly is the only form
+# both accept — via two different argument shapes.
+sj_sed_i() {  # sj_sed_i <sed-args…> <file>
+  if sed --version >/dev/null 2>&1; then sed -i "$@"; else sed -i '' "$@"; fi
+}
+
+# `timeout <secs> <cmd…>`, degrading to an unguarded run. GNU coreutils only: macOS has it as
+# `gtimeout` if coreutils is installed, and otherwise not at all — where the bare call would fail
+# with "command not found" and the git push it guards would simply never happen. Losing the timeout
+# is a far smaller harm than losing the command, so the last resort runs it unguarded.
+sj_timeout() {  # sj_timeout <secs> <cmd> [args…]
+  local secs="$1"; shift
+  if   sj_has timeout;  then timeout  "$secs" "$@"
+  elif sj_has gtimeout; then gtimeout "$secs" "$@"
+  else "$@"; fi
+}
+
+# Files under <dir> matching <name-glob>, newest first, one path per line. Replaces
+# `find -printf '%T@ %p\n' | sort -rn` — -printf is a GNU extension that BSD find lacks entirely.
+sj_ls_by_mtime() {  # sj_ls_by_mtime <dir> <name-glob> [maxdepth]
+  local dir="$1" glob="$2" depth="${3:-}" f
+  [ -d "$dir" ] || return 0
+  { if [ -n "$depth" ]; then find "$dir" -maxdepth "$depth" -type f -name "$glob" 2>/dev/null
+    else                     find "$dir" -type f -name "$glob" 2>/dev/null; fi
+  } | while IFS= read -r f; do printf '%s\t%s\n' "$(sj_mtime "$f")" "$f"; done \
+    | sort -rn | cut -f2-
+}
+
 # Absolute path of the app repo (this file lives in <app>/bin/).
-sj_app() { (cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd); }
+sj_app() { (cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd); }
 
 # Display-only: collapse a leading $HOME back to ~ so status/prompt output printed to the
 # terminal (and anything copied from it — scrollback, screenshots, pasted bug reports) doesn't
@@ -272,8 +344,8 @@ sj_archive_resolve() {  # sj_archive_resolve <root> <sid|handle>
 sj_archive_copy() {  # sj_archive_copy <root> <relpath> <dst>
   local root="$1" rel="$2" dst="$3" src="$1/$2" real_root real_src
   case "$rel" in /*|*..*) echo "sj: refusing unsafe archive path '$rel'" >&2; return 2 ;; esac
-  real_root="$(realpath -e "$root" 2>/dev/null)" || return 1
-  real_src="$(realpath -e "$src"  2>/dev/null)" || return 1
+  real_root="$(sj_realpath "$root")" || return 1
+  real_src="$(sj_realpath "$src")"  || return 1
   case "$real_src" in
     "$real_root"/*) ;;
     *) echo "sj: '$rel' escapes the archive root" >&2; return 2 ;;

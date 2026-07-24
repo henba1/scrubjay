@@ -140,6 +140,13 @@ without `gh` the onboarder prints the exact `gh repo create` commands and stops,
 yourself. No root required. Full walkthrough:
 [Onboarding](https://henba1.github.io/scrubjay/onboarding/).
 
+**Platforms.** Linux and **Windows via WSL 2** are supported. macOS should work but isn't regularly
+tested yet. Native Windows (PowerShell/CMD/Git Bash) is not supported — the config sync is built on
+symlinks, which Git Bash turns into copies. On WSL, install Claude Code *inside* the distro and
+launch it from there; a native-Windows Claude Code is a separate installation that scrubjay won't
+see. Details and the rest of the WSL caveats:
+[Platforms](https://henba1.github.io/scrubjay/onboarding/#platforms).
+
 ## Documentation
 
 Full docs — [**henba1.github.io/scrubjay**](https://henba1.github.io/scrubjay/):

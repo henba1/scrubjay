@@ -94,8 +94,7 @@ sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd> [sid]
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     if [ "$(sjh_session_cwd "$f")" = "$cwd" ]; then printf '%s' "$f"; return 0; fi
-  done < <(find "$root" -type f -name 'rollout-*.jsonl' -printf '%T@ %p\n' 2>/dev/null \
-           | sort -rn | head -50 | cut -d' ' -f2-)
+  done < <(sj_ls_by_mtime "$root" 'rollout-*.jsonl' | head -50)
 }
 
 # --- config ------------------------------------------------------------------------------------

@@ -25,9 +25,9 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
     git add "$relpath" 2>/dev/null
     git diff --cached --quiet -- "$relpath" 2>/dev/null && exit 0   # unchanged -> no commit
     git commit -q -m "relay: $relpath" -- "$relpath" 2>/dev/null || exit 1
-    if ! timeout 30 git push -q 2>/dev/null; then
+    if ! sj_timeout 30 git push -q 2>/dev/null; then
       if [ -z "$(git status --porcelain 2>/dev/null | grep -v "$relpath")" ]; then
-        timeout 30 git pull --rebase -q 2>/dev/null && timeout 30 git push -q 2>/dev/null && exit 0
+        sj_timeout 30 git pull --rebase -q 2>/dev/null && sj_timeout 30 git push -q 2>/dev/null && exit 0
       fi
       exit 1
     fi
@@ -41,7 +41,7 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
 transport_resolve() {  # transport_resolve <sid|sid8>  -> TSV: <relpath> <lines> <mtime>
   local chats; chats="$(sj_chats)"
   [ -n "$chats" ] && [ -d "$chats/.git" ] || return 1
-  timeout 30 git -C "$chats" pull --ff-only -q >/dev/null 2>&1 || true
+  sj_timeout 30 git -C "$chats" pull --ff-only -q >/dev/null 2>&1 || true
   sj_archive_resolve "$chats" "$1"
 }
 transport_fetch() {    # transport_fetch <relpath> <dst>   (relpath may be a file or a directory)

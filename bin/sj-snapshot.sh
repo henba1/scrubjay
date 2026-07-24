@@ -146,7 +146,10 @@ case "$ACTION" in
     if [ "$FS" = zfs ]; then
       zfs list -t snapshot -o name,creation 2>/dev/null | grep -F "$DATASET@" || info "no snapshots yet"
     else
-      snaps="$(find "$SNAPDIR" -maxdepth 1 -name 'scrubjay-[0-9]*' -printf '%f\n' 2>/dev/null | sort)"
+      # basename-only listing. `find -printf '%f\n'` would be shorter but is a GNU extension that
+      # BSD find lacks outright — and this script also runs on a non-Linux NAS.
+      snaps="$(find "$SNAPDIR" -maxdepth 1 -name 'scrubjay-[0-9]*' 2>/dev/null \
+               | while IFS= read -r s; do basename "$s"; done | sort)"
       [ -n "$snaps" ] && printf '%s\n' "$snaps" || info "no snapshots yet"
     fi
     ;;
