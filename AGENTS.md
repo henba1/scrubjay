@@ -113,7 +113,11 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
   `*.jsonl`, `*.credentials*`, and `.claude.json`; keep it that way.
 - This repo is public-safe: don't introduce real hostnames, personal paths, IPs, or emails.
   Use RFC-safe placeholders (`192.168.x`, `home.ddns.example`, `scrubjay-rx`, `laptop`).
-- Do not add a `Co-Authored-By: Claude` trailer to commits.
+- **Do** add the `Co-Authored-By: Claude` trailer to commits and PRs made here. This repo is an
+  exception to the maintainer's usual "only my name in history" rule, and deliberately so: scrubjay
+  is a tool for agentic coding, much of it is written with one, and the history should say so
+  rather than quietly imply otherwise. Configured in `.claude/settings.json` (project scope, so it
+  applies to this repo only) — do not "helpfully" strip it.
 - The scrubjay repos deploy directly from `main` (commit there is fine).
 - Shell scripts are `bash`, `set -uo pipefail`; match the surrounding style.
 - **Stay portable across GNU and BSD userlands.** Supported platforms are Linux and WSL 2, with
