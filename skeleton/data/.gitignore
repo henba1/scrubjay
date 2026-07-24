@@ -3,3 +3,8 @@
 .credentials.json
 .claude.json
 *.jsonl
+
+# Derived from logs/*.log by bin/sj-catalogue.sh, rebuilt on every SessionStart/SessionEnd.
+# The per-host logs can be tracked because each host only appends to its own (merge=union);
+# a whole-file table has no such property and would conflict on every cross-machine rebase.
+logs/CATALOGUE.md

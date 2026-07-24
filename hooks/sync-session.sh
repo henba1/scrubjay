@@ -51,6 +51,12 @@ fi
 # 2) apply into each harness's config root (idempotent; mostly a no-op thanks to symlinks)
 "$APP/bin/sync-config.sh" >/dev/null 2>&1 || true
 
+# 2b) re-render logs/CATALOGUE.md — the human-browsable chat table — now that the pull in (1)
+#     has brought in other machines' log lines. --no-pull: (1) already did it, and honors
+#     SCRUBJAY_SYNC_NOPULL, which a second pull here would quietly override.
+#     Derived + .gitignore'd; see bin/sj-catalogue.sh.
+"$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1 || true
+
 # 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
 #    primary push fails; the relay swallows its own errors (best-effort, must never block a
 #    session), so without this a dead/unauthorized relay key eats transcripts unnoticed. Printing

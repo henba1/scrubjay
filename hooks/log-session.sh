@@ -127,6 +127,13 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
       fi
     ) >/dev/null 2>&1 || true
   fi
+
+  # 1c-2) re-render the human-browsable chat table. AFTER the git block, not before: the push
+  #       fallback above rebases onto origin, which is what brings OTHER hosts' log lines into
+  #       this machine — rendering first would reliably miss the newest ones. --no-pull because
+  #       that push/fetch just did it. Derived + .gitignore'd, so `git add -A` never stages it.
+  #       See bin/sj-catalogue.sh.
+  "$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1 || true
 fi
 
 # ---- 1d) publish cross-machine memory to its own NAS-hosted git repo (not GitHub) ----
