@@ -113,4 +113,48 @@ assert_contains "without maxdepth it recurses" \
   "$(sj_ls_by_mtime "$SANDBOX/mt" '*.jsonl')" "nested/deep.jsonl"
 assert_eq "a missing directory yields nothing, quietly" "" "$(sj_ls_by_mtime "$SANDBOX/nope" '*')"
 
+# ── the shims fail closed, so `set -e` callers must guard them ─────────────────────────────────
+# sj_size/sj_mtime deliberately return non-zero instead of a fabricated 0 — which means a bare
+# `x="$(sj_mtime …)"` under `set -e` aborts the script. bin/claude-index-chats.sh runs under
+# `set -euo pipefail` and stats a file it globbed moments earlier, so a session ending concurrently
+# can genuinely make that stat fail. Losing one date is fine; losing every remaining project in the
+# index is not. This pins the guarded idiom.
+section "a failing stat degrades to 'unknown' instead of killing a set -e script"
+
+cat > "$SANDBOX/seti.sh" <<EOF
+set -euo pipefail
+. "$APP/bin/lib.sh"
+newest="/definitely/not/here.jsonl"
+last_epoch=""; [ -n "\$newest" ] && last_epoch="\$(sj_mtime "\$newest" 2>/dev/null || true)"
+last=unknown
+[ -n "\$last_epoch" ] && last="\$(sj_epoch_ymd "\${last_epoch%.*}" 2>/dev/null || echo unknown)"
+printf 'survived:%s' "\$last"
+EOF
+assert_eq "guarded form survives and reports unknown" "survived:unknown" "$(bash "$SANDBOX/seti.sh")"
+
+# The unguarded form is what this replaced — asserted so the reason the guard exists is on record.
+cat > "$SANDBOX/seti-bad.sh" <<EOF
+set -euo pipefail
+. "$APP/bin/lib.sh"
+last_epoch="\$(sj_mtime "/definitely/not/here.jsonl" 2>/dev/null)"
+printf 'survived'
+EOF
+assert_eq "unguarded form aborts — which is why the guard is there" "" "$(bash "$SANDBOX/seti-bad.sh" 2>/dev/null)"
+
+# And the real indexer, end to end: it must produce a valid index rather than dying partway.
+section "bin/claude-index-chats.sh produces a valid index"
+
+proj="$CLAUDE_CONFIG_DIR/projects/-tmp-demo"
+mkdir -p "$proj"
+printf '{"type":"user","cwd":"/tmp/demo","message":{"content":"hi"}}\n' > "$proj/aaaa1111.jsonl"
+out="$(bash "$APP/bin/claude-index-chats.sh" 2>&1)"; rc=$?
+# Report the script's own output on failure — a bare "expected 0, got 1" would send the next
+# reader hunting for a stack trace the runner already has in hand.
+assert_eq "the indexer exits 0${out:+ (said: $out)}" "0" "$rc"
+idx="$SCRUBJAY_DATA/hosts/testhost/chats.index.json"
+assert_file "it wrote chats.index.json" "$idx"
+check "the index is valid JSON" jq -e . "$idx"
+assert_eq "and dated the project from its transcript" "1" \
+  "$(jq -r '[.[] | select(.slug=="-tmp-demo") | select(.last|test("^[0-9]{4}-"))] | length' "$idx" 2>/dev/null)"
+
 finish

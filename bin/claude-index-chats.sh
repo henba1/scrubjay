@@ -26,8 +26,15 @@ for d in "$PROJDIR"/*/; do
     [ -n "$cwd" ] && break
   done
   size="$(du -sh "$d" 2>/dev/null | cut -f1)"
-  last_epoch="$(sj_mtime "$(sj_ls_by_mtime "$d" '*.jsonl' 1 | head -1)" 2>/dev/null)"
-  last="$([ -n "$last_epoch" ] && sj_epoch_ymd "${last_epoch%.*}" || echo unknown)"
+  # Newest transcript's date. Spelled out in three guarded steps rather than nested command
+  # substitutions because this script runs under `set -e`: sj_mtime deliberately fails instead of
+  # reporting a fabricated 0, and a bare assignment from a failing substitution would abort the
+  # whole indexer — losing every remaining project — where one unknown date is the honest outcome.
+  # The transcript can genuinely vanish between the glob above and here (a concurrent session end).
+  newest="$(sj_ls_by_mtime "$d" '*.jsonl' 1 | head -1)"
+  last_epoch=""; [ -n "$newest" ] && last_epoch="$(sj_mtime "$newest" 2>/dev/null || true)"
+  last=unknown
+  [ -n "$last_epoch" ] && last="$(sj_epoch_ymd "${last_epoch%.*}" 2>/dev/null || echo unknown)"
   tdir="${d%/}"; tdir="${tdir/#$HOME/~}"
   obj="$(jq -n \
     --arg slug "$slug" --arg cwd "$cwd" --argjson sessions "${#jsonls[@]}" \
