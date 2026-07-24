@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../favicon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -399,6 +399,34 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platforms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Platforms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#windows-use-wsl-2-and-stay-inside-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows: use WSL 2, and stay inside it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#the-three-repos-and-which-ones-are-yours" class="md-nav__link">
@@ -834,6 +862,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platforms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Platforms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#windows-use-wsl-2-and-stay-inside-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows: use WSL 2, and stay inside it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-three-repos-and-which-ones-are-yours" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -920,6 +976,79 @@
 
 
 <h1 id="onboarding">Onboarding<a class="headerlink" href="#onboarding" title="Permanent link">&para;</a></h1>
+<h2 id="platforms">Platforms<a class="headerlink" href="#platforms" title="Permanent link">&para;</a></h2>
+<p>scrubjay is a pile of <code>bash</code> scripts plus a Python MCP server, so "does it run here?" is really
+"does this machine have a POSIX shell and the usual tools?".</p>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Linux</strong></td>
+<td>Supported. The daily-driver target — every machine in the reference setup.</td>
+</tr>
+<tr>
+<td><strong>Windows via WSL 2</strong></td>
+<td>Supported. It <em>is</em> Linux; see the caveats below.</td>
+</tr>
+<tr>
+<td><strong>macOS</strong></td>
+<td>Should work; not regularly tested. The known GNU-vs-BSD gaps are shimmed in <code>bin/lib.sh</code> and pinned by <code>tests/test_portability.sh</code>, but no macOS machine runs the suite yet. Reports welcome.</td>
+</tr>
+<tr>
+<td><strong>Native Windows</strong> (PowerShell/CMD, Git Bash)</td>
+<td>Not supported, and not close. <code>bin/claude-sync.sh</code> applies your config as a tree of symlinks, which Git Bash emulates by <em>copying</em> — that quietly breaks the "edit once, live everywhere" property the whole design rests on. <code>rsync</code> is also absent, so the <code>rsync-wg</code> relay can't run. Use WSL 2.</td>
+</tr>
+</tbody>
+</table>
+<p>Everywhere: <code>bash</code>, <code>git</code>, <code>jq</code>, an SSH key on GitHub, and ideally <a href="https://cli.github.com"><code>gh</code></a>
+and <a href="https://docs.astral.sh/uv/"><code>uv</code></a> (the latter powers the <code>sjmcp</code> archive server behind
+<code>/sjrecall</code> and friends). No root required, except to install a NAS mount for the <code>local</code> backend.</p>
+<h3 id="windows-use-wsl-2-and-stay-inside-it">Windows: use WSL 2, and stay inside it<a class="headerlink" href="#windows-use-wsl-2-and-stay-inside-it" title="Permanent link">&para;</a></h3>
+<p>Claude Code runs <a href="https://code.claude.com/docs/en/setup">natively on Windows <em>or</em> inside WSL</a>.
+scrubjay only supports the second. Four things are genuinely different from a plain Linux box:</p>
+<ol>
+<li>
+<p><strong>One side or the other — never both.</strong> This is the mistake that costs people an afternoon.
+    A native-Windows Claude Code keeps its config in <code>%USERPROFILE%\.claude</code>; the WSL one uses
+    <code>~/.claude</code> <em>inside the distro</em>. They are two unrelated installations that happen to share a
+    name. scrubjay onboards into whichever one it was run from, so if you install it in WSL and
+    then launch <code>claude</code> from PowerShell out of habit, you get an unconfigured agent and no
+    transcripts reach the archive — with no error, because nothing is wrong. Install Claude Code
+    inside WSL (<code>curl -fsSL https://claude.ai/install.sh | bash</code>) and launch it from the WSL
+    terminal, always.</p>
+</li>
+<li>
+<p><strong>Keep your projects on the Linux filesystem.</strong> Work out of <code>~/code/...</code>, not <code>/mnt/c/...</code>.
+    Windows-side paths are slow enough over the 9p bridge to be noticeable on a large repo, and
+    they make the archive's per-project slugs (derived from the working directory) inconsistent
+    with the same project checked out anywhere else — which is what
+    <a href="../handoff/">hand-off</a> matches on.</p>
+</li>
+<li>
+<p><strong>The host name is your Windows machine name</strong> unless you change it. WSL inherits it, so two
+    distros on the same PC would register as the <em>same</em> scrubjay host and interleave their session
+    logs. Give each one its own: <code>SCRUBJAY_HOST=&lt;name&gt; bin/onboard.sh</code>, or write it to
+    <code>~/.config/scrubjay/host</code>.</p>
+</li>
+<li>
+<p><strong><code>systemd</code> is off by default.</strong> Only the <code>local</code> backend's NAS mount and scheduled snapshots
+    need it. Add it if you use them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># /etc/wsl.conf</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">[boot]</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="na">systemd</span><span class="o">=</span><span class="s">true</span>
+</code></pre></div>
+<p>then <code>wsl.exe --shutdown</code> from Windows and reopen the distro. Without it <code>bin/sj-mount.sh</code>
+falls back to <code>/etc/fstab</code> and <code>bin/sj-snapshot.sh --schedule</code> tells you to use cron instead.
+Neither is fatal; both are quieter than you'd like, so check they took.</p>
+</li>
+</ol>
+<p>Everything else — the relay, hooks, memory sync, hand-off, <code>sjmcp</code> — behaves exactly as it does on
+Linux, because it <em>is</em> Linux.</p>
 <h2 id="the-three-repos-and-which-ones-are-yours">The three repos, and which ones are yours<a class="headerlink" href="#the-three-repos-and-which-ones-are-yours" title="Permanent link">&para;</a></h2>
 <p>scrubjay is the <strong>app</strong> — public, and you run it straight from upstream. <strong>You don't fork it.</strong>
 It updates itself with <code>git pull</code>, which is why it must be a <code>git clone</code> and not an unpacked
@@ -964,9 +1093,9 @@ as yours, and says so.</p>
 <h2 id="install-with-claude-code-agent-assisted">Install with Claude Code (agent-assisted)<a class="headerlink" href="#install-with-claude-code-agent-assisted" title="Permanent link">&para;</a></h2>
 <p>The fastest path if you already run Claude Code: clone this repo, open Claude <em>inside</em>
 the clone, and ask it to set the machine up.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:henba1/scrubjay.git<span class="w"> </span>~/.scrubjay/scrubjay
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>~/.scrubjay/scrubjay
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>claude
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:henba1/scrubjay.git<span class="w"> </span>~/.scrubjay/scrubjay
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>~/.scrubjay/scrubjay
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>claude
 </code></pre></div>
 <p>Then, in the session:</p>
 <blockquote>
@@ -983,8 +1112,8 @@ registers the host and applies config, and — for the <code>rsync-wg</code> bac
 generates the dedicated relay SSH key, adds the <code>scrubjay-receiver</code> ssh-alias, and prints
 the exact <code>authorized_keys</code> line to paste on the receiver. It's re-runnable and every
 prompt has a default (or preset it via env, e.g. <code>SCRUBJAY_OWNER</code>, <code>SCRUBJAY_BACKEND</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:henba1/scrubjay.git<span class="w"> </span>~/.scrubjay/scrubjay
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>~/.scrubjay/scrubjay/bin/onboard.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:henba1/scrubjay.git<span class="w"> </span>~/.scrubjay/scrubjay
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>~/.scrubjay/scrubjay/bin/onboard.sh
 </code></pre></div>
 <p>Run <code>bin/sj-bootstrap.sh</code> on its own to create/seed the private repos without onboarding, and
 <code>bin/onboard.sh --version</code> to see which commit you're on.</p>
@@ -1001,20 +1130,20 @@ repo — see <a href="../memory-sync/">memory-sync.md</a>.)</p>
 </div>
 <details class="note">
 <summary>Manual steps (what the script automates)</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay.git<span class="w">      </span>~/.scrubjay/scrubjay
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay-data.git<span class="w"> </span>~/.scrubjay/scrubjay-data
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay-chats.git<span class="w">   </span>~/.scrubjay/scrubjay-chats<span class="w">   </span><span class="c1"># if syncing transcripts</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/scrubjay<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s">: &quot;${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}&quot;</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="s">: &quot;${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}&quot;</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s">: &quot;${SCRUBJAY_TRANSCRIPT_BACKEND:=git}&quot;</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="s">EOF</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;<span class="w">   </span><span class="c1"># scaffold + pin + index</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># review ~/.scrubjay/scrubjay-data/hosts/&lt;name&gt;/</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">                          </span><span class="c1"># apply into ~/.claude</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>add<span class="w"> </span>-A<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;host &lt;name&gt;&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>push
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay.git<span class="w">      </span>~/.scrubjay/scrubjay
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay-data.git<span class="w"> </span>~/.scrubjay/scrubjay-data
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay-chats.git<span class="w">   </span>~/.scrubjay/scrubjay-chats<span class="w">   </span><span class="c1"># if syncing transcripts</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/scrubjay<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;&#39;EOF&#39;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="s">: &quot;${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}&quot;</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="s">: &quot;${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}&quot;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="s">: &quot;${SCRUBJAY_TRANSCRIPT_BACKEND:=git}&quot;</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="s">EOF</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;<span class="w">   </span><span class="c1"># scaffold + pin + index</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1"># review ~/.scrubjay/scrubjay-data/hosts/&lt;name&gt;/</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">                          </span><span class="c1"># apply into ~/.claude</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>add<span class="w"> </span>-A<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;host &lt;name&gt;&quot;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>push
 </code></pre></div>
 <p><code>~/.scrubjay/</code> keeps the machinery out of your project workspace; the clone location is
 otherwise arbitrary (it's only referenced via the pointer file below).</p>
@@ -1022,40 +1151,40 @@ otherwise arbitrary (it's only referenced via the pointer file below).</p>
 <p>Prereqs: <code>bash</code>, <code>jq</code>, <code>git</code>, an SSH key on GitHub. No root.</p>
 <h2 id="pointers-machine-local">Pointers (machine-local)<a class="headerlink" href="#pointers-machine-local" title="Permanent link">&para;</a></h2>
 <p>The app finds your data/transcript repos via <code>~/.config/scrubjay/config</code> (env overrides):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_DATA</span><span class="p">:=</span><span class="nv">$HOME</span><span class="p">/.scrubjay/scrubjay-data</span><span class="si">}</span><span class="s2">&quot;</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_CHATS</span><span class="p">:=</span><span class="nv">$HOME</span><span class="p">/.scrubjay/scrubjay-chats</span><span class="si">}</span><span class="s2">&quot;</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_TRANSCRIPT_BACKEND</span><span class="p">:=git</span><span class="si">}</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_DATA</span><span class="p">:=</span><span class="nv">$HOME</span><span class="p">/.scrubjay/scrubjay-data</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_CHATS</span><span class="p">:=</span><span class="nv">$HOME</span><span class="p">/.scrubjay/scrubjay-chats</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_TRANSCRIPT_BACKEND</span><span class="p">:=git</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div>
 <p>Host identity is pinned separately in <code>~/.config/scrubjay/host</code> (because <code>hostname -s</code>
 is transient on HPC login nodes).</p>
 <h2 id="layout-this-repo-app-only">Layout (this repo — app only)<a class="headerlink" href="#layout-this-repo-app-only" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>bin/
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  lib.sh                 # shared helpers: host + data/chats pointers
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  claude-index-chats.sh  # write scrubjay-data/hosts/&lt;host&gt;/chats.index.json
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  claude-register-host.sh# scaffold a new host into the data repo
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -&gt; NAS
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
-<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>hooks/
-<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
-<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
-<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
-<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
-<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
-<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
-<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>mcp/
-<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
-<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>skeleton/host/           # template copied when registering a new machine
-<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>bin/
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>  lib.sh                 # shared helpers: host + data/chats pointers
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  claude-index-chats.sh  # write scrubjay-data/hosts/&lt;host&gt;/chats.index.json
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  claude-register-host.sh# scaffold a new host into the data repo
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -&gt; NAS
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>hooks/
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>mcp/
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>skeleton/host/           # template copied when registering a new machine
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
 </code></pre></div>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Moving the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>) is machine-local — nothing
@@ -1122,7 +1251,7 @@ to commit. See the <a href="../reference/#re-home-the-scrubjay-clones">Reference
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.sections", "content.code.copy", "toc.follow", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
