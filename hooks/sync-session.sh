@@ -97,8 +97,10 @@ fi
 # 3b) same for cross-machine memory. Its sync is best-effort and hook-invoked with stderr closed,
 #     so a dead remote used to strand memory on one machine indefinitely while every session
 #     reported success. Clears itself once a later pull/push succeeds.
+#     The file carries one line per mode, so a failed pull stays visible even after a push that
+#     had nothing to publish — hence no '^' anchor here.
 mfile="$(sj_memory_status_file 2>/dev/null || echo "$HOME/.config/scrubjay/last-memory-sync")"
-if [ -s "$mfile" ] && grep -q '^result=fail' "$mfile" 2>/dev/null; then
+if [ -s "$mfile" ] && grep -q 'result=fail' "$mfile" 2>/dev/null; then
   printf 'scrubjay: cross-machine memory sync FAILED — this machine may be running on a stale view of memory, and anything it writes may not reach the others. Check SCRUBJAY_MEMORY_REMOTE and the memory-git SSH key. Breadcrumb: %s\n' "$(cat "$mfile")"
 fi
 

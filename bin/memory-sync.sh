@@ -85,7 +85,10 @@ case "$mode" in
       # branch is provably not ahead; otherwise fall through and push what's already committed.
       # An unknown count (no remote-tracking ref yet) counts as ahead — try, don't assume.
       ahead="$(git rev-list --count "origin/$branch..$branch" 2>/dev/null)" || ahead=""
-      if [ "$ahead" = 0 ]; then track; sj_record_memory_sync ok push "$remote"; exit 0; fi
+      # `skip`, not `ok`: nothing was published, so the remote was never contacted and this run
+      # proves nothing about reachability. Claiming success here is what let a cut-off machine
+      # report green every session while its pull had been failing for weeks.
+      if [ "$ahead" = 0 ]; then track; sj_record_memory_sync skip push "$remote" "nothing-to-publish"; exit 0; fi
     else
       git commit -q -m "memory sync: $(sj_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
     fi

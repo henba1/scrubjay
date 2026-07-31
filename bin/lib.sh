@@ -284,12 +284,28 @@ sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
 # that warning reached nobody — a stale remote silently stranded weeks of memory on one machine.
 # Written by bin/memory-sync.sh; read by hooks/sync-session.sh.
 sj_memory_status_file() { printf '%s' "$HOME/.config/scrubjay/last-memory-sync"; }
-sj_record_memory_sync() {  # sj_record_memory_sync <ok|fail> <pull|push> <remote> [detail]
-  local result="$1" mode="$2" remote="$3" detail="${4:-}" f
+
+# ONE LINE PER MODE, and that is the whole point. A session pulls at the start and pushes at the
+# end, so a single-line breadcrumb meant the push always had the last word — and the push path
+# legitimately short-circuits when there is nothing to publish, WITHOUT contacting the remote. A
+# machine that could not reach its remote at all therefore ended every session reporting `ok`,
+# overwriting the pull's `fail`. Observed on a host that had been cut off for weeks.
+#
+#   result=ok    the operation reached the remote and did what it says
+#   result=fail  it tried and could not — the thing worth surfacing
+#   result=skip  there was nothing to do, so the remote was never contacted. NOT a success claim:
+#                it must never clear or mask a fail recorded by the other mode.
+sj_record_memory_sync() {  # sj_record_memory_sync <ok|fail|skip> <pull|push> <remote> [detail]
+  local result="$1" mode="$2" remote="$3" detail="${4:-}" f tmp
   f="$(sj_memory_status_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
-  printf 'result=%s ts=%s host=%s mode=%s remote=%s%s\n' \
-    "$result" "$(date +%FT%T)" "$(sj_host)" "$mode" "$remote" "${detail:+ detail=$detail}" \
-    > "$f" 2>/dev/null || true
+  tmp="$f.tmp.$$"
+  # The group's exit status is the printf's, not the grep's — see sj_clear_pending for why that
+  # distinction matters when grep legitimately matches nothing.
+  { [ -f "$f" ] && grep -v "^mode=$mode " "$f"
+    printf 'mode=%s result=%s ts=%s host=%s remote=%s%s\n' \
+      "$mode" "$result" "$(date +%FT%T)" "$(sj_host)" "$remote" "${detail:+ detail=$detail}"
+  } > "$tmp" 2>/dev/null && mv "$tmp" "$f" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+  return 0
 }
 
 # --- pending receiver authorization -----------------------------------------------------------

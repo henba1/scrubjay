@@ -204,8 +204,13 @@ doctor_outcomes() {
   head_ "last recorded outcomes"
   for pair in "ship:$(sj_ship_status_file)" "memory:$(sj_memory_status_file)"; do
     what="${pair%%:*}"; f="${pair#*:}"
+    # No '^' anchor: the memory breadcrumb keeps one line per mode, so a pull failure must still
+    # be seen after a push that had nothing to publish (which records `skip`, not `ok`).
     if [ ! -s "$f" ]; then note "$what: nothing recorded yet"
-    elif grep -q '^result=fail' "$f" 2>/dev/null; then bad "$what: last attempt FAILED — $(cat "$f")" "re-run it and re-check"
+    elif grep -q 'result=fail' "$f" 2>/dev/null; then
+      bad "$what: last attempt FAILED — $(grep 'result=fail' "$f" | tr '\n' ';')" "re-run it and re-check"
+    elif grep -q 'result=skip' "$f" 2>/dev/null && ! grep -q 'result=ok' "$f" 2>/dev/null; then
+      note "$what: nothing to publish yet — no run has actually reached the remote"
     else ok "$what: last attempt ok"; fi
   done
 }
