@@ -136,3 +136,16 @@ onboard) and aren't auto-applied — do them once when you first enable client m
    sure `git-shell` is installed on the receiver.
 
 After these, every new client is fully covered by `onboard-memory.sh` + adding its one printed key.
+
+## When memory isn't arriving
+
+Run `/sjdoctor` (or `bin/sj-doctor.sh`) first — it checks the things that fail silently here, in
+the order they actually go wrong: whether the clone's `origin` still matches the configured
+remote, whether it is on `main` (a clone that fell back to `master` can never reconcile), whether
+the remote is reachable at all, and whether commits are sitting unpublished. Each finding comes
+with a fix.
+
+The usual answer on a peer-to-peer backend is that this host's key hasn't been added to the
+receiver's `authorized_keys` yet. That is not a fault to work around: a machine must not be able
+to authorize itself. Onboarding records the wait, and a session publishes the backlog by itself
+once the key lands.
