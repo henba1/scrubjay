@@ -1013,7 +1013,7 @@ onboard) and aren't auto-applied — do them once when you first enable client m
 </ol>
 <p>After these, every new client is fully covered by <code>onboard-memory.sh</code> + adding its one printed key.</p>
 <h2 id="when-memory-isnt-arriving">When memory isn't arriving<a class="headerlink" href="#when-memory-isnt-arriving" title="Permanent link">&para;</a></h2>
-<p>Run <code>/sjdoctor</code> (or <code>bin/sj-doctor.sh</code>) first — it checks the things that fail silently here, in
+<p>Run <code>/sjdoctor memory</code> (or <code>bin/sj-doctor.sh memory</code>) first — it checks the things that fail silently here, in
 the order they actually go wrong: whether the clone's <code>origin</code> still matches the configured
 remote, whether it is on <code>main</code> (a clone that fell back to <code>master</code> can never reconcile), whether
 the remote is reachable at all, and whether commits are sitting unpublished. Each finding comes

@@ -983,7 +983,9 @@ elsewhere, adjust, or run <code>bin/*</code> from inside the repo). For the in-s
 <p>Every subsystem is best-effort and hook-invoked with its output discarded, so a machine can be
 degraded — relaying nothing, publishing memory nowhere — while each session still looks fine.
 This checks the wiring rather than the last attempt, and exits non-zero if anything is wrong.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>~/.scrubjay/scrubjay/bin/sj-doctor.sh<span class="w">        </span><span class="c1"># or /sjdoctor in a session</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>~/.scrubjay/scrubjay/bin/sj-doctor.sh<span class="w">            </span><span class="c1"># everything (or /sjdoctor in a session)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>~/.scrubjay/scrubjay/bin/sj-doctor.sh<span class="w"> </span>memory<span class="w">     </span><span class="c1"># just one subsystem — skips the other probes</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>~/.scrubjay/scrubjay/bin/sj-doctor.sh<span class="w"> </span>--list<span class="w">     </span><span class="c1"># what can be checked</span>
 </code></pre></div>
 <p>Read-only: it never writes, pushes or installs. Each failure comes with a <code>fix:</code> hint. On the
 peer-to-peer backends the usual finding is that this host's key isn't in the receiver's
