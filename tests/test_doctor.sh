@@ -58,6 +58,24 @@ out="$(SCRUBJAY_MEMORY_REMOTE="" doctor)"
 assert_contains "says it is off" "$out" "memory sync is off"
 check "and does not fail the run" bash -c 'SCRUBJAY_MEMORY_REMOTE="" bash "$1/bin/sj-doctor.sh" --quiet' _ "$APP"
 
+section "sections can be selected, like tests/run.sh"
+out="$(bash "$APP/bin/sj-doctor.sh" --list 2>&1)"
+assert_contains "--list names the sections" "$out" "memory"
+out="$(SCRUBJAY_MEMORY="$MEM" SCRUBJAY_MEMORY_REMOTE="$BARE" bash "$APP/bin/sj-doctor.sh" memory 2>&1)"
+assert_contains "a narrowed run checks what was asked" "$out" "cross-machine memory"
+case "$out" in *"transcript relay"*) _no "and nothing else" "the relay section ran too" ;; *) _ok "and nothing else" ;; esac
+assert_contains "the verdict states the narrowed scope" "$out" "(checked: memory)"
+# Each section must stand alone: `relay` alone used to abort on an unbound \$backend under set -u.
+check "a section that reads shared state still runs alone" bash "$APP/bin/sj-doctor.sh" --quiet relay
+check "several sections can be combined" bash "$APP/bin/sj-doctor.sh" --quiet relay harnesses
+
+section "a mistyped section fails loudly instead of passing vacuously"
+out="$(bash "$APP/bin/sj-doctor.sh" memroy 2>&1)"; rc=0
+bash "$APP/bin/sj-doctor.sh" memroy >/dev/null 2>&1 || rc=$?
+assert_eq "exits 2 (usage), not 0" "2" "$rc"
+assert_contains "and says what is available" "$out" "no such section"
+case "$out" in *healthy*) _no "never reports healthy for checks it did not run" "a typo produced a clean bill of health" ;; *) _ok "never reports healthy for checks it did not run" ;; esac
+
 section "it is read-only"
 # An agent may run this unprompted, so it must never mutate a repo.
 before="$(git -C "$MEM" rev-parse HEAD)$(git --git-dir="$BARE" rev-parse main)"

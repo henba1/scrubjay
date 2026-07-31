@@ -31,7 +31,9 @@ degraded — relaying nothing, publishing memory nowhere — while each session 
 This checks the wiring rather than the last attempt, and exits non-zero if anything is wrong.
 
 ```sh
-~/.scrubjay/scrubjay/bin/sj-doctor.sh        # or /sjdoctor in a session
+~/.scrubjay/scrubjay/bin/sj-doctor.sh            # everything (or /sjdoctor in a session)
+~/.scrubjay/scrubjay/bin/sj-doctor.sh memory     # just one subsystem — skips the other probes
+~/.scrubjay/scrubjay/bin/sj-doctor.sh --list     # what can be checked
 ```
 
 Read-only: it never writes, pushes or installs. Each failure comes with a `fix:` hint. On the
