@@ -273,3 +273,20 @@ if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
   sj_record_pending relay ssh "$WG_TARGET"
   info "(Recorded as pending — a future session will notice once the key is authorized.)"
 fi
+
+# ---- 10) prove it ---------------------------------------------------------------------
+# Onboarding writes config and reports success on that basis, which is not the same as the
+# machine actually working — the difference is what let a host look configured and sync nothing.
+# Run the health check so the run ends on evidence rather than on intent.
+#
+# NOT a failure of onboarding: on the p2p backends the receiver key is deliberately not yet
+# authorized at this point, so a red line here is expected and self-resolving (see step 9). Report
+# it, don't exit non-zero on it.
+echo
+info "Verifying this machine end to end (bin/sj-doctor.sh)…"
+"$APP/bin/sj-doctor.sh" || {
+  echo
+  info "Some checks failed — see the fix hints above. If this host is still waiting on the"
+  info "receiver's authorized_keys, that is expected: a session will pick it up automatically"
+  info "once the line is pasted. Re-check any time with /sjdoctor."
+}

@@ -24,6 +24,20 @@ git -C ~/.scrubjay/scrubjay-data pull             # config, rules, memory, templ
 git -C ~/.scrubjay/scrubjay      pull             # the scripts & hooks themselves
 ```
 
+## Check this machine is actually syncing
+
+Every subsystem is best-effort and hook-invoked with its output discarded, so a machine can be
+degraded — relaying nothing, publishing memory nowhere — while each session still looks fine.
+This checks the wiring rather than the last attempt, and exits non-zero if anything is wrong.
+
+```sh
+~/.scrubjay/scrubjay/bin/sj-doctor.sh        # or /sjdoctor in a session
+```
+
+Read-only: it never writes, pushes or installs. Each failure comes with a `fix:` hint. On the
+peer-to-peer backends the usual finding is that this host's key isn't in the receiver's
+`authorized_keys` yet — which a human with root on the receiver has to fix, by design.
+
 ## Find a past chat across every machine
 
 ```sh
