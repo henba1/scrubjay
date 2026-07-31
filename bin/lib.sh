@@ -292,6 +292,52 @@ sj_record_memory_sync() {  # sj_record_memory_sync <ok|fail> <pull|push> <remote
     > "$f" 2>/dev/null || true
 }
 
+# --- pending receiver authorization -----------------------------------------------------------
+# On the peer-to-peer backends a new machine CANNOT authorize itself: onboarding prints an
+# authorized_keys line that a human with root on the receiver must paste. That is deliberate. The
+# consequence is that a freshly onboarded host is *expected* to fail every sync until that happens
+# — so "not yet authorized" is a normal, resumable state, not an error, and it needs to be recorded
+# rather than inferred. Without this the host looks configured, silently syncs nothing, and the
+# user has to remember to re-run the publish by hand afterwards (which is how a host sat stranded).
+#
+# One line per waiting subsystem, TSV: <subsystem> <probe-kind> <probe-target>
+#   probe-kind  ssh -> reachable when ssh does NOT exit 255 (the relay key's forced command
+#                      refuses every command by design, so only ssh's own 255 means "no")
+#               git -> reachable when `git ls-remote` succeeds
+sj_pending_file() { printf '%s' "$HOME/.config/scrubjay/pending-authorization"; }
+
+sj_record_pending() {  # sj_record_pending <subsystem> <ssh|git> <target>
+  local sub="$1" kind="$2" tgt="$3" f tmp
+  f="$(sj_pending_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
+  tmp="$f.tmp.$$"
+  { [ -f "$f" ] && grep -v "^$sub	" "$f"; printf '%s\t%s\t%s\n' "$sub" "$kind" "$tgt"; } \
+    > "$tmp" 2>/dev/null && mv "$tmp" "$f" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+  return 0
+}
+
+sj_clear_pending() {  # sj_clear_pending <subsystem>
+  local sub="$1" f tmp; f="$(sj_pending_file)"; [ -f "$f" ] || return 0
+  tmp="$f.tmp.$$"
+  # NB: `grep -v` exits 1 when it prints nothing, which is exactly the case where the LAST pending
+  # entry is being cleared — branching on its exit code would leave the file behind forever and
+  # keep reporting a wait that is over. Judge by the output, not the status.
+  grep -v "^$sub	" "$f" > "$tmp" 2>/dev/null || true
+  if [ -s "$tmp" ]; then mv "$tmp" "$f" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+  else rm -f "$tmp" "$f" 2>/dev/null; fi          # nothing left waiting: drop the file entirely
+  return 0
+}
+
+sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when it now works
+  local kind="$1" tgt="$2"
+  case "$kind" in
+    ssh) sj_timeout 20 ssh -o BatchMode=yes -o ConnectTimeout=8 "$tgt" true >/dev/null 2>&1
+         [ "$?" != 255 ] ;;
+    git) GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=8' \
+           sj_timeout 20 git ls-remote "$tgt" HEAD >/dev/null 2>&1 ;;
+    *)   return 1 ;;
+  esac
+}
+
 # --- session hand-off (bin/sj-resume.sh) ------------------------------------------------------
 # Where a session lives locally, and how a harness encodes a project into a directory name, are
 # harness-specific — they moved to bin/adapters/<harness>.sh (sjh_project_dir / sjh_slug).
