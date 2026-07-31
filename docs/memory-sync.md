@@ -139,7 +139,7 @@ After these, every new client is fully covered by `onboard-memory.sh` + adding i
 
 ## When memory isn't arriving
 
-Run `/sjdoctor` (or `bin/sj-doctor.sh`) first — it checks the things that fail silently here, in
+Run `/sjdoctor memory` (or `bin/sj-doctor.sh memory`) first — it checks the things that fail silently here, in
 the order they actually go wrong: whether the clone's `origin` still matches the configured
 remote, whether it is on `main` (a clone that fell back to `master` can never reconcile), whether
 the remote is reachable at all, and whether commits are sitting unpublished. Each finding comes
