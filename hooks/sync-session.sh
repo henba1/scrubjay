@@ -67,4 +67,12 @@ if [ -s "$sfile" ] && grep -q '^result=fail' "$sfile" 2>/dev/null; then
   printf 'scrubjay: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. Check the relay SSH key / authorized_keys on the receiver, then re-ship. Breadcrumb: %s\n' "$(cat "$sfile")"
 fi
 
+# 3b) same for cross-machine memory. Its sync is best-effort and hook-invoked with stderr closed,
+#     so a dead remote used to strand memory on one machine indefinitely while every session
+#     reported success. Clears itself once a later pull/push succeeds.
+mfile="$(sj_memory_status_file 2>/dev/null || echo "$HOME/.config/scrubjay/last-memory-sync")"
+if [ -s "$mfile" ] && grep -q '^result=fail' "$mfile" 2>/dev/null; then
+  printf 'scrubjay: cross-machine memory sync FAILED — this machine may be running on a stale view of memory, and anything it writes may not reach the others. Check SCRUBJAY_MEMORY_REMOTE and the memory-git SSH key. Breadcrumb: %s\n' "$(cat "$mfile")"
+fi
+
 exit 0

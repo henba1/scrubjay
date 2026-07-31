@@ -31,6 +31,11 @@ if [ ! -d "$mem/.git" ]; then
     # push can populate the bare repo. (An empty `git clone` of a freshly-init'd bare repo
     # already succeeds, so this mainly covers the unreachable case.)
     git init -q "$mem" 2>/dev/null || exit 0
+    # Pin the unborn branch to main. `git init` names it after init.defaultBranch, which is still
+    # `master` on plenty of installs — and the resulting repo then pulls/pushes `origin master`
+    # against a bare repo whose only branch is `main`, so it can NEVER reconcile. Silent, permanent
+    # island; observed on a real host. (symbolic-ref, not `init -b`: works on git < 2.28 too.)
+    git -C "$mem" symbolic-ref HEAD refs/heads/main 2>/dev/null || true
     git -C "$mem" remote add origin "$remote" 2>/dev/null || true
   }
 fi
@@ -38,6 +43,19 @@ fi
 
 cd "$mem" || exit 0
 git config pull.rebase true 2>/dev/null || true
+
+# Keep origin honest. Everything below talks to `origin`, but origin's URL was frozen at clone
+# time — so editing SCRUBJAY_MEMORY_REMOTE in the config appeared to work and changed nothing,
+# and a renamed/moved bare repo stranded every push behind a dead path while sync reported
+# success. The config is the source of truth; reassert it on every run.
+cur="$(git remote get-url origin 2>/dev/null)" || cur=""
+if [ "$cur" != "$remote" ]; then
+  if [ -z "$cur" ]; then git remote add origin "$remote" 2>/dev/null || true
+  else
+    git remote set-url origin "$remote" 2>/dev/null || true
+    warn "memory remote moved: '$cur' -> '$remote' (origin re-pointed from the config)"
+  fi
+fi
 
 # Resolve the branch once. Pull/push use an EXPLICIT `origin $branch` refspec so they work even
 # when tracking isn't set yet (a bare `git pull` would otherwise error "no tracking information"
@@ -48,24 +66,34 @@ track() { git branch --set-upstream-to="origin/$branch" "$branch" >/dev/null 2>&
 
 case "$mode" in
   pull)
-    sj_timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null || true
+    if sj_timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null; then
+      sj_record_memory_sync ok pull "$remote"
+    else
+      # A failed pull is not fatal (the local memory is still readable), but it does mean this
+      # machine is running on a stale view of everyone else's — worth surfacing, not swallowing.
+      sj_record_memory_sync fail pull "$remote" "branch=$branch"
+    fi
     track
     ;;
   push)
     git add -A 2>/dev/null
-    git diff --cached --quiet 2>/dev/null && { track; exit 0; }   # nothing new to publish
+    git diff --cached --quiet 2>/dev/null && { track; sj_record_memory_sync ok push "$remote"; exit 0; }
     git commit -q -m "memory sync: $(sj_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
     if ! sj_timeout 30 git push -q origin "$branch" 2>/dev/null; then
       # remote moved on (another machine pushed): tree is clean after commit, so rebase onto it + retry.
       if sj_timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null \
          && sj_timeout 30 git push -q origin "$branch" 2>/dev/null; then
-        :
+        sj_record_memory_sync ok push "$remote"
       else
         # Genuinely couldn't reconcile (conflict / remote unreachable): surface it instead of
-        # swallowing — the commit is safe locally but UNPUBLISHED until resolved by hand.
+        # swallowing — the commit is safe locally but UNPUBLISHED until resolved by hand. The
+        # breadcrumb is what actually reaches you: both callers are hooks that discard stderr.
         warn "push to '$remote' failed and auto-reconcile didn't complete — local memory committed but NOT on the NAS."
         warn "resolve with:  git -C '$mem' pull --rebase && git -C '$mem' push"
+        sj_record_memory_sync fail push "$remote" "ahead=$(git rev-list --count origin/$branch..$branch 2>/dev/null || echo '?')"
       fi
+    else
+      sj_record_memory_sync ok push "$remote"
     fi
     track
     ;;

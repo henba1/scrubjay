@@ -279,6 +279,19 @@ sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
     "$result" "$(date +%FT%T)" "$(sj_host)" "$backend" "${sid:0:8}" "$rc" > "$f" 2>/dev/null || true
 }
 
+# Same idea for cross-machine memory. memory-sync.sh warns on a failed push, but both its callers
+# are hooks that redirect stderr to /dev/null (they must never write to a session's stream), so
+# that warning reached nobody — a stale remote silently stranded weeks of memory on one machine.
+# Written by bin/memory-sync.sh; read by hooks/sync-session.sh.
+sj_memory_status_file() { printf '%s' "$HOME/.config/scrubjay/last-memory-sync"; }
+sj_record_memory_sync() {  # sj_record_memory_sync <ok|fail> <pull|push> <remote> [detail]
+  local result="$1" mode="$2" remote="$3" detail="${4:-}" f
+  f="$(sj_memory_status_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
+  printf 'result=%s ts=%s host=%s mode=%s remote=%s%s\n' \
+    "$result" "$(date +%FT%T)" "$(sj_host)" "$mode" "$remote" "${detail:+ detail=$detail}" \
+    > "$f" 2>/dev/null || true
+}
+
 # --- session hand-off (bin/sj-resume.sh) ------------------------------------------------------
 # Where a session lives locally, and how a harness encodes a project into a directory name, are
 # harness-specific — they moved to bin/adapters/<harness>.sh (sjh_project_dir / sjh_slug).
