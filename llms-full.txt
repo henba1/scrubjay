@@ -270,6 +270,7 @@ Host identity is pinned separately in `~/.config/scrubjay/host` (because `hostna
 bin/
   onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
   onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
+  sj-doctor.sh           # read-only end-to-end health check of this machine (the /sjdoctor command); onboarding's last step
   lib.sh                 # shared helpers: host + data/chats pointers
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
   claude-index-chats.sh  # write scrubjay-data/hosts/<host>/chats.index.json
@@ -365,6 +366,16 @@ The SessionStart hook does both for you:
 git -C ~/.scrubjay/scrubjay-data pull             # config, rules, memory, templates, logs
 git -C ~/.scrubjay/scrubjay      pull             # the scripts & hooks themselves
 ```
+
+## Check this machine is actually syncing
+
+Every subsystem is best-effort and hook-invoked with its output discarded, so a machine can be degraded — relaying nothing, publishing memory nowhere — while each session still looks fine. This checks the wiring rather than the last attempt, and exits non-zero if anything is wrong.
+
+```
+~/.scrubjay/scrubjay/bin/sj-doctor.sh        # or /sjdoctor in a session
+```
+
+Read-only: it never writes, pushes or installs. Each failure comes with a `fix:` hint. On the peer-to-peer backends the usual finding is that this host's key isn't in the receiver's `authorized_keys` yet — which a human with root on the receiver has to fix, by design.
 
 ## Find a past chat across every machine
 
@@ -503,6 +514,7 @@ All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/
 | `/sjresume [sid8 \| words]` | —            | **Continue a session from another machine here** ([hand-off](https://henba1.github.io/scrubjay/handoff/index.md)). Stages the archived transcript — plus its subagents, tasks and file history — into this machine's `~/.claude/projects/`, rewriting the other host's paths to this one's, so Claude Code's own `/resume` can pick it up. Run it from the project dir; then `/resume`. |
 | `/sjonboard [hint]`         | —            | Guided wrapper around `bin/onboard.sh` (gathers choices in chat, then runs it unattended). For onboarding or reconfiguring (e.g. *"switch backend to rsync-wg"*). For a *brand-new* machine without scrubjay yet, run `bin/onboard.sh` in a terminal instead.                                                                                                                           |
 | `/sjmemory`                 | —            | Enable/repair cross-machine memory on **this** machine (idempotent — runs `bin/onboard-memory.sh`). First-time memory setup, or when memory sync looks broken.                                                                                                                                                                                                                          |
+| `/sjdoctor`                 | —            | **Check that this machine's sync actually works** (runs `bin/sj-doctor.sh`). Verifies config, the data repo, the memory clone, relay reachability, adapters and the last recorded outcomes. Read-only and safe to run any time — reach for it when something *should* have synced and didn't, or before trusting a machine you haven't used in a while.                                 |
 
 # Session hand-off — continue a chat on another machine
 
@@ -898,6 +910,12 @@ The memory ride reuses the transcript relay's *connection* (same host, port, acc
 1. **Authorize each client key** with the `git-shell` forced-command line from step above, and make sure `git-shell` is installed on the receiver.
 
 After these, every new client is fully covered by `onboard-memory.sh` + adding its one printed key.
+
+## When memory isn't arriving
+
+Run `/sjdoctor` (or `bin/sj-doctor.sh`) first — it checks the things that fail silently here, in the order they actually go wrong: whether the clone's `origin` still matches the configured remote, whether it is on `main` (a clone that fell back to `master` can never reconcile), whether the remote is reachable at all, and whether commits are sitting unpublished. Each finding comes with a fix.
+
+The usual answer on a peer-to-peer backend is that this host's key hasn't been added to the receiver's `authorized_keys` yet. That is not a fault to work around: a machine must not be able to authorize itself. Onboarding records the wait, and a session publishes the backlog by itself once the key lands.
 
 # Mirror host (optional): also keep a NAS copy of the `git` backend
 

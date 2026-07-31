@@ -743,6 +743,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#when-memory-isnt-arriving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When memory isn't arriving
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -851,6 +862,17 @@
     <span class="md-ellipsis">
       
         Receiver one-time admin (per box, NOT per client)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-memory-isnt-arriving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When memory isn't arriving
       
     </span>
   </a>
@@ -990,6 +1012,16 @@ onboard) and aren't auto-applied — do them once when you first enable client m
    sure <code>git-shell</code> is installed on the receiver.</li>
 </ol>
 <p>After these, every new client is fully covered by <code>onboard-memory.sh</code> + adding its one printed key.</p>
+<h2 id="when-memory-isnt-arriving">When memory isn't arriving<a class="headerlink" href="#when-memory-isnt-arriving" title="Permanent link">&para;</a></h2>
+<p>Run <code>/sjdoctor</code> (or <code>bin/sj-doctor.sh</code>) first — it checks the things that fail silently here, in
+the order they actually go wrong: whether the clone's <code>origin</code> still matches the configured
+remote, whether it is on <code>main</code> (a clone that fell back to <code>master</code> can never reconcile), whether
+the remote is reachable at all, and whether commits are sitting unpublished. Each finding comes
+with a fix.</p>
+<p>The usual answer on a peer-to-peer backend is that this host's key hasn't been added to the
+receiver's <code>authorized_keys</code> yet. That is not a fault to work around: a machine must not be able
+to authorize itself. Onboarding records the wait, and a session publishes the backlog by itself
+once the key lands.</p>
 
 
 

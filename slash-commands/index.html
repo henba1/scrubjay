@@ -910,6 +910,11 @@ injects it directly with no tool call at all.</p>
 <td>—</td>
 <td>Enable/repair cross-machine memory on <strong>this</strong> machine (idempotent — runs <code>bin/onboard-memory.sh</code>). First-time memory setup, or when memory sync looks broken.</td>
 </tr>
+<tr>
+<td><code>/sjdoctor</code></td>
+<td>—</td>
+<td><strong>Check that this machine's sync actually works</strong> (runs <code>bin/sj-doctor.sh</code>). Verifies config, the data repo, the memory clone, relay reachability, adapters and the last recorded outcomes. Read-only and safe to run any time — reach for it when something <em>should</em> have synced and didn't, or before trusting a machine you haven't used in a while.</td>
+</tr>
 </tbody>
 </table>
 
