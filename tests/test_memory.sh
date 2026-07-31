@@ -66,11 +66,26 @@ assert_eq "the stranded commit reached the remote" \
 assert_contains "and the breadcrumb clears to ok" "$(crumb)" "result=ok"
 
 # ── a genuinely clean run stays quiet ──────────────────────────────────────────────────────────
-section "a no-op push is reported as success, not as work"
+section "a no-op push creates nothing and does not claim to have reached the remote"
 before="$(git --git-dir="$GONE" rev-parse main)"
 sync "$GONE" push >/dev/null 2>&1
 assert_eq "no empty commit was created" "$before" "$(git --git-dir="$GONE" rev-parse main)"
-assert_contains "still reports ok" "$(crumb)" "result=ok"
+# `skip`, not `ok`: nothing was published, so this run says nothing about reachability.
+assert_contains "records skip rather than success" "$(crumb)" "result=skip"
+
+# ── the breadcrumb must not be able to report green on a cut-off machine ───────────────────────
+# A session pulls at the start and pushes at the end. With one line for both, the push always had
+# the last word — and a push with nothing to publish never contacts the remote, so a host that
+# could not reach its remote at all still ended every session reporting ok. Seen in the wild.
+section "a no-op push cannot erase a failed pull"
+rm -rf "$MEM"; DEAD="$SANDBOX/unreachable.git"
+sync "$DEAD" pull >/dev/null 2>&1
+assert_contains "the pull failure is recorded" "$(crumb)" "result=fail"
+sync "$DEAD" push >/dev/null 2>&1
+assert_contains "the failed pull is STILL visible after the push" "$(crumb)" "result=fail"
+assert_eq "one line per mode, not one line total" "2" "$(crumb | wc -l | tr -d ' ')"
+# What SessionStart and sj-doctor both grep for:
+check "a fail is still detectable in the file" bash -c 'grep -q "result=fail" "$1"' _ "$HOME/.config/scrubjay/last-memory-sync"
 
 # ── the config is the source of truth for where memory goes ────────────────────────────────────
 # BUG 1: origin was frozen at clone time and never reconciled, so editing SCRUBJAY_MEMORY_REMOTE
