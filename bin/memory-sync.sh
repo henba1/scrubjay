@@ -77,8 +77,18 @@ case "$mode" in
     ;;
   push)
     git add -A 2>/dev/null
-    git diff --cached --quiet 2>/dev/null && { track; sj_record_memory_sync ok push "$remote"; exit 0; }
-    git commit -q -m "memory sync: $(sj_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
+    if git diff --cached --quiet 2>/dev/null; then
+      # Nothing new to stage — which is NOT the same as nothing to publish. An earlier run may
+      # have committed while the remote was unreachable (the normal first-run state on a WG client
+      # whose key isn't authorized yet), leaving commits stranded locally. Exiting "ok" here
+      # asserted success for a repo that had never pushed anything. Only claim success once the
+      # branch is provably not ahead; otherwise fall through and push what's already committed.
+      # An unknown count (no remote-tracking ref yet) counts as ahead — try, don't assume.
+      ahead="$(git rev-list --count "origin/$branch..$branch" 2>/dev/null)" || ahead=""
+      if [ "$ahead" = 0 ]; then track; sj_record_memory_sync ok push "$remote"; exit 0; fi
+    else
+      git commit -q -m "memory sync: $(sj_host) $(date '+%F %H:%M')" 2>/dev/null || exit 0
+    fi
     if ! sj_timeout 30 git push -q origin "$branch" 2>/dev/null; then
       # remote moved on (another machine pushed): tree is clean after commit, so rebase onto it + retry.
       if sj_timeout 30 git pull --rebase --autostash -q origin "$branch" 2>/dev/null \
