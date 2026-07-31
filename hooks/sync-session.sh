@@ -67,6 +67,33 @@ if [ -s "$sfile" ] && grep -q '^result=fail' "$sfile" 2>/dev/null; then
   printf 'scrubjay: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. Check the relay SSH key / authorized_keys on the receiver, then re-ship. Breadcrumb: %s\n' "$(cat "$sfile")"
 fi
 
+# 3a) finish onboarding if the receiver has been authorized since last time. A p2p host cannot
+#     authorize itself, so onboarding ends mid-way by design and the host syncs nothing until a
+#     human pastes its key on the receiver. Rather than make the user remember to come back and
+#     re-run the publish, probe here: the moment the key lands, catch up and clear the wait.
+#     Costs one bounded probe per session, and ONLY while something is actually pending.
+pfile="$(sj_pending_file 2>/dev/null || echo "$HOME/.config/scrubjay/pending-authorization")"
+if [ -s "$pfile" ]; then
+  while IFS="$(printf '\t')" read -r sub kind tgt; do
+    [ -n "${sub:-}" ] || continue
+    if sj_pending_authorized "$kind" "$tgt"; then
+      case "$sub" in
+        memory)
+          # Publish whatever accumulated while the remote was refusing us.
+          "$APP/bin/memory-sync.sh" pull >/dev/null 2>&1 || true
+          "$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
+          printf 'scrubjay: this machine is now authorized for cross-machine memory — memory accumulated since onboarding has been published, and sync is live.\n' ;;
+        relay)
+          printf 'scrubjay: this machine is now authorized on the transcript receiver — session-end relay is live. Sessions recorded before now stayed local; re-ship them with bin/backfill-transcripts.sh if you want them archived.\n' ;;
+        *) printf 'scrubjay: %s is now authorized on the receiver.\n' "$sub" ;;
+      esac
+      sj_clear_pending "$sub"
+    else
+      printf 'scrubjay: %s is NOT yet authorized on the receiver (%s), so it is syncing nothing. Add this host key to the receiver'"'"'s authorized_keys — the line was printed by onboarding, and a human with root on the receiver must paste it.\n' "$sub" "$tgt"
+    fi
+  done < "$pfile"
+fi
+
 # 3b) same for cross-machine memory. Its sync is best-effort and hook-invoked with stderr closed,
 #     so a dead remote used to strand memory on one machine indefinitely while every session
 #     reported success. Clears itself once a later pull/push succeeds.

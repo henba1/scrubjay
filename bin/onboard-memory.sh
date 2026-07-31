@@ -166,5 +166,11 @@ if [ -n "$authorize_key" ] && [ -f "$authorize_key" ]; then
   printf '    command="git-shell -c \\"$SSH_ORIGINAL_COMMAND\\"",restrict %s\n' "$(cat "$authorize_key")"
   echo
   info "git-shell must be installed on the receiver; then verify here:  bin/memory-sync.sh pull"
+  # The clone above could not succeed yet (that is what this key unlocks), so memory-sync fell back
+  # to a local repo whose commits have nowhere to go. Record the wait: SessionStart will detect the
+  # authorization and publish what accumulated, rather than leaving it stranded until someone
+  # notices. This is the exact state that stranded a host for three weeks.
+  sj_record_pending memory git "$remote"
+  info "(Recorded as pending — a future session will publish automatically once authorized.)"
 fi
 ok "cross-machine memory ready on '$(sj_host)'"

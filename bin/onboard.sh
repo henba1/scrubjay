@@ -268,4 +268,8 @@ if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
   echo
   info "Then verify from here:  ssh scrubjay-receiver true   (should succeed silently),"
   info "and a session-end will rsync transcripts/subagents/plans to the NAS."
+  # Until that line is pasted, this host relays nothing. Record the wait so SessionStart can say
+  # so — and can notice by itself once the key lands, instead of the user having to remember.
+  sj_record_pending relay ssh "$WG_TARGET"
+  info "(Recorded as pending — a future session will notice once the key is authorized.)"
 fi
