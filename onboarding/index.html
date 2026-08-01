@@ -1162,30 +1162,31 @@ is transient on HPC login nodes).</p>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>  sj-doctor.sh           # read-only end-to-end health check of this machine (the /sjdoctor command); onboarding&#39;s last step
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  lib.sh                 # shared helpers: host + data/chats pointers
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  claude-index-chats.sh  # write scrubjay-data/hosts/&lt;host&gt;/chats.index.json
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  claude-register-host.sh# scaffold a new host into the data repo
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -&gt; NAS
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>hooks/
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
-<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>mcp/
-<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
-<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>skeleton/host/           # template copied when registering a new machine
-<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>  onboard-receiver.sh    # set up THIS box as the archive host, and authorize one client key per role (run on the receiver)
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>  lib.sh                 # shared helpers: host + data/chats pointers
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  claude-index-chats.sh  # write scrubjay-data/hosts/&lt;host&gt;/chats.index.json
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>  claude-register-host.sh# scaffold a new host into the data repo
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -&gt; NAS
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>hooks/
+<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
+<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
+<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
+<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
+<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
+<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
+<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>mcp/
+<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
+<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>skeleton/host/           # template copied when registering a new machine
+<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
 </code></pre></div>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Moving the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>) is machine-local — nothing

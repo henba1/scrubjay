@@ -126,6 +126,7 @@ bin/
   onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
   onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
   sj-doctor.sh           # read-only end-to-end health check of this machine (the /sjdoctor command); onboarding's last step
+  onboard-receiver.sh    # set up THIS box as the archive host, and authorize one client key per role (run on the receiver)
   lib.sh                 # shared helpers: host + data/chats pointers
   claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
   claude-index-chats.sh  # write scrubjay-data/hosts/<host>/chats.index.json

@@ -1009,7 +1009,10 @@ onboard) and aren't auto-applied — do them once when you first enable client m
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sudo<span class="w"> </span>-u<span class="w"> </span>&lt;relay-account&gt;<span class="w"> </span>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>--add<span class="w"> </span>safe.directory<span class="w"> </span>&lt;symlink-path&gt;<span class="w">  </span><span class="c1"># e.g. /srv/scrubjay-chats/memory.git</span>
 </code></pre></div></li>
 <li><strong>Authorize each client key</strong> with the <code>git-shell</code> forced-command line from step above, and make
-   sure <code>git-shell</code> is installed on the receiver.</li>
+   sure <code>git-shell</code> is installed on the receiver. <code>bin/onboard-receiver.sh --authorize memory
+   &lt;client.pub&gt;</code>, run on the receiver, does this for you — it gets the forced command right and
+   appends safely (a file not ending in a newline splices the new key onto the previous one and
+   breaks both). It still requires someone with access to the receiver, which is the point.</li>
 </ol>
 <p>After these, every new client is fully covered by <code>onboard-memory.sh</code> + adding its one printed key.</p>
 <h2 id="when-memory-isnt-arriving">When memory isn't arriving<a class="headerlink" href="#when-memory-isnt-arriving" title="Permanent link">&para;</a></h2>
