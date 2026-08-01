@@ -256,6 +256,39 @@ if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
     && ok "pushed hosts/$HOST" || warn "push skipped/failed — do it manually in $(sj_pretty_path "$DATA_DIR")"
 fi
 
+# ---- 8b) archive versioning (only when THIS box holds the archive) --------------------
+# The archive is copied, not committed: transcripts ride rsync precisely so they don't pay git's
+# blob tax (docs/durability.md). The trade is that nothing keeps a history of them — and a re-ship
+# overwrites in place, while plan mirroring uses rsync --delete. So point-in-time recovery is a
+# real choice, and onboarding is the moment to make it, not something to discover after a loss.
+# Kept deliberately small: detect, offer once, move on. Opt-in, and never a failure either way —
+# plenty of people back the archive up by other means.
+if [ "$BACKEND" = local ] && [ -n "$LOCAL_CHATS" ]; then
+  # Subshell: sj-snapshot.sh defines its own info/ok/warn on stderr, which would clobber ours.
+  ARCHIVE_FS="$(SCRUBJAY_SNAP_LIB=1 . "$APP/bin/sj-snapshot.sh" 2>/dev/null; sjs_detect_fs "$LOCAL_CHATS" 2>/dev/null)"
+  echo
+  case "$ARCHIVE_FS" in
+    zfs|btrfs)
+      info "Archive versioning: $LOCAL_CHATS is on $ARCHIVE_FS, so point-in-time snapshots are available."
+      info "Hourly, keeping the last 48; restore prints its commands rather than running them."
+      if confirm "install the snapshot timer now (needs sudo)?" N; then
+        sudo "$APP/bin/sj-snapshot.sh" --schedule --path "$LOCAL_CHATS" \
+          && ok "snapshot timer installed" \
+          || warn "could not install the timer — run it yourself: sudo $APP/bin/sj-snapshot.sh --schedule --path $LOCAL_CHATS"
+      else
+        info "Skipped. Later:  sudo $APP/bin/sj-snapshot.sh --schedule --path $LOCAL_CHATS"
+      fi
+      ;;
+    *)
+      # Not a failure — just the one thing people assume and shouldn't.
+      info "Archive versioning: not available here — $LOCAL_CHATS is not on zfs/btrfs, so scrubjay"
+      info "keeps NO history of the archive. Fine if you back it up separately; if you want"
+      info "point-in-time restore, put the archive on a btrfs subvolume or zfs dataset and run"
+      info "bin/sj-snapshot.sh --schedule (see docs/durability.md)."
+      ;;
+  esac
+fi
+
 # ---- 9) what's left -------------------------------------------------------------------
 echo; ok "onboarding complete for '$HOST' (backend: $BACKEND)"
 if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
