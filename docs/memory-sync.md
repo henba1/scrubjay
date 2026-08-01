@@ -133,7 +133,10 @@ onboard) and aren't auto-applied — do them once when you first enable client m
    sudo -u <relay-account> git config --global --add safe.directory <symlink-path>  # e.g. /srv/scrubjay-chats/memory.git
    ```
 3. **Authorize each client key** with the `git-shell` forced-command line from step above, and make
-   sure `git-shell` is installed on the receiver.
+   sure `git-shell` is installed on the receiver. `bin/onboard-receiver.sh --authorize memory
+   <client.pub>`, run on the receiver, does this for you — it gets the forced command right and
+   appends safely (a file not ending in a newline splices the new key onto the previous one and
+   breaks both). It still requires someone with access to the receiver, which is the point.
 
 After these, every new client is fully covered by `onboard-memory.sh` + adding its one printed key.
 
