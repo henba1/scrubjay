@@ -873,8 +873,13 @@ you <em>edit</em>; snapshots are for the records you only ever <em>append</em>.<
 <h2 id="setup-run-on-the-nas-with-root">Setup — run on the NAS, with root<a class="headerlink" href="#setup-run-on-the-nas-with-root" title="Permanent link">&para;</a></h2>
 <p><code>scrubjay-storage</code> lives on the box that holds the archive (the <code>local</code> backend's mount, or the
 <code>rsync-wg</code> receiver). Snapshotting is configured <strong>there, with root</strong> — so, like the
-<code>authorized_keys</code> line and the other receiver-side steps, it stays yours: onboard never does it.
-The helper is <a href="https://github.com/henba1/scrubjay/blob/main/bin/sj-snapshot.sh"><code>bin/sj-snapshot.sh</code></a>.</p>
+<code>authorized_keys</code> line and the other receiver-side steps, it stays yours: onboard never applies it
+unasked. The helper is <a href="https://github.com/henba1/scrubjay/blob/main/bin/sj-snapshot.sh"><code>bin/sj-snapshot.sh</code></a>.</p>
+<p>On the <code>local</code> backend, <code>bin/onboard.sh</code> now <strong>offers</strong> this once, at the end of the run: it detects
+what the archive sits on, and either asks whether to install the timer (zfs/btrfs) or says plainly
+that no history is being kept (anything else). It is opt-in, and declining is a normal answer —
+many people back the archive up by other means. The point is that you find out at install time
+rather than after a loss.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># on the NAS, as root — auto-detects zfs or btrfs under the storage path</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>sudo<span class="w"> </span>bin/sj-snapshot.sh<span class="w"> </span>--now<span class="w">                 </span><span class="c1"># take one snapshot now, prune to --keep</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>sudo<span class="w"> </span>bin/sj-snapshot.sh<span class="w"> </span>--schedule<span class="w">            </span><span class="c1"># install a systemd timer (default: hourly, keep 48)</span>

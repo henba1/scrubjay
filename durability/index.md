@@ -10,7 +10,9 @@ Transcripts are large, append-only, and grow without bound. Committing them woul
 
 ## Setup — run on the NAS, with root
 
-`scrubjay-storage` lives on the box that holds the archive (the `local` backend's mount, or the `rsync-wg` receiver). Snapshotting is configured **there, with root** — so, like the `authorized_keys` line and the other receiver-side steps, it stays yours: onboard never does it. The helper is [`bin/sj-snapshot.sh`](https://github.com/henba1/scrubjay/blob/main/bin/sj-snapshot.sh).
+`scrubjay-storage` lives on the box that holds the archive (the `local` backend's mount, or the `rsync-wg` receiver). Snapshotting is configured **there, with root** — so, like the `authorized_keys` line and the other receiver-side steps, it stays yours: onboard never applies it unasked. The helper is [`bin/sj-snapshot.sh`](https://github.com/henba1/scrubjay/blob/main/bin/sj-snapshot.sh).
+
+On the `local` backend, `bin/onboard.sh` now **offers** this once, at the end of the run: it detects what the archive sits on, and either asks whether to install the timer (zfs/btrfs) or says plainly that no history is being kept (anything else). It is opt-in, and declining is a normal answer — many people back the archive up by other means. The point is that you find out at install time rather than after a loss.
 
 ```
 # on the NAS, as root — auto-detects zfs or btrfs under the storage path
