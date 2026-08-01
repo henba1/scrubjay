@@ -52,4 +52,15 @@ section "a non-snapshot filesystem fails loudly with guidance"
 check_fails "ext4 storage is refused, not silently skipped" \
   env FAKE_FSTYPE=ext4 bash "$APP/bin/sj-snapshot.sh" --now --dry-run --path /x
 
+section "the library seam is safe for onboard.sh to borrow"
+# onboard.sh asks this script which filesystem the archive is on, to offer versioning at install
+# time. Both scripts define info/ok/warn — but this one writes to stderr and onboard's writes to
+# stdout, so sourcing it in onboard's own shell would silently redirect onboard's output. It must
+# be sourced in a SUBSHELL, and this pins that the seam works that way round.
+out="$(info() { printf 'CALLER-INFO\n'; }
+       fs="$(SCRUBJAY_SNAP_LIB=1 . "$APP/bin/sj-snapshot.sh" 2>/dev/null; FAKE_FSTYPE=btrfs sjs_detect_fs /x 2>/dev/null)"
+       info; printf 'fs=%s\n' "$fs")"
+assert_contains "detection works when sourced as a library" "$out" "fs=btrfs"
+assert_contains "and the caller's own info() survives it" "$out" "CALLER-INFO"
+
 finish
