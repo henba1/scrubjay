@@ -15,6 +15,7 @@ read-only [`sjmcp` MCP tools](archive-mcp.md); **lifecycle** commands just run t
 | `/sjbrowse [transcript\|plan\|memory] [host= project= since=]` | `sj_list` → `sj_get` | Eyeballing a **date-sorted list** and grabbing one, when you have no search term in mind — "show me the last few plans on `laptop`." |
 | `/sjfind <topic> in <session-id\|topic-words> [context=N]` | `sj_search_within` (+ `sj_recall`/`sj_get`) | You know **which** session and want the **exact spot** a subject came up — returns turn/line anchors inside that one transcript instead of the whole thing. |
 | `/sjget <sid8 \| path \| sj://uri> [turns=A-B \| lines=A-B]` | `sj_get` (one call, no search) | You **already know the item** and just want it pulled in — cheapest way, no recall/ranking. Its edge is **slicing**: fetch only `lines=1200-1300` or `turns=5-10` of a huge transcript to keep tokens down. |
+| `/sjtable [head=N \| tail=N \| [a:b] \| all] [host= project= harness= model= topic= since= until=]` | `bin/sj-table.sh` (no MCP) | **Reading the catalogue as a table**, not picking one item out of it. Filters apply *before* slices, so `harness=opencode head=20` is "the newest 20 opencode sessions". Unlike `/sjbrowse` it shows sessions whose topic was never authored, and it costs no MCP round-trip — it queries the rendered `logs/CATALOGUE.md`. Bare `/sjtable` prints a summary, not ~600 rows. |
 
 > For pulling a *whole small* doc with even less overhead than `/sjget`, `@`-mention it from the
 > `sjmcp` resource picker (match on the title, e.g. `plan: … — <date> · <host>`) — the harness

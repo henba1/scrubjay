@@ -157,4 +157,16 @@ check "the index is valid JSON" jq -e . "$idx"
 assert_eq "and dated the project from its transcript" "1" \
   "$(jq -r '[.[] | select(.slug=="-tmp-demo") | select(.last|test("^[0-9]{4}-"))] | length' "$idx" 2>/dev/null)"
 
+section "awk interval expressions {n} — unsupported by mawk, and it fails SILENTLY"
+# Debian/Ubuntu ship mawk as /usr/bin/awk, and mawk has no {n} repetition: a pattern using it
+# matches NOTHING and the script reports an empty result rather than an error. Cost us a
+# zero-row catalogue in sj-table.sh. Spell repetition out, and keep it spelled out.
+probe='| 2026-08-02 10:00 |'
+assert_eq "the {4} form cannot be relied on" "" \
+  "$(printf '%s\n' "$probe" | awk '/^\| [0-9]{4}-/' 2>/dev/null)"
+assert_eq "the spelled-out form matches everywhere" "$probe" \
+  "$(printf '%s\n' "$probe" | awk '/^\| [0-9][0-9][0-9][0-9]-/' 2>/dev/null)"
+check_fails "no shipped script uses an awk {n} interval" \
+  grep -rlE 'awk[^|]*\[0-9\]\{[0-9]' "$APP/bin" "$APP/hooks"
+
 finish
