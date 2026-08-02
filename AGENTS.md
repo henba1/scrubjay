@@ -75,7 +75,7 @@ Steps:
    already-mounted NAS storage path (`LOCAL_CHATS`) **or** the share details so onboard mounts it
    for you (`SCRUBJAY_NAS_SERVER` / `_EXPORT` / `_PROTO=nfs|cifs` / `_MOUNTPOINT`, plus
    `SCRUBJAY_STORAGE_DIR` for the archive directory's name on the share — default
-   `scrubjay-storage`, and it must be a single path component; via
+   `scrubjay-storage`, may nest but must stay inside the mountpoint; via
    `bin/sj-mount.sh` — see below); which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
    auto-detects installed ones via each adapter's PATH-based `sjh_present`, so you usually only
    set this to override, e.g. an opencode that isn't on PATH yet); and whether to enable
