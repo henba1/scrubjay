@@ -13,12 +13,13 @@
 #   SCRUBJAY_NAS_SERVER      NAS host/IP                     (required)
 #   SCRUBJAY_NAS_EXPORT      export/share path on the NAS    (required, e.g. /export/scrubjay)
 #   SCRUBJAY_NAS_MOUNTPOINT  where to mount it locally       (default /mnt/nas1)
+#   SCRUBJAY_STORAGE_DIR     archive dir name on the share   (default scrubjay-storage)
 #   SCRUBJAY_NAS_OPTS        extra mount options, comma-list (optional)
 #   SCRUBJAY_NAS_CREDS       cifs credentials file           (default /etc/scrubjay-nas.creds)
 #   SCRUBJAY_ASSUME_YES=1    install without prompting        (for unattended onboard)
 #   SCRUBJAY_MOUNT_PRINT=1   never touch the system — print the config + steps only
 #
-# On success it creates <mountpoint>/scrubjay-storage and prints the path to feed
+# On success it creates <mountpoint>/<storage-dir> and prints the path to feed
 # SCRUBJAY_LOCAL_CHATS.  Sourcing with SCRUBJAY_MOUNT_LIB=1 defines the functions without running.
 set -uo pipefail
 
@@ -87,6 +88,15 @@ sjm_unit_name() { systemd-escape -p --suffix=mount "$1"; }
 # Do we drive systemd, or fall back to fstab?
 sjm_use_systemd() { have systemd-escape && have systemctl; }
 
+# The archive directory created on the share. Deliberately ONE path component: the share may hold
+# other things, and a name carrying a slash or ".." would put the archive somewhere the mountpoint
+# no longer describes — which is exactly the path every other script derives from LOCAL_CHATS.
+sjm_storage_dir() {  # sjm_storage_dir [name]
+  local d="${1:-scrubjay-storage}"
+  case "$d" in ""|.|..|*/*) return 1 ;; esac
+  printf '%s' "$d"
+}
+
 [ "${SCRUBJAY_MOUNT_LIB:-0}" = 1 ] && return 0 2>/dev/null || true
 
 # ── main: assemble, install (guarded), verify ────────────────────────────────────────────────
@@ -95,6 +105,7 @@ PROTO="${SCRUBJAY_NAS_PROTO:-nfs}"
 SERVER="${SCRUBJAY_NAS_SERVER:-}"
 EXPORT="${SCRUBJAY_NAS_EXPORT:-}"
 MP="${SCRUBJAY_NAS_MOUNTPOINT:-/mnt/nas1}"
+STORE_DIR="${SCRUBJAY_STORAGE_DIR:-}"
 EXTRA="${SCRUBJAY_NAS_OPTS:-}"
 CREDS="${SCRUBJAY_NAS_CREDS:-/etc/scrubjay-nas.creds}"
 YES="${SCRUBJAY_ASSUME_YES:-0}"
@@ -107,14 +118,16 @@ esac
 [ -n "$SERVER" ] || die "SCRUBJAY_NAS_SERVER is required (the NAS host/IP)."
 [ -n "$EXPORT" ] || die "SCRUBJAY_NAS_EXPORT is required (the export/share path on the NAS)."
 case "$PROTO" in nfs|cifs) : ;; *) die "SCRUBJAY_NAS_PROTO must be nfs or cifs (got '$PROTO')." ;; esac
+STORE_DIR="$(sjm_storage_dir "$STORE_DIR")" \
+  || die "SCRUBJAY_STORAGE_DIR must be a single directory name (got '${SCRUBJAY_STORAGE_DIR:-}')."
 
 FSTYPE="$(sjm_fstype "$PROTO")"
 WHAT="$(sjm_what "$PROTO" "$SERVER" "$EXPORT")"
 OPTS="$(sjm_opts "$PROTO" "$CREDS" "$(id -u)" "$(id -g)" "$EXTRA")"
-STORAGE="$MP/scrubjay-storage"
+STORAGE="$MP/$STORE_DIR"
 
 info "NAS mount plan:"
-printf '    %s  ->  %s   (%s)\n    options: %s\n' "$WHAT" "$MP" "$FSTYPE" "$OPTS" >&2
+printf '    %s  ->  %s   (%s)\n    options: %s\n    archive: %s\n' "$WHAT" "$MP" "$FSTYPE" "$OPTS" "$STORAGE" >&2
 
 # CIFS: we never touch the password. Point at the credentials file and stop short of it.
 if [ "$PROTO" = cifs ] && [ ! -f "$CREDS" ]; then

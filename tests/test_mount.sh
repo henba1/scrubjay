@@ -34,6 +34,15 @@ fl="$(sjm_fstab_line nas1:/export /mnt/nas1 nfs _netdev,noatime)"
 assert_contains "fstab line carries the mountpoint field" "$fl" "	/mnt/nas1	"
 assert_contains "fstab line carries the fstype" "$fl" "	nfs	"
 
+section "archive dir name: chosen, defaulted, and confined to one path component"
+assert_eq "defaults to scrubjay-storage" "scrubjay-storage" "$(sjm_storage_dir)"
+assert_eq "empty falls back to the default" "scrubjay-storage" "$(sjm_storage_dir "")"
+assert_eq "a chosen name is used verbatim" "archive" "$(sjm_storage_dir archive)"
+for bad in .. . nested/dir /absolute ../escape; do
+  check_fails "refuses '$bad' — it would move the archive out of the mountpoint" \
+    sjm_storage_dir "$bad"
+done
+
 section "verify guard: a path that is not a live mount fails loudly (no silent no-op)"
 check_fails "sj-mount refuses to finish when the mountpoint is not mounted" \
   env SCRUBJAY_MOUNT_LIB=0 SCRUBJAY_MOUNT_PRINT=1 SCRUBJAY_NAS_SERVER=nas1 \
