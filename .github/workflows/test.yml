@@ -85,8 +85,15 @@ jobs:
       # --include-path keeps the measurement on shipped code: the tests themselves are always
       # 100% covered by construction, and counting them would flatter the number into meaning
       # nothing. kcov exits with the suite's own status, so a red suite is red here too.
+      #
+      # --bash-parse-files-in-dirs is what makes the percentage honest. Without it kcov only reports
+      # files it watched execute, so a script no test ever loads — onboard.sh, sj-receive.sh, the
+      # remote transports — is not 0%, it is absent, and vanishes from the denominator. The number
+      # then measures "coverage of the code the tests already reach", which only ever goes up and
+      # says nothing. Parsing the directories up front puts every shipped script in the report at
+      # the coverage it truly has.
       - name: kcov
-        run: kcov --include-path=bin,hooks coverage tests/run.sh
+        run: kcov --include-path=bin,hooks --bash-parse-files-in-dirs=bin,hooks coverage tests/run.sh
 
       - name: collect the report
         run: |
@@ -110,7 +117,7 @@ jobs:
           # reached the children, only run.sh is measured, and a single-file report is a broken run
           # however healthy its percentage looks.
           python3 - <<'PY'
-          import sys, xml.etree.ElementTree as ET
+          import pathlib, sys, xml.etree.ElementTree as ET
           rows = sorted(
               ((c.get("filename"), float(c.get("line-rate"))) for c in ET.parse("coverage.xml").iter("class")),
               key=lambda r: r[1],
@@ -120,6 +127,14 @@ jobs:
               print(f"  {rate * 100:5.1f}%  {name}")
           if len(rows) < 2:
               sys.exit("only one file measured — kcov did not trace into the test children")
+
+          # A shipped script missing from the report isn't 0%, it's excluded from the denominator —
+          # the exact distortion --bash-parse-files-in-dirs exists to prevent. Warn rather than fail:
+          # kcov quietly skips files its parser chokes on, and that shouldn't redden a good PR.
+          shipped = {str(p) for d in ("bin", "hooks") for p in pathlib.Path(d).rglob("*.sh")}
+          missing = sorted(shipped - {name for name, _ in rows})
+          if missing:
+              print(f"::warning::{len(missing)} shipped scripts absent from the report: {', '.join(missing)}")
           PY
 
       # kcov's HTML report, for when the per-file list above raises a question. Kept on failed runs
