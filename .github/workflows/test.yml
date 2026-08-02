@@ -101,7 +101,37 @@ jobs:
           [ -n "$report" ] || { echo "kcov produced no cobertura.xml:"; find coverage -maxdepth 2; exit 1; }
           cp "$report" coverage.xml
           echo "report: $report"
-          grep -o 'line-rate="[0-9.]*"' coverage.xml | head -1
+
+          # Per-file, worst first. This is the output worth reading: an overall percentage looks
+          # identical whether kcov followed the suite into bin/ or measured run.sh alone, and the
+          # bottom of this list is where the untested scripts announce themselves.
+          #
+          # It also guards the failure mode that would otherwise pass silently — if the trace never
+          # reached the children, only run.sh is measured, and a single-file report is a broken run
+          # however healthy its percentage looks.
+          python3 - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          rows = sorted(
+              ((c.get("filename"), float(c.get("line-rate"))) for c in ET.parse("coverage.xml").iter("class")),
+              key=lambda r: r[1],
+          )
+          print(f"{len(rows)} files measured")
+          for name, rate in rows:
+              print(f"  {rate * 100:5.1f}%  {name}")
+          if len(rows) < 2:
+              sys.exit("only one file measured — kcov did not trace into the test children")
+          PY
+
+      # kcov's HTML report, for when the per-file list above raises a question. Kept on failed runs
+      # too, since a coverage job that died is exactly when you want to look at what it produced.
+      - name: keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: ignore
 
       # The one third-party action in this repo, pinned by commit rather than tag (v7.0.0) — CI
       # here has write access to nothing, but the principle in lint.yml is that a tag can move
