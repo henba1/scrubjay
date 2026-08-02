@@ -111,6 +111,20 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
 
 ## Git & PR workflow
 
+- **Work in a git worktree — this checkout is shared.** More than one agent runs here at a time. A
+  checkout has exactly one HEAD and one index, so two agents in one directory are two writers to one
+  variable: the other session's `git checkout -b` moves HEAD under you, and your next `git commit`
+  lands on *their* branch. Nothing in git prevents this; it is shared mutable state, not a race to
+  retry. Use **`EnterWorktree`** (or `git worktree add <path> -b <branch> origin/main`) before you
+  start changing files. Each worktree gets its own directory, HEAD and index over one shared object
+  store, and git refuses to check the same branch out in two of them — so a collision becomes an
+  error instead of a silent interleave. Put worktrees under `.claude/worktrees/` (gitignored) or
+  outside the repo entirely; never inside a path the other agent's `git add -A` can reach.
+- **Verify HEAD immediately before you commit.** `git symbolic-ref --short HEAD`, compared against
+  the branch you created — and stop if it moved. Worktrees only protect you when *every* agent uses
+  one, and you cannot make the other side comply; this check works regardless. Observed 2026-08-02:
+  a commit intended for #30 landed on an unrelated `ci/…` branch exactly this way, and had to be
+  cherry-picked back out and the other branch reset.
 - **Branch, then PR.** Work on this repo goes through a pull request with a real description —
   never straight to `main`. **Do not merge until the maintainer explicitly asks.** (The private
   content repos — `scrubjay-data`, `scrubjay-chats`, `scrubjay-memory` — are the opposite: push
