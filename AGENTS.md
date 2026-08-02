@@ -109,6 +109,32 @@ anti-self-authorization design: a new machine must not be able to grant itself a
 not** attempt to install it, ssh in to add it, or work around it. Print the exact line and
 tell the user to add it on the receiver. Until they do, that host's sync silently no-ops.
 
+## Git & PR workflow
+
+- **Branch, then PR.** Work on this repo goes through a pull request with a real description —
+  never straight to `main`. **Do not merge until the maintainer explicitly asks.** (The private
+  content repos — `scrubjay-data`, `scrubjay-chats`, `scrubjay-memory` — are the opposite: push
+  direct, no PR.)
+- **This repo squash-merges, and squash-merge is the only method enabled** (`allow_rebase_merge`
+  and `allow_merge_commit` are both false). That is a deliberate choice — one clean commit per PR,
+  carrying the PR's full reasoning — and it has one consequence you must design around:
+- **Never stack a PR on another PR's branch.** Squashing replaces the parent's commits with a new
+  commit of a different identity, so the moment the parent merges, the child's branch is proposing
+  changes that are already on `main`: it goes `CONFLICTING`. Worse, deleting the parent branch
+  **closes** the child, and a closed PR whose base branch is gone can be neither reopened nor
+  retargeted — the review thread is unrecoverable and the work has to be re-opened under a new
+  number. If a follow-up depends on unmerged work, **merge the parent first, then branch from the
+  updated `main`.** Sequential work does not need a stack; it needs an order.
+  (If genuinely parallel stacked work ever becomes necessary, enable rebase-merge for it first —
+  rebase preserves commit identity, which is the property stacking depends on.)
+- **Flag branches that nothing hinges on.** Merged and abandoned branches accumulate silently.
+  When you finish a piece of work here, check `gh pr list --state open` against
+  `gh api repos/<owner>/scrubjay/branches -q '.[].name'` and tell the maintainer which remote
+  branches have no open PR and are either already merged or long stale — one line, as a
+  suggestion. **Deleting a branch is the maintainer's call, not yours**; name them and let them
+  decide. Note `git branch -a` will also show stale *local* remote-tracking refs for branches
+  already deleted on GitHub — run `git fetch --prune` before believing that list.
+
 ## Safety & conventions
 
 - **Never** read or commit credentials, `.env` files, or `*.key`. The `.gitignore` blocks
@@ -120,7 +146,6 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
   is a tool for agentic coding, much of it is written with one, and the history should say so
   rather than quietly imply otherwise. Configured in `.claude/settings.json` (project scope, so it
   applies to this repo only) — do not "helpfully" strip it.
-- The scrubjay repos deploy directly from `main` (commit there is fine).
 - Shell scripts are `bash`, `set -uo pipefail`; match the surrounding style.
 - **Stay portable across GNU and BSD userlands.** Supported platforms are Linux and WSL 2, with
   macOS best-effort (see the Platforms table in `docs/onboarding.md`). GNU-only spellings —
