@@ -34,14 +34,36 @@ fl="$(sjm_fstab_line nas1:/export /mnt/nas1 nfs _netdev,noatime)"
 assert_contains "fstab line carries the mountpoint field" "$fl" "	/mnt/nas1	"
 assert_contains "fstab line carries the fstype" "$fl" "	nfs	"
 
-section "archive dir name: chosen, defaulted, and confined to one path component"
+section "archive dir name: chosen, defaulted, nestable — but never climbing out"
 assert_eq "defaults to scrubjay-storage" "scrubjay-storage" "$(sjm_storage_dir)"
 assert_eq "empty falls back to the default" "scrubjay-storage" "$(sjm_storage_dir "")"
 assert_eq "a chosen name is used verbatim" "archive" "$(sjm_storage_dir archive)"
-for bad in .. . nested/dir /absolute ../escape; do
+assert_eq "nesting is allowed (one fixed share per user is a real NAS shape)" \
+  "team/scrubjay-storage" "$(sjm_storage_dir team/scrubjay-storage)"
+assert_eq "a trailing slash is tolerated, not preserved" "archive" "$(sjm_storage_dir archive/)"
+for bad in .. . ../escape a/../b /absolute a//b /; do
   check_fails "refuses '$bad' — it would move the archive out of the mountpoint" \
     sjm_storage_dir "$bad"
 done
+
+# The lexical check above cannot see a symlink that is already on the share; this is the other half
+# of issue #25 — the verify guard asserts the MOUNTPOINT is live, not that the archive is inside it.
+section "confinement: the archive must RESOLVE inside the mountpoint, symlinks included"
+mkdir -p "$SANDBOX/mnt/nas1" "$SANDBOX/offsite"
+check "a plain name under the mountpoint is confined" \
+  sjm_confined "$SANDBOX/mnt/nas1" "$SANDBOX/mnt/nas1/scrubjay-storage"
+check "so is a nested one" \
+  sjm_confined "$SANDBOX/mnt/nas1" "$SANDBOX/mnt/nas1/team/scrubjay-storage"
+mkdir -p "$SANDBOX/mnt/nas1/existing"
+check "an existing directory under the mountpoint is confined" \
+  sjm_confined "$SANDBOX/mnt/nas1" "$SANDBOX/mnt/nas1/existing"
+ln -s "$SANDBOX/offsite" "$SANDBOX/mnt/nas1/decoy"
+check_fails "a symlink on the share that points off it is refused" \
+  sjm_confined "$SANDBOX/mnt/nas1" "$SANDBOX/mnt/nas1/decoy"
+check_fails "...and so is a path THROUGH that symlink, which mkdir -p would happily follow" \
+  sjm_confined "$SANDBOX/mnt/nas1" "$SANDBOX/mnt/nas1/decoy/scrubjay-storage"
+check_fails "a path that climbs out is refused even when it exists" \
+  sjm_confined "$SANDBOX/mnt/nas1" "$SANDBOX/mnt/nas1/../../offsite"
 
 section "verify guard: a path that is not a live mount fails loudly (no silent no-op)"
 check_fails "sj-mount refuses to finish when the mountpoint is not mounted" \
