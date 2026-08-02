@@ -8,9 +8,9 @@
 !tests/fixtures/*.jsonl
 projects/
 
-# agent worktrees. More than one agent works in this checkout, so each takes its own worktree
-# (AGENTS.md, "Git & PR workflow"). A worktree placed here must not look like untracked content —
-# otherwise the *other* agent's `git add -A` sweeps up a whole nested checkout.
+# agent worktrees (`EnterWorktree`, or `git worktree add .claude/worktrees/<name>`). A worktree is a
+# whole nested checkout: unignored it reads as untracked content, and any `git add -A` in the parent
+# sweeps it up. Ignore it whether or not you use one.
 .claude/worktrees/
 
 # editor / OS noise
