@@ -33,6 +33,8 @@ jobs:
   # measuring only run.sh itself.
   coverage:
     runs-on: ubuntu-latest
+    env:
+      KCOV_VERSION: v43
     permissions:
       contents: read
       id-token: write        # Codecov OIDC — see the upload step
@@ -41,8 +43,44 @@ jobs:
         with:
           fetch-depth: 0     # Codecov wants the base commit to compute a diff against
 
-      - name: install jq + kcov
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq kcov
+      # kcov is built from source, pinned to a tag, because Ubuntu dropped the package in 24.04 —
+      # `apt-get install kcov` fails outright on ubuntu-latest. The alternatives were worse: pinning
+      # the runner to ubuntu-22.04 only defers this to that image's retirement, and upstream's last
+      # prebuilt tarball is v42 from 2023.
+      #
+      # The build is ~90s, so it's cached on the tag. Only the compile is skipped on a hit — the
+      # apt step stays unconditional so the runtime libs kcov links (libdw, libcurl, libbfd) are
+      # guaranteed present rather than assumed from whatever the runner image ships this month.
+      - name: install jq + kcov build deps
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq cmake binutils-dev libcurl4-openssl-dev \
+                                      libdw-dev libelf-dev libiberty-dev zlib1g-dev
+
+      - name: cache kcov
+        id: kcov-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: kcov-${{ env.KCOV_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: build kcov
+        if: steps.kcov-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          # Installed under $HOME rather than /usr/local: actions/cache restores as the runner
+          # user, which cannot write a root-owned prefix.
+          git clone --depth 1 --branch "$KCOV_VERSION" https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          cmake -S /tmp/kcov -B /tmp/kcov/build -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+          cmake --build /tmp/kcov/build -j"$(nproc)"
+          cmake --install /tmp/kcov/build
+
+      - name: put kcov on PATH
+        run: |
+          set -euo pipefail
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/kcov" --version
 
       # --include-path keeps the measurement on shipped code: the tests themselves are always
       # 100% covered by construction, and counting them would flatter the number into meaning
