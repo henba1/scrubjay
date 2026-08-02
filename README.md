@@ -3,6 +3,8 @@
 <img src="docs/banner.png" alt="scrubjay — recall what · where · when" width="100%">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![tests](https://github.com/henba1/scrubjay/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/henba1/scrubjay/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/henba1/scrubjay/branch/main/graph/badge.svg)](https://codecov.io/gh/henba1/scrubjay)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-2094f3.svg)](https://henba1.github.io/scrubjay/)
 [![Built for opencode](https://img.shields.io/badge/built%20for-opencode-000000.svg)](https://opencode.ai)
 [![Built for Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-d97757.svg)](https://claude.ai/code)

@@ -1,0 +1,46 @@
+# Codecov configuration. See .github/workflows/test.yml for how the report is produced (kcov,
+# cobertura) and CONTRIBUTING.md for how to reproduce it locally.
+#
+# Posture: coverage here is a *measurement*, not a gate. `informational: true` means Codecov
+# reports the delta on every PR and never marks the check red. Nothing about a shell script's
+# line coverage is worth blocking a fix on — and a hard threshold on a 5k-line shell codebase
+# mostly teaches people to write tests that exercise lines without asserting anything.
+
+codecov:
+  require_ci_to_pass: true      # a red suite's coverage number is meaningless
+
+coverage:
+  precision: 1
+  round: down
+  range: "40...80"
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: true         # stay quiet on PRs that don't move coverage
+  behavior: default
+
+flags:
+  shell:
+    paths:
+      - bin/
+      - hooks/
+    carryforward: false
+
+# Everything the test suite is not aimed at. kcov already restricts itself to bin/ and hooks/
+# via --include-path, so this is belt-and-braces — except for mcp/, which is the one deliberate
+# exclusion worth naming: sjmcp_server.py has no tests yet, and folding 800 untested Python lines
+# into a shell coverage number would just produce a wrong headline.
+ignore:
+  - "tests/**"
+  - "skeleton/**"
+  - "docs/**"
+  - "site/**"
+  - "commands/**"
+  - "mcp/**"

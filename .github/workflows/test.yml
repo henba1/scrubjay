@@ -1,0 +1,82 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# No paths filter, deliberately: this is the gate a PR is judged on, and a "skipped because it
+# didn't touch bin/" run reports as neutral, not green, which makes required-check rules unhappy.
+permissions:
+  contents: read
+
+jobs:
+  # The gate. Fast, and independent of the coverage tooling below — if kcov ever misbehaves it
+  # must not be able to take the pass/fail signal with it.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      # Every tests/test_*.sh runs in its own sandbox ($HOME moved into a temp dir), so the runner
+      # has nothing for them to find and nothing of the runner's is at risk. See tests/lib.sh.
+      - name: tests/run.sh
+        run: bash tests/run.sh
+
+  # Coverage is measured, reported, and *not* enforced. It runs the same suite a second time under
+  # kcov, which traces bash by exporting SHELLOPTS=xtrace + BASH_XTRACEFD — that's what makes it
+  # follow the `bash tests/test_*.sh` children and the bin/ scripts they invoke, rather than
+  # measuring only run.sh itself.
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write        # Codecov OIDC — see the upload step
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # Codecov wants the base commit to compute a diff against
+
+      - name: install jq + kcov
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq kcov
+
+      # --include-path keeps the measurement on shipped code: the tests themselves are always
+      # 100% covered by construction, and counting them would flatter the number into meaning
+      # nothing. kcov exits with the suite's own status, so a red suite is red here too.
+      - name: kcov
+        run: kcov --include-path=bin,hooks coverage tests/run.sh
+
+      - name: collect the report
+        run: |
+          set -euo pipefail
+          # kcov writes one cobertura.xml per traced program plus a merged one; take the merge
+          # when it exists, otherwise the single run. Uploading both would double-count.
+          if [ -f coverage/kcov-merged/cobertura.xml ]; then
+            report=coverage/kcov-merged/cobertura.xml
+          else
+            report="$(find coverage -name cobertura.xml -print -quit)"
+          fi
+          [ -n "$report" ] || { echo "kcov produced no cobertura.xml:"; find coverage -maxdepth 2; exit 1; }
+          cp "$report" coverage.xml
+          echo "report: $report"
+          grep -o 'line-rate="[0-9.]*"' coverage.xml | head -1
+
+      # The one third-party action in this repo, pinned by commit rather than tag (v7.0.0) — CI
+      # here has write access to nothing, but the principle in lint.yml is that a tag can move
+      # under you and a SHA cannot.
+      #
+      # use_oidc avoids storing an upload token at all. If Codecov's repo settings don't have
+      # OIDC enabled, drop it and add a CODECOV_TOKEN secret instead: token: ${{ secrets.CODECOV_TOKEN }}
+      - name: upload to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          files: ./coverage.xml
+          flags: shell
+          disable_search: true
+          use_oidc: true
+          # Coverage reporting is not a merge gate. A Codecov outage must not turn a good PR red.
+          fail_ci_if_error: false
