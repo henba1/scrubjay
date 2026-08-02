@@ -118,10 +118,13 @@ jobs:
           # however healthy its percentage looks.
           python3 - <<'PY'
           import pathlib, sys, xml.etree.ElementTree as ET
+          root = ET.parse("coverage.xml").getroot()
           rows = sorted(
-              ((c.get("filename"), float(c.get("line-rate"))) for c in ET.parse("coverage.xml").iter("class")),
+              ((c.get("filename"), float(c.get("line-rate"))) for c in root.iter("class")),
               key=lambda r: r[1],
           )
+          print(f"TOTAL {float(root.get('line-rate')) * 100:.1f}%  "
+                f"({root.get('lines-covered')}/{root.get('lines-valid')} lines, {len(rows)} files)")
           print(f"{len(rows)} files measured")
           for name, rate in rows:
               print(f"  {rate * 100:5.1f}%  {name}")

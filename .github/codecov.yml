@@ -12,7 +12,12 @@ codecov:
 coverage:
   precision: 1
   round: down
-  range: "40...80"
+  # Colour gradient only — it changes no pass/fail behaviour. The real figure is 37.1%, and it sits
+  # here rather than higher because ~17 shipped scripts are installers and receiver-side tools that
+  # the suite cannot execute (onboard.sh, sj-receive.sh, the remote transports) and which now count
+  # as 0% by design. Anchoring the low end at 30 keeps the badge legible instead of permanently red;
+  # raise both ends as the renderers and claude-sync.sh get tests.
+  range: "30...80"
   status:
     project:
       default:
