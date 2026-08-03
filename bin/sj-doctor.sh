@@ -29,7 +29,7 @@ APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # The section list is the contract: `--list` prints it, the arg parser validates against it, and
 # adding a check means adding a `doctor_<name>` function and one line here.
-SECTIONS="config data memory relay harnesses outcomes"
+SECTIONS="config data memory relay harnesses sessions outcomes"
 section_desc() {
   case "$1" in
     config)    printf 'host name, backend value, config file' ;;
@@ -37,6 +37,7 @@ section_desc() {
     memory)    printf 'the memory clone: right remote, right branch, nothing unpublished' ;;
     relay)     printf 'the transcript relay for this backend is reachable' ;;
     harnesses) printf 'each configured harness has an adapter and a config dir' ;;
+    sessions)  printf 'sessions on this disk that never reached the catalogue' ;;
     outcomes)  printf 'what the last ship / memory sync actually did' ;;
   esac
 }
@@ -199,6 +200,35 @@ doctor_harnesses() {
 }
 
 # ── last recorded outcomes ─────────────────────────────────────────────────────────────────────
+# ── stranded sessions ──────────────────────────────────────────────────────────────────────────
+# Every other section asks whether the wiring is sound. This one asks whether anything fell through
+# it: a session that ended without the session-end hook firing (kill -9, closed terminal, power cut)
+# is catalogued by nothing and — because the relay breadcrumb is written by the ship that never ran
+# — reported by nothing either. `--dry-run` counts without writing, shipping or pushing, which is
+# what keeps this section inside sj-doctor's read-only contract.
+doctor_sessions() {
+  head_ "sessions"
+  local out n
+  # The DEFAULT window, not --all: this reports the set the next SessionStart will actually fix,
+  # which is what makes the advice below true. A pre-scrubjay back catalogue is not a fault, and
+  # counting it here would turn a healthy machine into a wall of findings.
+  out="$("$APP/bin/sj-reconcile.sh" --dry-run 2>/dev/null)" || out=""
+  if [ -z "$out" ]; then
+    note "could not enumerate sessions for this harness"
+    return 0
+  fi
+  n="$(printf '%s' "$out" | sed -n 's/^sj-reconcile: \([0-9][0-9]*\) session.*/\1/p')"
+  if [ -z "$n" ] || [ "$n" = 0 ]; then
+    ok "every session on this disk is in the catalogue"
+  else
+    # Not a FAIL: the content is safe on disk and the fix is one command. It is a finding, not a
+    # broken machine — and the next SessionStart will clear it on its own.
+    note "$n session(s) on this disk are not in the catalogue (they ended without a clean exit)"
+    printf '%s\n' "$out" | sed -n '2,6p' | sed 's/^/    /'
+    note "the next session reconciles them automatically; or now: bin/sj-reconcile.sh --all"
+  fi
+}
+
 doctor_outcomes() {
   # The checks above prove the wiring; these say what actually happened last time.
   head_ "last recorded outcomes"

@@ -51,82 +51,19 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   LOG="$DATA/logs/$host.log"; mkdir -p "$DATA/logs"; touch "$LOG"
   ts="$(date '+%Y-%m-%d %H:%M')"
 
-  # 1a) append the human-readable session line (once per session)
-  if ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
-    # Topic: prefer a model-authored one-sentence essence passed in by /sjlog (SCRUBJAY_TOPIC).
-    # The automatic SessionEnd path has no model in the loop, so it falls back to the first real
-    # user prompt (sjh_session_topic) — good enough, and never misleading.
-    topic="${SCRUBJAY_TOPIC:-}"
-    model=""; turns=""
-    if [ -n "$tpath" ] && [ -f "$tpath" ]; then
-      [ -n "$topic" ] || topic="$(sjh_session_topic "$tpath")"
-      # model + turns in one pass (the transcript can be tens of MB); TSV, empty fields are fine.
-      IFS=$'\t' read -r model turns < <(sjh_session_meta "$tpath")
-    fi
-    [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
-    # Keep the line parseable: the topic is quoted, but a stray " or | inside it would derail both
-    # readers (sjmcp's regex and sj_log_catalogue's pipe-split), so neutralize those two chars.
-    topic="${topic//\"/}"; topic="${topic//|//}"
-    size="$(sj_size "$tpath")" || size=0
-    # Everything after `harness=` is an additive `key=value` field: a line written before a field
-    # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
-    # for a later pass — the readers already tolerate trailing fields they don't know.
-    printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s\n' \
-      "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" >> "$LOG"
-  fi
+  # 1a) append the session's catalogue row (write-once; sj_log_row in bin/lib.sh is the single
+  #     writer of that format — bin/sj-reconcile.sh writes the same row for a session that ended
+  #     without ever reaching this hook). SCRUBJAY_TOPIC is the model-authored essence /sjlog
+  #     passes in; empty on the automatic path, where the row falls back to the first user prompt.
+  sj_log_row "$LOG" "$sid" "$cwd" "$tpath" "$harness" "$host" "$ts" "${SCRUBJAY_TOPIC:-}"
 
   # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended). It indexes
   #     ~/.claude/projects/, so it only means anything for the claude harness.
   [ "$harness" = claude ] && "$APP/bin/claude-index-chats.sh" >/dev/null 2>&1 || true
 
-  # 1c) commit + push EVERYTHING in the data repo so nothing needs a manual sync:
-  #     log line, chat index, plus any memory/ templates/ hosts/ settings/ edits.
-  #     .gitignore blocks secrets/transcripts (*.credentials*, *.jsonl, .claude.json),
-  #     so `git add -A` can never stage those.
-  if [ "${SCRUBJAY_LOG_NOGIT:-0}" != "1" ]; then
-    (
-      cd "$DATA" || exit 0
-
-      # Self-heal before touching anything. A previous session's push fallback may have
-      # left an interrupted rebase/merge (a conflict, or — more insidiously — a commit
-      # that went empty and made rebase pause). If we don't clear it, `git add -A` below
-      # commits onto the DETACHED rebase HEAD (even baking conflict markers into files),
-      # every push silently no-ops, and the wedge compounds one commit per session. This
-      # is exactly the July-2026 henpi failure. Aborting is safe: it just drops the
-      # partial replay; our content lives in the working tree and re-commits cleanly.
-      if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
-        git rebase --abort 2>/dev/null || true
-      elif [ -f .git/MERGE_HEAD ]; then
-        git merge --abort 2>/dev/null || true
-      fi
-      # Commits on a detached HEAD can never push — bail rather than orphan work.
-      git symbolic-ref -q HEAD >/dev/null 2>&1 || exit 0
-
-      git add -A 2>/dev/null
-      git diff --cached --quiet 2>/dev/null && exit 0   # nothing to commit
-      # Never commit a tree carrying conflict markers (unambiguous start/end lines).
-      git diff --cached | grep -qE '^\+(<{7} |>{7} )' && exit 0
-      git commit -q -m "auto-sync (session end): $host $ts" 2>/dev/null || exit 0
-      if ! sj_timeout 20 git push -q 2>/dev/null; then
-        # Remote moved on: rebase our commit onto it and retry. What makes this wedge-proof
-        # where a bare `git pull --rebase` was not is that nothing here can stop on a conflict:
-        #   * append-only logs union both sides (.gitattributes: logs/*.log merge=union);
-        #   * for any *shared* file that genuinely diverged — e.g. plugins/known_marketplaces.json
-        #     or settings — `-X ours` takes origin's copy (during a rebase "ours" is the upstream
-        #     we replay onto) instead of pausing. A machine's auto-sync must never fork shared
-        #     config; deliberate shared edits are made by hand, not by this fallback. A bare pull
-        #     --rebase aborted on the first such conflict and left the machine's commits stacking
-        #     locally forever — the July-2026 hensipi wedge.
-        # Belt and suspenders: if anything still fails, abort so the next session starts clean.
-        if sj_timeout 20 git fetch -q origin 2>/dev/null \
-           && sj_timeout 30 git rebase -X ours -q origin/main 2>/dev/null; then
-          sj_timeout 20 git push -q 2>/dev/null || true
-        else
-          git rebase --abort 2>/dev/null || true
-        fi
-      fi
-    ) >/dev/null 2>&1 || true
-  fi
+  # 1c) commit + push EVERYTHING in the data repo so nothing needs a manual sync: the row, the
+  #     chat index, plus any memory/ templates/ hosts/ settings/ edits.
+  sj_data_push "auto-sync (session end): $host $ts"
 
   # 1c-2) re-render the human-browsable chat table. AFTER the git block, not before: the push
   #       fallback above rebases onto origin, which is what brings OTHER hosts' log lines into
@@ -142,7 +79,7 @@ fi
 "$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
 
 # ---- 2) relay the full transcript + the session's other records (pluggable backend) ----
-if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
+if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -s "${tpath:-}" ]; then
   slug="$(sjh_session_slug "$tpath" "$cwd")"
   SCRUBJAY_HARNESS="$harness" \
     "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true

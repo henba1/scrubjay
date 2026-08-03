@@ -42,6 +42,7 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_render <transcript>` | the readable Markdown rendering, on stdout |
 | `sjh_extra_artifacts <transcript> <sid> <slug> <cwd>` | TSV of the session's *other* records to relay (below) |
 | `sjh_find_live_transcript <cwd>` | the in-progress session's transcript, for a publish-now with no hook payload (empty if the harness has none on disk) |
+| `sjh_list_sessions` | every session this harness has on disk, TSV `<sid>\t<path>` — what `bin/sj-reconcile.sh` walks. Empty is a valid answer (below) |
 | `sjh_detect <file>` | 0 if this file is *this harness's* transcript format (see below) |
 | `sjh_slug <path>` | the harness's own project-dir encoding of an absolute path |
 | `sjh_project_dir <cwd>` | where a fetched session must land locally to be resumable |
@@ -70,6 +71,23 @@ to `opencode import`. Where they differ there is no native resume, so scrubjay c
 The readable Markdown rendering is the one artifact every harness produces in the same shape — a
 `# title`, a `_N turns_` line, and `## User` / `## Assistant` blocks. That is what lets `/sjrecall`
 and `/sjbrowse` search across harnesses, and what `mcp/sjmcp_server.py` parses. Keep to it.
+
+### `sjh_list_sessions` — and why empty is an answer
+
+`bin/sj-reconcile.sh` exists because Claude Code records a session in exactly one place, at exactly
+one moment: the session-end hook. Kill the terminal and nothing is catalogued, nothing is shipped,
+and — since the relay breadcrumb is written by the ship that never ran — nothing is reported. The
+reconcile pass walks this list looking for sessions the catalogue has never heard of.
+
+A harness that publishes **per turn** has no such gap, and should return nothing here. That is
+opencode (`session.idle`) and very nearly codex (`Stop`, which leaves only a session killed inside
+its first turn). Returning an empty list is a statement that the harness cannot strand a session,
+not an unimplemented function — say which one it is in a comment, because the two look identical
+from the outside.
+
+Exclude anything that is an *artifact* of a session rather than a session: Claude's nested subagent
+transcripts (`projects/<slug>/<sid>/agent-*.jsonl`) are shipped as part of their parent and must
+never be listed, or reconcile invents sessions a user can neither resume nor recognize.
 
 ### `sjh_extra_artifacts`
 
