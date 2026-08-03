@@ -51,18 +51,25 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   LOG="$DATA/logs/$host.log"; mkdir -p "$DATA/logs"; touch "$LOG"
   ts="$(date '+%Y-%m-%d %H:%M')"
 
-  # 1a) append the human-readable session line (once per session)
-  if ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
+  # 1a) append the human-readable session line (once per session, and only for a session that
+  #     actually recorded something). A session with no transcript on disk produced no records at
+  #     all: nothing is shipped below, nothing is rendered, so its catalogue row would point at an
+  #     archive entry that does not exist — `"(no text)" … model= | turns= | size=0` in every
+  #     reader. That is not hypothetical; it is what a session ended without a single user turn
+  #     (open, /clear or quit straight away) leaves behind, because SessionEnd still fires and
+  #     names a transcript_path the harness never wrote. `-s` covers both missing and empty.
+  #     The config/memory sync below still runs — this skips the row, not the session's other work.
+  if [ -s "${tpath:-}" ] && ! grep -q "session=$sid" "$LOG" 2>/dev/null; then
     # Topic: prefer a model-authored one-sentence essence passed in by /sjlog (SCRUBJAY_TOPIC).
     # The automatic SessionEnd path has no model in the loop, so it falls back to the first real
     # user prompt (sjh_session_topic) — good enough, and never misleading.
     topic="${SCRUBJAY_TOPIC:-}"
-    model=""; turns=""
-    if [ -n "$tpath" ] && [ -f "$tpath" ]; then
-      [ -n "$topic" ] || topic="$(sjh_session_topic "$tpath")"
-      # model + turns in one pass (the transcript can be tens of MB); TSV, empty fields are fine.
-      IFS=$'\t' read -r model turns < <(sjh_session_meta "$tpath")
-    fi
+    [ -n "$topic" ] || topic="$(sjh_session_topic "$tpath")"
+    # model + turns in one pass (the transcript can be tens of MB); TSV, empty fields are fine.
+    IFS=$'\t' read -r model turns < <(sjh_session_meta "$tpath")
+    # A transcript can hold records without a quotable opening prompt (a resumed session whose
+    # first user record is a caveat block). Those ARE real sessions with a real archive entry, so
+    # they keep their row — only the topic degrades.
     [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
     # Keep the line parseable: the topic is quoted, but a stray " or | inside it would derail both
     # readers (sjmcp's regex and sj_log_catalogue's pipe-split), so neutralize those two chars.
@@ -142,7 +149,7 @@ fi
 "$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
 
 # ---- 2) relay the full transcript + the session's other records (pluggable backend) ----
-if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -n "$tpath" ] && [ -f "$tpath" ]; then
+if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -s "${tpath:-}" ]; then
   slug="$(sjh_session_slug "$tpath" "$cwd")"
   SCRUBJAY_HARNESS="$harness" \
     "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true
