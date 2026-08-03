@@ -210,6 +210,56 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl>
     "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
 }
 
+# The date a session STARTED, as YYYY-MM-DD, read from the transcript's own records.
+#
+# This is what the readable filename is dated by, and it must be a pure function of the session:
+# the readable file is (re)written on EVERY publish — /sjlog can run several times, then session end
+# runs — and each publish recomputes the name. A name derived from anything mutable produces a
+# second file instead of overwriting the first, and since nothing prunes the readable tree (the
+# rrsync receiver's key is write-only by design) the older, shorter copy survives as a duplicate of
+# the same session. The readers then disagree: /sjrecall scores both and can rank the stale one
+# higher, and resolve_ref returns whichever it iterates onto first.
+#
+# File mtime was that mutable thing, in two ways. A session /sjlog'd either side of midnight
+# changed dates mid-life; and a transcript's mtime does not survive being copied — the `local`
+# transport ships with `cp -f` (no -p), so bin/backfill-readable.sh, reading the archived copy,
+# would date a session from when it was *shipped* and mint a second name for it.
+#
+# Reading only the head keeps this cheap on a transcript that can be tens of MB, and each line is
+# parsed on its own (`-R … fromjson?`) so one odd or truncated line is skipped rather than failing
+# the read. Falls back to mtime, then to today: a date is always produced, never an empty path
+# component.
+sj_transcript_date() {  # sj_transcript_date <transcript>
+  local src="$1" t="" d mt
+  if command -v jq >/dev/null 2>&1; then
+    # Claude and codex are JSONL and carry an ISO-8601 `timestamp` per record — but not necessarily
+    # on the FIRST line (Claude opens with a `mode`/`sessionId` record), hence the small window.
+    # Bounded in BYTES as well as lines: opencode's export is one enormous single line, and a
+    # line-count limit alone would pull the whole document through jq only to find no `.timestamp`.
+    # A truncated tail just fails `fromjson?`, which this already tolerates.
+    t="$(head -c 262144 "$src" 2>/dev/null | head -100 \
+          | jq -rR 'fromjson? | .timestamp? // empty' 2>/dev/null | head -1)"
+    # opencode's export is a single JSON *document*, so the line-wise read above finds nothing. Its
+    # start time is one field — in epoch MILLISECONDS. This matters most for opencode: its transcript
+    # is exported fresh into a temp file on every publish, so its mtime is always "now".
+    [ -n "$t" ] || t="$(jq -r '.info.time.created? // empty' "$src" 2>/dev/null)"
+  fi
+  case "$t" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*)
+      # ISO-8601: slice the date off the string rather than parsing it. `date -d` is GNU-only and
+      # `date -r` means different things on GNU (epoch) and BSD (file mtime) — staying in string
+      # space sidesteps the split the shims at the top of this file exist for.
+      printf '%.10s' "$t"; return 0 ;;
+    ''|*[!0-9]*) ;;                                  # not a date and not a number — fall through
+    *)
+      [ "${#t}" -gt 11 ] && t="${t%???}"             # milliseconds once it outgrows 11 digits
+      d="$(sj_epoch_ymd "$t")" && [ -n "$d" ] && { printf '%s' "$d"; return 0; } ;;
+  esac
+  mt="$(sj_mtime "$src")" && [ -n "$mt" ] && d="$(sj_epoch_ymd "$mt")" && [ -n "$d" ] \
+    && { printf '%s' "$d"; return 0; }
+  date +%F
+}
+
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
 #   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
 #   real user prompt, slugified).
@@ -226,7 +276,7 @@ sj_readable_relpath() {  # sj_readable_relpath <transcript> <session_id> [cwd] [
   topic="$(printf '%s' "$topic" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
             | sed -E "s/^-+//; s/-+$//" | cut -c1-40 | sed -E "s/-+$//")"
   [ -n "$topic" ] || topic="session"
-  d="$(date -r "$src" +%F 2>/dev/null || date +%F)"
+  d="$(sj_transcript_date "$src")"
   printf '%s/%s_%s__%s' "$project" "$d" "$topic" "$(sj_session_handle "$sid")"
 }
 

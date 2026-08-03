@@ -37,9 +37,22 @@ machine-readable, the thing you'd resume or feed to a tool. Alongside it, a `rea
 holds the same sessions rendered as Markdown session logs (user + assistant text plus the full
 tool stream — each call shows its input, Bash commands verbatim, and the tool's output inline;
 only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by **project** (the session's working dir),
-each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified.
+each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified and
+`date` is when the session **started**, read from the transcript's own records.
+
+That date has to come from the content, because the name is recomputed on *every* publish — `/sjlog`
+can run several times before session end — and this tree is additive: nothing prunes it, since the
+`rsync-wg` receiver's key is write-only by design. A name derived from anything mutable therefore
+adds a file instead of overwriting one, leaving two entries for one session under the same `__<sid8>`
+handle, the older a truncated copy. File mtime was exactly that: a session logged either side of
+midnight changed dates mid-life, and an archived copy carries the time it was *shipped* rather than
+the time it ran (`cp` does not preserve mtime). Reading the session's first record instead makes the
+name a pure function of the session, so re-publishing overwrites by construction.
+
 Rendering happens automatically on every ship (`bin/render-transcript.sh`, additive — it never
-touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS.
+touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS, and
+prunes duplicates left by the old mtime-based naming (same topic and handle, different date —
+`--no-prune` to skip that).
 
 Plans get the same human-friendly treatment: Claude Code saves each plan under three random words
 (`rippling-sprouting-whisper.md`), so on every ship `sj_normalize_plans` (in `bin/lib.sh`) renames
