@@ -14,6 +14,7 @@ Diagram source: [`overview.dot`](https://henba1.github.io/scrubjay/overview.dot)
 
 ## Where to go
 
+- **[Project brief](https://henba1.github.io/scrubjay/projectbrief/index.md)** — what problem it solves, how it differs from a shared git repo or a shared NAS, and what it does *not* do yet. Read this first if you are deciding whether scrubjay is for you.
 - **[Concepts](https://henba1.github.io/scrubjay/concepts/index.md)** — the two-kinds-of-sync model, what scrubjay is, and what lives in the database. Start here to understand *why* the system is shaped this way.
 - **[Onboarding](https://henba1.github.io/scrubjay/onboarding/index.md)** — install on a new machine (interactive script or Claude-assisted), the repo layout, and the machine-local pointers.
 - **[Day-to-day](https://henba1.github.io/scrubjay/day-to-day/index.md)** — the hooks that keep it hands-off, finding a past chat, and troubleshooting.

@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://henba1.github.io/scrubjay/archive-mcp/">
+        <link rel="canonical" href="https://henba1.github.io/scrubjay/projectbrief/">
       
       
-        <link rel="prev" href="../day-to-day/">
+        <link rel="prev" href="..">
       
       
-        <link rel="next" href="../handoff/">
+        <link rel="next" href="../concepts/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Query the archive (MCP) - scrubjay</title>
+        <title>Project brief - scrubjay</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#query-the-archive-mcp" class="md-skip">
+        <a href="#project-brief" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Query the archive (MCP)
+              Project brief
             
           </span>
         </div>
@@ -284,10 +284,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../projectbrief/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project brief
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -303,6 +330,159 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-it-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#central-feature-syncing-and-book-keeping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Central feature: syncing and book-keeping
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature list
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advantages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advantages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advantages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cross-harness-resume-setup-and-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-harness resume, setup and exchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#differentiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differentiation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Differentiation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#just-syncing-everything-via-one-git-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Just syncing everything via one git repo"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#just-directly-using-a-nas-that-each-team-member-can-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Just directly using a NAS that each team member can access"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#basic-functionality-surfaced-by-the-harness-eg-claude-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Basic functionality surfaced by the harness (e.g. Claude Code)"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downsides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downsides
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -419,37 +599,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Query the archive (MCP)
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../archive-mcp/" class="md-nav__link">
         
   
   
@@ -465,70 +618,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#registration-is-automatic-three-ways" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registration is automatic, three ways
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-remote-transport-ssh-stdio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The remote transport (SSH-stdio)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-same-channel-also-serves-session-hand-off" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The same channel also serves session hand-off
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-one-manual-step-authorize-the-client-on-the-archive-host" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The one manual step — authorize the client on the archive host
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -839,10 +928,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#registration-is-automatic-three-ways" class="md-nav__link">
+  <a href="#why-it-exists" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Registration is automatic, three ways
+        Why it exists
       
     </span>
   </a>
@@ -850,10 +939,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-remote-transport-ssh-stdio" class="md-nav__link">
+  <a href="#design-goals" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The remote transport (SSH-stdio)
+        Design goals
       
     </span>
   </a>
@@ -861,10 +950,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-same-channel-also-serves-session-hand-off" class="md-nav__link">
+  <a href="#central-feature-syncing-and-book-keeping" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The same channel also serves session hand-off
+        Central feature: syncing and book-keeping
       
     </span>
   </a>
@@ -872,10 +961,99 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-one-manual-step-authorize-the-client-on-the-archive-host" class="md-nav__link">
+  <a href="#feature-list" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The one manual step — authorize the client on the archive host
+        Feature list
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advantages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advantages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advantages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cross-harness-resume-setup-and-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-harness resume, setup and exchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#differentiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differentiation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Differentiation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#just-syncing-everything-via-one-git-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Just syncing everything via one git repo"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#just-directly-using-a-nas-that-each-team-member-can-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Just directly using a NAS that each team member can access"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#basic-functionality-surfaced-by-the-harness-eg-claude-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Basic functionality surfaced by the harness (e.g. Claude Code)"
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downsides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downsides
       
     </span>
   </a>
@@ -902,129 +1080,165 @@
   
 
 
-<h1 id="query-the-archive-mcp">Query the archive (MCP)<a class="headerlink" href="#query-the-archive-mcp" title="Permanent link">&para;</a></h1>
-<p><code>grep</code>-ing the logs finds a chat by a word you remember typing. The harder case — <em>"I discussed
-X </em><em>somewhere</em><em> a while ago, which machine was it even on?"</em> — is what the <strong><code>sjmcp</code></strong> MCP server
-solves: a <strong>read</strong> path back into a live session over everything the relay already wrote
-(transcripts, plans, cross-machine memory), so you can recall a past session by <em>topic</em> and pull
-it — or just the relevant slice — straight into context without leaving Claude.</p>
-<p>It's a single-file, <strong>read-only</strong> server (<code>mcp/sjmcp_server.py</code>, run via <code>uv run --script</code>) that
-reads the same storage pointers as the rest of scrubjay (<code>SCRUBJAY_LOCAL_CHATS</code>,
-<code>SCRUBJAY_MEMORY</code>, <code>SCRUBJAY_DATA</code>). Recall is deliberately <strong>embedding-free</strong> — a fast ripgrep
-prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic
-ranking — so there's no index to build and nothing sensitive ever leaves the NAS. Each <code>sj_recall</code>
-enumerates the archive <strong>once</strong> and resolves every candidate's metadata from that single pass, so
-cost scales with the size of the archive rather than the number of matches — it stays snappy as the
-corpus grows (a NAS-mounted archive of ~100+ sessions recalls in tens of milliseconds). It also folds the
-<code>logs/&lt;host&gt;.log</code> <strong>session catalogue</strong> into recall: a topic match there links to the transcript
-when present, or stands alone as a "you had this on <code>&lt;host&gt;</code>" pointer — so recall spans even
-sessions whose full transcript isn't on the machine you're asking from. It exposes:</p>
+<h1 id="project-brief">Project brief<a class="headerlink" href="#project-brief" title="Permanent link">&para;</a></h1>
+<p>scrubjay's primary function is to sync context — like prompts, agent identities and artefacts such
+as session transcripts — for coding agents such as Claude Code and those deployed through the
+opencode harness (e.g. plans, memories, transcripts, <code>CLAUDE.md</code> / <code>AGENTS.md</code>), and to make them
+accessible and usable from all hosts in a scrubjay network. scrubjay's design follows privacy-first
+principles.</p>
+<p>The payoff is time and tokens: context a previous session already worked out stays findable and
+reusable, instead of being rebuilt from scratch over several turns on whichever machine you happen
+to be sitting at.</p>
+<h2 id="why-it-exists">Why it exists<a class="headerlink" href="#why-it-exists" title="Permanent link">&para;</a></h2>
+<p>I run my own home infrastructure (e.g. self-hosted Nextcloud) with multiple boxes, and ran into
+three problems, each of which cost me time and induced overhead and friction in my workflows.</p>
+<p><strong>Setup drift.</strong> Setting up Claude Code and opencode the way I like them on all machines was time
+consuming, and once each box was set up correctly, they still drifted apart as I changed things on
+one machine and not the others.</p>
+<p><strong>Context that does not travel.</strong> The context from sessions did not propagate to all hosts, so I had
+to drag it along manually — copying transcripts, and keeping track of the harness, root and host the
+session took place in.</p>
+<p><strong>Findability.</strong> I was manually browsing via the Claude Code and opencode global lookup functions on
+multiple hosts, or through artefacts like GitHub issues and PR descriptions, to find specific
+conversation snippets, prompts, or my own user turns that I wanted to continue and expand upon.
+Sometimes I had an idea while working, or an issue surfaced that I did not pursue in that session —
+and later I wanted to build or tackle it. That manual process was very time intensive and not very
+efficient, as often I could not even find what I was looking for. As a result, not only was my time
+used sub-optimally, overall token usage also increased: I had to rebuild the model context from
+scratch, sometimes over multiple turns, for something a previous model had already worked out but
+which had got lost in the noise.</p>
+<h2 id="design-goals">Design goals<a class="headerlink" href="#design-goals" title="Permanent link">&para;</a></h2>
+<p>scrubjay's design goals follow two tenets:</p>
+<ol>
+<li><strong>Efficiency.</strong> Valuable data and insights are often hidden in produced context such as session
+   transcripts. We want to use this rather than lose it, and thereby improve time and token
+   efficiency.</li>
+<li><strong>Flexibility.</strong> A session should be indexed and made usable independently of where that session
+   took place along the directory, host, or harness dimension. It should be as easy to search and
+   resume a conversation from a different host and/or harness as on the machine and/or harness where
+   the conversation started. Environment setups (prompts, <code>CLAUDE.md</code>) should travel easily across
+   host boundaries. Ideally, it should not matter from where you pick up the work you began on
+   machine X.</li>
+</ol>
+<h2 id="central-feature-syncing-and-book-keeping">Central feature: syncing and book-keeping<a class="headerlink" href="#central-feature-syncing-and-book-keeping" title="Permanent link">&para;</a></h2>
+<p>Everything scrubjay moves is one of two things, and which one it is decides how it moves:</p>
 <table>
 <thead>
 <tr>
-<th>Surface</th>
-<th>What</th>
+<th></th>
+<th>Things you <strong>author</strong></th>
+<th>Things that <strong>happen</strong></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>tools</strong></td>
-<td><code>sj_list</code> (browse w/ filters, incl. <code>type=log</code> for the catalogue), <code>sj_recall</code> (topic → ranked candidates + anchors), <code>sj_search_within</code> (a topic <em>inside</em> one session → turn/line anchors), <code>sj_get</code> (fetch an artifact or a <code>turns=</code>/<code>lines=</code> slice), <code>sj_status</code></td>
+<td><em>For example</em></td>
+<td>prompts, agent identities, commands, settings, <code>CLAUDE.md</code> / <code>AGENTS.md</code></td>
+<td>transcripts, plans, memories, task and file history</td>
 </tr>
 <tr>
-<td><strong>resources</strong></td>
-<td>every transcript/plan/memory as an <code>@</code>-pickable resource (<code>sj://transcript/…</code>, <code>sj://plan/…</code>, <code>sj://memory/…</code>) with a human, date-sorted title</td>
+<td><em>Shape</em></td>
+<td>small, hand-edited, wants to merge</td>
+<td>large, machine-generated, append-only, never edited twice</td>
 </tr>
 <tr>
-<td><strong>commands</strong></td>
-<td><code>/sjrecall &lt;topic&gt;</code>, <code>/sjfind &lt;topic&gt; in &lt;session&gt;</code>, <code>/sjbrowse [type]</code>, <code>/sjget &lt;ref&gt;</code> — thin wrappers that drive the tools (full list under <a href="../slash-commands/">Slash commands</a>)</td>
+<td><em>So it uses</em></td>
+<td><strong>git</strong> — every machine, both ways</td>
+<td><strong>one-way relay</strong> to storage you own</td>
 </tr>
 </tbody>
 </table>
-<h2 id="registration-is-automatic-three-ways">Registration is automatic, three ways<a class="headerlink" href="#registration-is-automatic-three-ways" title="Permanent link">&para;</a></h2>
-<p>All done by <code>claude-sync.sh</code> at <strong>user scope</strong>, picked by what this machine has:</p>
+<p>This is why transcripts do not live in the config repo: they are records, not authored files, and
+they only ever travel machine → storage. <a href="../concepts/">Concepts</a> has the long version, including the
+second axis — sensitive vs. not — that decides NAS vs. GitHub.</p>
+<p>Session syncing needs a single source of truth. Currently this is facilitated either through a
+third-party GitHub repo or — for privacy and potentially compliance reasons, and preferably — through
+a NAS on a self-hosted box running scrubjay, which can also be accessed from other networks through
+WireGuard tunnels.</p>
+<p>Topologically this is hub-and-spoke, or <em>centralized peer-to-peer</em>: the storage node is the central
+entity necessary to provide the service. What makes it peer-to-peer is the data path rather than the shape — records travel directly
+from your machines to hardware you control, with no third party in between. If you are concerned
+about downtime, reliability and the maintenance that self-hosted infrastructure entails, the network
+drive holding the scrubjay storage can also be located on a cloud VPS.</p>
+<h2 id="feature-list">Feature list<a class="headerlink" href="#feature-list" title="Permanent link">&para;</a></h2>
+<p><strong>Basic.</strong> Transcripts are indexed, can be searched, and can be pulled into context via an
+<a href="../archive-mcp/">MCP server</a> running on the NAS host (the central node).</p>
+<p><strong>Quality-of-life.</strong> scrubjay catalogues sessions and keeps track of e.g. the topic, harness and
+token usage. To get an overview across sessions, users can print a session table and browse it
+manually.</p>
+<p><strong>New commands.</strong> scrubjay functions are callable in Claude Code and opencode via
+<a href="../slash-commands/"><code>/sj*</code> commands</a>.</p>
+<p><strong>Installation.</strong> <a href="../onboarding/">Onboarding</a> of new nodes into the scrubjay network happens via an
+onboarding script. The goal is as few manual steps as possible, while keeping the user informed
+about what is happening.</p>
+<h2 id="advantages">Advantages<a class="headerlink" href="#advantages" title="Permanent link">&para;</a></h2>
+<p>scrubjay especially makes sense for a many-machine setup on which a team of developers run Claude or
+other SDE agents and want to improve the exchange of their session context and agent artefacts.</p>
+<h3 id="cross-harness-resume-setup-and-exchange">Cross-harness resume, setup and exchange<a class="headerlink" href="#cross-harness-resume-setup-and-exchange" title="Permanent link">&para;</a></h3>
+<p>Operations like session lookup, setup and retention across a distributed host network become much
+easier:</p>
 <ul>
-<li><strong>On a GitHub (<code>git</code> backend) machine</strong> — the <code>scrubjay-chats</code> clone <em>is</em> the archive: the relay
-  writes the same <code>&lt;host&gt;/{readable,plans,…}</code> tree into it that a NAS holds, so <code>claude-sync.sh</code>
-  registers a local stdio server pointed straight at the clone. <code>sync-session.sh</code> <code>git pull</code>s the
-  clone at the start of each session, so recall spans <strong>every</strong> machine's sessions, not just this
-  one's. No NAS, WireGuard, or SSH — nothing to authorize. (Cross-machine <em>memory</em> recall rides its
-  own repo, not <code>scrubjay-chats</code> — enable it with <code>/sjmemory</code>, which points it at a separate private
-  <code>scrubjay-memory</code> GitHub repo for this backend; transcripts, plans, and the logs catalogue work out of
-  the box. See <a href="../memory-sync/">memory</a> for the custody trade-off.)</li>
-<li><strong>On the archive host</strong> (the always-on home server where <code>SCRUBJAY_LOCAL_CHATS</code> → the NAS is
-  mounted): a local stdio server reads the mounted archive directly. Nothing to do beyond onboarding.</li>
-<li><strong>On a client with no local archive</strong> (a laptop, or an <strong>HPC login node</strong>): run
-  <code>bin/onboard-mcp-client.sh</code> (offered by <code>onboard.sh</code>). It points <code>SCRUBJAY_MCP_REMOTE</code> at the
-  archive host and registers an <code>ssh</code> entry; on connect, a forced command (<code>bin/sjmcp-serve.sh</code>) runs
-  the server <strong>on the archive host</strong> and pipes MCP stdio back over the same SSH/ProxyJump path the
-  relay uses. The server side stays a manual <code>authorized_keys</code> authorize (printed by the script),
-  like the relay + memory keys. <strong>One mechanism covers both kinds of client:</strong> a laptop on the
-  WireGuard mesh, <em>and</em> an HPC login node that can't join it — clusters typically block the outbound
-  UDP that WireGuard needs, so those nodes fall back to plain SSH/ProxyJump instead. If neither path
-  applies, <code>claude-sync.sh</code> prints a loud, actionable skip rather than silently doing nothing.</li>
+<li>Setting up Claude Code and/or opencode becomes much easier in distributed infrastructure settings,
+  e.g. where a few locally hosted worker nodes are accessed by a pool of client nodes.</li>
+<li>Resume and lookup become independent of the harness: start with Claude Code, run into a token cap,
+  continue the transcript with opencode — and vice versa. See <a href="../handoff/">Session hand-off</a>.</li>
 </ul>
-<h2 id="the-remote-transport-ssh-stdio">The remote transport (SSH-stdio)<a class="headerlink" href="#the-remote-transport-ssh-stdio" title="Permanent link">&para;</a></h2>
-<p>A client with no local archive registers <code>sjmcp</code> as a <em>stdio</em> server whose command is
-<code>ssh &lt;alias&gt;</code>. That SSH <strong>jumps the edge/bastion</strong> (ProxyJump) to reach the archive host on the
-home LAN, where a forced command launches the read-only server; MCP JSON-RPC rides the pipe. The
-clever bit is the <strong>two nested SSH sessions</strong>: an <em>outer</em> one authenticates to the edge (whose key
-is restricted to forwarding a single port — no shell), and an <em>inner</em>, <strong>end-to-end</strong> session runs
-through that tunnel to the archive host. So the edge only ever relays opaque ciphertext — it can't
-read or tamper with the MCP traffic. Auth is asymmetric (an <code>ed25519</code> key, verified at both hops);
-the tunnel itself is the usual symmetric SSH channel.</p>
-<p><img alt="Query the archive (MCP) over SSH-stdio, jumping the edge" src="../transport-mcp.svg" /></p>
-<p><sub>Diagram source: <a href="../transport-mcp.dot"><code>transport-mcp.dot</code></a> — <code>dot -Tsvg docs/transport-mcp.dot -o docs/transport-mcp.svg</code>. Placeholder DDNS name + default ports; substitute your own.</sub></p>
-<h2 id="the-same-channel-also-serves-session-hand-off">The same channel also serves session hand-off<a class="headerlink" href="#the-same-channel-also-serves-session-hand-off" title="Permanent link">&para;</a></h2>
-<p><code>bin/sjmcp-serve.sh</code> dispatches on <code>$SSH_ORIGINAL_COMMAND</code>, so the one pinned forced command answers
-three things:</p>
-<table>
-<thead>
-<tr>
-<th><code>$SSH_ORIGINAL_COMMAND</code></th>
-<th>Serves</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><em>(empty)</em></td>
-<td>the MCP stdio server — recall/search/get, i.e. everything on this page</td>
-</tr>
-<tr>
-<td><code>resolve &lt;sid&gt;</code></td>
-<td><code>&lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;</code> for every archived copy of a session</td>
-</tr>
-<tr>
-<td><code>fetch &lt;relpath&gt;</code></td>
-<td>a tar stream of that archive entry (file or directory)</td>
-</tr>
-</tbody>
-</table>
-<p>The two extra verbs exist so a machine on the <strong>write-only</strong> <code>rsync-wg</code> relay can pull a whole
-session back down for <code>claude --resume</code> (<a href="../handoff/">session hand-off</a>) without the transcript having
-to cross the client's context window to reach its disk. They grant this key nothing new — it can
-already hand out the same raw <code>.jsonl</code> via <code>sj_get(format="raw")</code>. Both verbs re-check the resolved
-path against the archive root (so a symlink inside the archive is not a way out), and anything else
-is refused.</p>
-<h2 id="the-one-manual-step-authorize-the-client-on-the-archive-host">The one manual step — authorize the client on the archive host<a class="headerlink" href="#the-one-manual-step-authorize-the-client-on-the-archive-host" title="Permanent link">&para;</a></h2>
-<p><code>onboard-mcp-client.sh</code> does everything on the client, then prints the exact line(s) to install by
-hand (the server side is never automated — same rule as the relay + memory keys). Each key is
-pinned to the read-only server and nothing else:</p>
-<ul>
-<li><strong>On the archive host</strong>, add to the <strong>owner account</strong>'s <code>~/.ssh/authorized_keys</code> (the account with
-  <code>uv</code> + the scrubjay clone + archive read — <em>not</em> the write-only relay account). The forced command
-  confines the key to the one server, so a leaked key can only run read-only archive queries:</li>
-</ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>command=&quot;&lt;abs-path-to-clone&gt;/bin/sjmcp-serve.sh&quot;,restrict &lt;the printed public key&gt;
-</code></pre></div>
-<ul>
-<li><strong>If the path crosses a ProxyJump edge/bastion</strong> (e.g. an HPC client), also add to the jump user's
-  <code>~/.ssh/authorized_keys</code> <strong>on the edge</strong> — letting the key tunnel only to the archive host's port,
-  run nothing:</li>
-</ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>restrict,port-forwarding,permitopen=&quot;&lt;archive-host&gt;:&lt;port&gt;&quot;,command=&quot;/bin/false&quot; &lt;the printed public key&gt;
-</code></pre></div>
-<p>Then verify from the client — `ssh <mcp-alias> </p>
+<h2 id="differentiation">Differentiation<a class="headerlink" href="#differentiation" title="Permanent link">&para;</a></h2>
+<p>How it differs from:</p>
+<h3 id="just-syncing-everything-via-one-git-repo">"Just syncing everything via one git repo"<a class="headerlink" href="#just-syncing-everything-via-one-git-repo" title="Permanent link">&para;</a></h3>
+<p>A repo is a place files sit; it is not a mechanism that applies them. Agent config lives at user
+scope (<code>~/.claude/</code>, <code>~/.config/opencode/</code>), not in the project tree. Somebody still symlinks or
+copies it per machine, and then machines drift silently. scrubjay pulls and re-applies at every
+session start, merges base with per-host overrides, and ships <code>/sjdoctor</code> to prove a machine is
+actually in sync.</p>
+<p>Transcripts also do not belong in git: they are big, they do not diff usefully, and they may contain
+confidential information. This approach would not solve the inter-harness quality-of-life problems
+either.</p>
+<h3 id="just-directly-using-a-nas-that-each-team-member-can-access">"Just directly using a NAS that each team member can access"<a class="headerlink" href="#just-directly-using-a-nas-that-each-team-member-can-access" title="Permanent link">&para;</a></h3>
+<p>This induces inflexibility, as project roots need to be located on the NAS, and it introduces I/O
+concurrency issues if the same location is changed by two users. That can be solved with a versioning
+system, but we would still have to coordinate a lot of unnecessary continuous I/O where it is not
+actually needed: asynchronous updates are entirely fine for the intended use case. scrubjay runs
+everything on local disk and relays small artefacts asynchronously, which is much more maintainable
+and robust.</p>
+<p>The NAS solution also makes the MCP integration unnecessarily complex, as many working trees would
+exist in parallel if the MCP is asked to surface a currently contested location on the drive.</p>
+<h3 id="basic-functionality-surfaced-by-the-harness-eg-claude-code">"Basic functionality surfaced by the harness (e.g. Claude Code)"<a class="headerlink" href="#basic-functionality-surfaced-by-the-harness-eg-claude-code" title="Permanent link">&para;</a></h3>
+<p>As of now, this is limited to one host and one harness. scrubjay breaks that inflexibility open.</p>
+<p>Anthropic may of course release the functionality scrubjay implements gradually into the Claude Code
+harness, and opencode may pick up on it too. But it is highly doubtful that this will be
+peer-to-peer or privacy-by-design oriented.</p>
+<h2 id="downsides">Downsides<a class="headerlink" href="#downsides" title="Permanent link">&para;</a></h2>
+<p><strong>Setup effort (one time).</strong> There is a higher up-front cost for setup. Setting up and onboarding new
+nodes in a scrubjay network should be easy, but there may still be manual work involved, and basic
+knowledge of networking (WireGuard, port traversal, reverse proxying, DDNS for stable hostnames,
+etc.) is still required. The additional up-front cost of onboarding might not make sense for a user
+who runs a single machine and only one harness.</p>
+<p>scrubjay ships with an onboarding script that sets up the networking and MCP. However, setting up
+WireGuard tunnels (keys) and NAT traversal may require sudo rights. scrubjay will print the commands
+to run — but check before you sudo.</p>
+<p><strong>No per-person access control.</strong> scrubjay knows hosts, not users. Everyone pointed at the same
+storage sees everything in it — including the shared config and memory that ride along with the
+sessions. For a small, trusting team that is the point; where separation matters, the answer today is
+one archive per team or per engagement, not permissions inside one archive.</p>
+<p><strong>Some commands take getting used to.</strong> Ending a session with <code>/sjlog</code> (or <code>/clear</code>) gives it a
+written one-sentence topic. Quit any other way and the session still lands in the archive — it just
+gets the first prompt as its topic line, which makes it harder to recognise later when you are
+scanning the catalogue. This will be improved in a future update.</p>
+<p><strong>The scrubjay storage on the central node is a single point of failure.</strong> In future, the central
+storage should be moved to an off-premise VPS and managed via a distributed database such as Apache
+Cassandra, which opens up the path to further optimisation. For production environments relying on
+100% uptime, this is non-negotiable. See <a href="../durability/">Archive durability</a> for what protects the
+archive today.</p>
+<div class="admonition warning">
+<p class="admonition-title">Disclaimer</p>
+<p>scrubjay is work in progress. It is an <strong>open-source project</strong>, so feel free to contribute — and
+when using it, <strong>treat it as alpha-stage software</strong>. Understand the implications before
+copy-pasting sudo commands from the initial onboarding.</p>
+<p>It is also recommended that you make yourself familiar with networking and security basics
+(WireGuard tunnels) and correctly harden the involved infrastructure (automatic security
+updates, firewall setup, etc.) before using scrubjay to sync across networks.</p>
+</div>
 
 
 
