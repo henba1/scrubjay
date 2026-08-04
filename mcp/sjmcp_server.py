@@ -3,6 +3,9 @@
 # requires-python = ">=3.10"
 # dependencies = ["mcp[cli]>=1.2"]
 # ///
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 """sjmcp — a read interface over the scrubjay archive, exposed via MCP.
 
 scrubjay *writes* every session's records to the NAS (transcripts, plans, cross-machine

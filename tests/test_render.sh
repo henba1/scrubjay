@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # The readable renderers. All three must emit the SAME Markdown shape — a `# title`, a `_N turns_`
 # line, and `## User` / `## Assistant` blocks — because that shared shape is the entire basis for
 # /sjrecall searching across harnesses, and mcp/sjmcp_server.py parses the turn count off it.

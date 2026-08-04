@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: FSL-1.1-ALv2
+// Copyright (c) 2026 Hendrik. See LICENSE.
+
 /**
  * scrubjay — the opencode bridge.
  *

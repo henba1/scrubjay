@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Harness adapter: OpenAI Codex CLI. Source this; do not execute. See bin/adapters/README.md.
 #
 # Codex is the cheap one where opencode was expensive, and vice versa:

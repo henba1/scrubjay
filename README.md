@@ -2,7 +2,7 @@
 
 <img src="docs/banner.png" alt="scrubjay — recall what · where · when" width="100%">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-2094f3.svg)](https://henba1.github.io/scrubjay/)
 [![Built for opencode](https://img.shields.io/badge/built%20for-opencode-000000.svg)](https://opencode.ai)
 [![Built for Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-d97757.svg)](https://claude.ai/code)
@@ -31,7 +31,8 @@ scrubjay fixes both, and keeps it all on hardware you own.
   your own NAS automatically. Later you ask *"what was that fix for the auth timeout?"* and get the
   real conversation back — whichever machine and whichever agent it happened on.
 - **Yours.** Your config and chats live in private repos on your own account; transcripts go
-  straight to your own storage. This repo is only the machinery, which is why it can be public.
+  straight to your own storage. This repo is only the machinery, which is why you can read every
+  line of what runs on your machines.
 
 Three repos, so the machinery can be public without leaking anything you wrote:
 
@@ -186,4 +187,21 @@ it's a coined compound, so it survives a namespace check, and `sjrecall` reads w
 
 ## License
 
-[MIT](LICENSE) © 2026 Hendrik
+**[FSL-1.1-ALv2](LICENSE)** — the [Functional Source License](https://fsl.software/), with an
+Apache-2.0 future licence. © 2026 Hendrik.
+
+Source-available rather than open source, and the line is drawn in one specific place:
+
+- **You may** read it, run it, modify it, fork it, and use it inside your own organisation,
+  commercially included. All of that is a *Permitted Purpose* under the licence.
+- **You may not** make it available to others as a commercial product or service that competes
+  with scrubjay.
+- **After two years** each released version becomes Apache-2.0 automatically. Nothing here is
+  locked up permanently.
+
+scrubjay was MIT from its first commit through
+[`v0.2.0-mit`](https://github.com/henba1/scrubjay/releases/tag/v0.2.0-mit). That grant is
+irrevocable and every copy taken at or before that tag keeps it — see [LICENSE-MIT](LICENSE-MIT)
+for the terms and how to check that state out. The relicence binds commits after the tag only.
+
+Need terms other than these? Open an issue.

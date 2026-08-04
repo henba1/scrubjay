@@ -146,6 +146,25 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
   is a tool for agentic coding, much of it is written with one, and the history should say so
   rather than quietly imply otherwise. Configured in `.claude/settings.json` (project scope, so it
   applies to this repo only) — do not "helpfully" strip it.
+- **Every new source file gets the licence header — no exceptions.** scrubjay is FSL-1.1-ALv2 from
+  the tag `v0.2.0-mit` onward (MIT before it; see [`docs/licensing.md`](docs/licensing.md)), so a
+  file no longer answers *"under what terms does this ship?"* on its own. Every new `.sh`, `.py` or
+  `.js` starts with these two lines, directly under the shebang:
+
+  ```sh
+  # SPDX-License-Identifier: FSL-1.1-ALv2
+  # Copyright (c) 2026 Hendrik. See LICENSE.
+  ```
+
+  `//` instead of `#` for JavaScript. In `mcp/sjmcp_server.py` the header sits *below* the PEP 723
+  `# /// script` block so the metadata stays adjacent to the shebang — same rule for any future
+  script with inline metadata. Do **not** add it to Markdown, JSON, or anything under `skeleton/`:
+  JSON cannot carry a comment, prose is covered by `LICENSE`, and `skeleton/` is seed content that
+  becomes the *user's* private data repo. `tests/test_license_headers.sh` enforces this and reads
+  untracked files too, so a file you just wrote fails the suite before it is ever committed — run
+  `bash tests/run.sh license_headers` after adding files.
+- **Don't describe this repo as "open source."** It is public and source-available; the FSL forbids
+  reselling it as a competing product. "Open source" in docs or a PR description is now inaccurate.
 - Shell scripts are `bash`, `set -uo pipefail`; match the surrounding style.
 - **Stay portable across GNU and BSD userlands.** Supported platforms are Linux and WSL 2, with
   macOS best-effort (see the Platforms table in `docs/onboarding.md`). GNU-only spellings —

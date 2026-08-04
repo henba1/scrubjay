@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Harness adapter: Claude Code. Source this; do not execute. See bin/adapters/README.md.
 #
 # This is scrubjay's original (and, for a long time, only) harness, so the adapter is mostly a

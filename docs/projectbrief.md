@@ -168,7 +168,8 @@ Cassandra, which opens up the path to further optimisation. For production envir
 archive today.
 
 !!! warning "Disclaimer"
-    scrubjay is work in progress. It is an **open-source project**, so feel free to contribute — and
+    scrubjay is work in progress. It is a **source-available project** ([FSL-1.1-ALv2](licensing.md)),
+    so feel free to contribute — and
     when using it, **treat it as alpha-stage software**. Understand the implications before
     copy-pasting sudo commands from the initial onboarding.
 

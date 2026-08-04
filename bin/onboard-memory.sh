@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Set up THIS machine for cross-machine memory (the self-hosted NAS git repo). Idempotent:
 # run it on a fresh machine to turn memory sync on, or on an existing one to enable/repair it —
 # re-running when already configured is a safe no-op.

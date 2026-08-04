@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Run on the always-on mirror host (any small home server). Pull the scrubjay-chats relay and mirror it
 # into the NAS archive. Designed for cron (every 30 min). Idempotent.
 #   env: CHATS_REPO      clone of scrubjay-chats    (default ~/scrubjay-chats)
