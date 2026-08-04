@@ -26,7 +26,7 @@ without leaking anything:
 
 ## Where to go
 
-- **[Why scrubjay](why.md)** — what problem it solves, how it differs from a shared git
+- **[Project brief](projectbrief.md)** — what problem it solves, how it differs from a shared git
   repo or a shared NAS, and what it does *not* do yet. Read this first if you are deciding
   whether scrubjay is for you.
 - **[Concepts](concepts.md)** — the two-kinds-of-sync model, what scrubjay is, and

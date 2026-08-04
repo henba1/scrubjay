@@ -1,4 +1,4 @@
-# Why scrubjay
+# Project brief
 
 scrubjay's primary function is to sync context — like prompts, agent identities and artefacts such
 as session transcripts — for coding agents such as Claude Code and those deployed through the

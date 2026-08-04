@@ -56,7 +56,7 @@ plugins:
       sections:
         Overview:
           - index.md
-          - why.md
+          - projectbrief.md
           - concepts.md
           - harnesses.md
         Setup & operation:
@@ -76,7 +76,7 @@ plugins:
 
 nav:
   - Home: index.md
-  - Why scrubjay: why.md
+  - Project brief: projectbrief.md
   - Concepts: concepts.md
   - Harnesses: harnesses.md
   - Onboarding: onboarding.md
