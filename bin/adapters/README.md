@@ -116,7 +116,8 @@ it doesn't own (a key you set that the data repo never mentions always survives;
 | What | Where | Effect |
 |---|---|---|
 | shared + per-host settings | `opencode.json` (deep-merged under your keys) | `opencode.base.json` + `hosts/<host>/opencode/opencode.json` apply, like Claude's base+overlay |
-| shared instructions | `opencode.json` → `instructions[]` | points at `<data>/shared/AGENTS.md` by absolute path (live on `git pull`) |
+| shared instructions | `opencode.json` → `instructions[]` | points at `<data>/shared/AGENTS.md` by absolute path (live on `git pull`) — the claude adapter links the same file into `~/.claude/rules/`, since Claude Code reads `CLAUDE.md`, not `AGENTS.md` |
+| skills | `skills/<name>/` | `<data>/claude-md/skills/` + `<data>/opencode/skills/` — symlinked, no translation (`SKILL.md` is a cross-tool standard) |
 | the lifecycle bridge | `opencode.json` → `plugin[]` | sessions are logged + relayed to the archive |
 | the sjmcp archive server | `opencode.json` → `mcp.sjmcp` | `/sjrecall` & co. can read the archive |
 | the `/sj*` + personal commands | `commands/*.md` (generated) | slash commands exist in opencode (data-repo ones override on a name clash) |

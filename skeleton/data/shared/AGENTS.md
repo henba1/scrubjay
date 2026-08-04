@@ -1,8 +1,10 @@
 <!--
   Shared agent instructions — used by BOTH harnesses scrubjay syncs.
 
-  scrubjay points opencode at this file by absolute path (opencode.json `instructions`),
-  and Claude Code reads it through the AGENTS.md convention. A `git pull` of the data repo
+  scrubjay points opencode at this file by absolute path (opencode.json `instructions`), and
+  symlinks it into ~/.claude/rules/ for Claude Code — user-level rules load on every session in
+  every project. (Claude Code reads CLAUDE.md, *not* AGENTS.md; the rules dir is how a shared
+  file reaches it without editing the CLAUDE.md you authored.) A `git pull` of the data repo
   updates it live on every machine, the same way the hooks symlink self-updates.
 
   Put instructions here that are true regardless of which agent you are driving. Harness- or

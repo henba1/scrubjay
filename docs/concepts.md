@@ -70,6 +70,17 @@ directories. Each one feeds Claude in a specific way:
   sub-agents Claude can delegate to — `agents/test-runner.md` defines a focused helper that runs
   your test suite and reports back. `CLAUDE.md` and `agents/` are symlinked straight into
   `~/.claude/`, so editing a file here changes Claude's behaviour everywhere on the next pull.
+  `skills/` holds skills — `skills/<name>/SKILL.md` plus whatever that skill bundles — linked per
+  *directory* into `~/.claude/skills/` **and** into opencode's own `skills/`, since `SKILL.md` is a
+  cross-tool standard both harnesses read. `output-styles/` follows the same per-file shape as
+  `commands/`.
+
+- **`shared/AGENTS.md`** — instructions that hold whichever agent you are driving. opencode is
+  pointed at it by absolute path (`opencode.json` → `instructions[]`); Claude Code is given it as a
+  **user-level rule** (symlinked to `~/.claude/rules/`, which loads on every session in every
+  project). That indirection is deliberate: Claude Code reads `CLAUDE.md`, *not* `AGENTS.md`, so a
+  rule is the only user-scope mechanism that makes one shared file reach both harnesses without
+  rewriting the `CLAUDE.md` you authored.
 
 - **`hosts/<machine>/`** — the part that is *different* per machine. `env.md` describes that
   box in prose (its OS, where Python lives, cluster quirks) so Claude knows the lay of the

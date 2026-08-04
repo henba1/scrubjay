@@ -50,6 +50,7 @@ survives, and an unparseable `opencode.json` is refused rather than clobbered):
 | the archive server | `opencode.json` → `mcp.sjmcp` | the app (`/sjrecall`, `/sjfind`, `/sjbrowse` work inside opencode) |
 | the `/sj*` + your commands | `commands/*.md` | the app + `claude-md/commands/` (yours override on a name clash) |
 | agents | `agent/*.md` | `claude-md/agents/` (translated) + `opencode/agent/` (native) |
+| skills | `skills/<name>/` | `claude-md/skills/` + `opencode/skills/` (native wins), symlinked as-is |
 
 The settings merge is the same model as Claude's `settings.base.json` + per-host overlay: shared
 defaults apply, the host overlay wins where it sets a key, and every key *you* set that the data
