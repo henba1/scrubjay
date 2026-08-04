@@ -8,6 +8,8 @@ The **app/logic** for syncing [Claude Code](https://claude.ai/code) across machi
 | **scrubjay-data**   | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private     |
 | **scrubjay-chats**  | full chat transcripts (`.jsonl`), relayed off each machine            | private     |
 
+Public and readable, but **source-available rather than open source**: use it for anything, including inside your company, just don't resell it as a competing product. See [Licensing](https://henba1.github.io/scrubjay/licensing/index.md).
+
 Diagram source: [`overview.dot`](https://henba1.github.io/scrubjay/overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.
 
 > **Flow:** `scrubjay` (logic) + `scrubjay-data` (your config) → applied into each machine's `~/.claude` by `claude-sync.sh`. On `SessionEnd` a hook appends a one-line entry to `scrubjay-data/logs/<host>.log` *and* relays the session (transcript, subagents, plans) off the machine via a pluggable backend — either peer-to-peer to your own NAS (over WireGuard), or to a private `scrubjay-chats` repo on GitHub if you'd rather not run storage of your own. Top-level is keyed by machine so envs stay distinct and Claude can re-tailor one host's rules for another.

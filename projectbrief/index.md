@@ -94,6 +94,6 @@ scrubjay ships with an onboarding script that sets up the networking and MCP. Ho
 
 Disclaimer
 
-scrubjay is work in progress. It is an **open-source project**, so feel free to contribute — and when using it, **treat it as alpha-stage software**. Understand the implications before copy-pasting sudo commands from the initial onboarding.
+scrubjay is work in progress. It is a **source-available project** ([FSL-1.1-ALv2](https://henba1.github.io/scrubjay/licensing/index.md)), so feel free to contribute — and when using it, **treat it as alpha-stage software**. Understand the implications before copy-pasting sudo commands from the initial onboarding.
 
 It is also recommended that you make yourself familiar with networking and security basics (WireGuard tunnels) and correctly harden the involved infrastructure (automatic security updates, firewall setup, etc.) before using scrubjay to sync across networks.
