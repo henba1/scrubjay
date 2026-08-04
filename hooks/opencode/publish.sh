@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Publish one opencode session: export it, then hand it to the shared SessionEnd hook.
 #
 # WHY THIS IS A SCRIPT AND NOT PART OF THE PLUGIN: opencode fires `session.idle` and then, in

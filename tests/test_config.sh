@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Config apply. The property that matters for every harness: idempotent, and additive — scrubjay
 # owns its own keys and never clobbers config the user (or another tool) put there.
 set -uo pipefail

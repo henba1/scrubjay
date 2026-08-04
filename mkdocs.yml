@@ -59,6 +59,7 @@ plugins:
           - projectbrief.md
           - concepts.md
           - harnesses.md
+          - licensing.md
         Setup & operation:
           - onboarding.md
           - day-to-day.md
@@ -86,6 +87,7 @@ nav:
   - Slash commands: slash-commands.md
   - "Transcripts: relay + NAS": transports.md
   - Reference: reference.md
+  - Licensing: licensing.md
   - Deep dives:
       - Transcript transport: transcript-transport.md
       - Archive durability: durability.md

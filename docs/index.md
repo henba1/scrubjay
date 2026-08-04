@@ -12,6 +12,10 @@ without leaking anything:
 | **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private |
 | **scrubjay-chats** | full chat transcripts (`.jsonl`), relayed off each machine | private |
 
+Public and readable, but **source-available rather than open source**: use it for anything,
+including inside your company, just don't resell it as a competing product. See
+[Licensing](licensing.md).
+
 ![scrubjay — system overview](overview.svg)
 
 <sub>Diagram source: [`overview.dot`](overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.</sub>

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Verify that this machine's scrubjay is actually working — end to end, right now.
 #
 # Why this exists: scrubjay's subsystems are deliberately best-effort. A session must never be

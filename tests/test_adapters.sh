@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # The harness seam: every adapter implements the contract, and each recognizes its own transcript
 # format and nobody else's. Detection is what a hand-off keys off — get it wrong and scrubjay feeds
 # one agent's session to another (which it once did).

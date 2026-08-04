@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # sj-mount.sh turns NAS share details into a persistent mount config (a systemd .mount unit or an
 # /etc/fstab line) and verifies the result is live + writable. These generators are pure and
 # side-effect-free — the sudo/systemctl install stays gated behind a confirm/ASSUME_YES flag — so

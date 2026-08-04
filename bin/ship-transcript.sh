@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Transport-agnostic AND harness-agnostic entry point for relaying a session's records:
 #   1) the transcript                     -> <host>/<slug>/<session>.<ext>
 #   2) everything else the harness keeps  -> per sjh_extra_artifacts (subagent transcripts,

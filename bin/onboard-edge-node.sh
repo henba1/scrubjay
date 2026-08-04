@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Configure a home EDGE / bastion node to accept an HPC transcript client and ProxyJump it
 # to the receiver — hardened. Run ON the edge node as root. Idempotent and safe-by-default:
 #   * creates a dedicated jump user (key-only);

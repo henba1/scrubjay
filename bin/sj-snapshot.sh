@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Snapshot durability for the scrubjay archive — run this WITH ROOT ON THE NAS (the box that holds
 # scrubjay-storage). It is the receiver-side half of the `local` backend and, like the other
 # root-owned steps (bin/sj-migrate.sh, the authorized_keys line), it stays yours: onboard never runs

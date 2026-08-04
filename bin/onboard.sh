@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # Interactive onboarding for a new machine. Condenses the README "Onboard a new machine"
 # steps into one guided run:
 #   - check deps (git, jq) and Claude Code — offer to install Claude if missing

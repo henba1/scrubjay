@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # The GNU-vs-BSD seam. scrubjay was written on Linux, so GNU flags leaked into it; most of them
 # fail *quietly* on macOS/BSD, which is what makes them worth a test rather than a code review.
 #

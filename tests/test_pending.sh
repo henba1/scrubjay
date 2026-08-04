@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik. See LICENSE.
+
 # "Not yet authorized on the receiver" as a first-class, self-clearing state.
 #
 # On the p2p backends a new machine cannot authorize itself — a human with root on the receiver
