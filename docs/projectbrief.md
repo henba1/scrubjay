@@ -66,8 +66,8 @@ third-party GitHub repo or — for privacy and potentially compliance reasons, a
 a NAS on a self-hosted box running scrubjay, which can also be accessed from other networks through
 WireGuard tunnels.
 
-Topologically this is hub-and-spoke: the storage node is the central entity necessary to provide the
-service. What makes it peer-to-peer is the data path rather than the shape — records travel directly
+Topologically this is hub-and-spoke, or *centralized peer-to-peer*: the storage node is the central
+entity necessary to provide the service. What makes it peer-to-peer is the data path rather than the shape — records travel directly
 from your machines to hardware you control, with no third party in between. If you are concerned
 about downtime, reliability and the maintenance that self-hosted infrastructure entails, the network
 drive holding the scrubjay storage can also be located on a cloud VPS.
