@@ -29,14 +29,15 @@ bin/sync-config.sh
 
 `sync-config.sh` then writes the following into `~/.config/opencode/` — additively, and it never rewrites a key it doesn't own (a setting you chose that the data repo never mentions always survives, and an unparseable `opencode.json` is refused rather than clobbered):
 
-| What                       | Where                                                 | From                                                                  |
-| -------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------- |
-| shared + per-host settings | `opencode.json` (deep-merged **under** your own keys) | `opencode/opencode.base.json` + `hosts/<host>/opencode/opencode.json` |
-| shared instructions        | `opencode.json` → `instructions[]`                    | `shared/AGENTS.md` (by absolute path — live on `git pull`)            |
-| the lifecycle bridge       | `opencode.json` → `plugin[]`                          | the app (sessions get logged + relayed)                               |
-| the archive server         | `opencode.json` → `mcp.sjmcp`                         | the app (`/sjrecall`, `/sjfind`, `/sjbrowse` work inside opencode)    |
-| the `/sj*` + your commands | `commands/*.md`                                       | the app + `claude-md/commands/` (yours override on a name clash)      |
-| agents                     | `agent/*.md`                                          | `claude-md/agents/` (translated) + `opencode/agent/` (native)         |
+| What                       | Where                                                 | From                                                                    |
+| -------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------- |
+| shared + per-host settings | `opencode.json` (deep-merged **under** your own keys) | `opencode/opencode.base.json` + `hosts/<host>/opencode/opencode.json`   |
+| shared instructions        | `opencode.json` → `instructions[]`                    | `shared/AGENTS.md` (by absolute path — live on `git pull`)              |
+| the lifecycle bridge       | `opencode.json` → `plugin[]`                          | the app (sessions get logged + relayed)                                 |
+| the archive server         | `opencode.json` → `mcp.sjmcp`                         | the app (`/sjrecall`, `/sjfind`, `/sjbrowse` work inside opencode)      |
+| the `/sj*` + your commands | `commands/*.md`                                       | the app + `claude-md/commands/` (yours override on a name clash)        |
+| agents                     | `agent/*.md`                                          | `claude-md/agents/` (translated) + `opencode/agent/` (native)           |
+| skills                     | `skills/<name>/`                                      | `claude-md/skills/` + `opencode/skills/` (native wins), symlinked as-is |
 
 The settings merge is the same model as Claude's `settings.base.json` + per-host overlay: shared defaults apply, the host overlay wins where it sets a key, and every key *you* set that the data repo doesn't mention is left untouched.
 

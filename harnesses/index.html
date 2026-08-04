@@ -1008,6 +1008,11 @@ survives, and an unparseable <code>opencode.json</code> is refused rather than c
 <td><code>agent/*.md</code></td>
 <td><code>claude-md/agents/</code> (translated) + <code>opencode/agent/</code> (native)</td>
 </tr>
+<tr>
+<td>skills</td>
+<td><code>skills/&lt;name&gt;/</code></td>
+<td><code>claude-md/skills/</code> + <code>opencode/skills/</code> (native wins), symlinked as-is</td>
+</tr>
 </tbody>
 </table>
 <p>The settings merge is the same model as Claude's <code>settings.base.json</code> + per-host overlay: shared

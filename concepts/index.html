@@ -1038,7 +1038,19 @@ directories. Each one feeds Claude in a specific way:</p>
   ship with the app; <code>claude-sync.sh</code> merges both into <code>~/.claude/commands/</code>.) <code>agents/</code> holds
   sub-agents Claude can delegate to — <code>agents/test-runner.md</code> defines a focused helper that runs
   your test suite and reports back. <code>CLAUDE.md</code> and <code>agents/</code> are symlinked straight into
-  <code>~/.claude/</code>, so editing a file here changes Claude's behaviour everywhere on the next pull.</p>
+  <code>~/.claude/</code>, so editing a file here changes Claude's behaviour everywhere on the next pull.
+  <code>skills/</code> holds skills — <code>skills/&lt;name&gt;/SKILL.md</code> plus whatever that skill bundles — linked per
+  <em>directory</em> into <code>~/.claude/skills/</code> <strong>and</strong> into opencode's own <code>skills/</code>, since <code>SKILL.md</code> is a
+  cross-tool standard both harnesses read. <code>output-styles/</code> follows the same per-file shape as
+  <code>commands/</code>.</p>
+</li>
+<li>
+<p><strong><code>shared/AGENTS.md</code></strong> — instructions that hold whichever agent you are driving. opencode is
+  pointed at it by absolute path (<code>opencode.json</code> → <code>instructions[]</code>); Claude Code is given it as a
+  <strong>user-level rule</strong> (symlinked to <code>~/.claude/rules/</code>, which loads on every session in every
+  project). That indirection is deliberate: Claude Code reads <code>CLAUDE.md</code>, <em>not</em> <code>AGENTS.md</code>, so a
+  rule is the only user-scope mechanism that makes one shared file reach both harnesses without
+  rewriting the <code>CLAUDE.md</code> you authored.</p>
 </li>
 <li>
 <p><strong><code>hosts/&lt;machine&gt;/</code></strong> — the part that is <em>different</em> per machine. <code>env.md</code> describes that
