@@ -36,6 +36,11 @@ Every released version converts to the **Apache License 2.0 two years after its 
 automatically and irrevocably. The restriction above is a moving two-year window, not a permanent
 enclosure — today's code is Apache-2.0 in 2028 whatever happens to this project or its maintainer.
 
+The repository therefore ships a
+[`NOTICE`](https://github.com/henba1/scrubjay/blob/main/NOTICE) file: Apache-2.0 §4(d) binds
+redistributors to it, but only if one exists, and it cannot be added to a version that has already
+converted. It carries attribution only — `LICENSE` governs.
+
 ## The MIT period
 
 scrubjay was MIT-licensed from its first commit (2026-06-23) through the commit tagged

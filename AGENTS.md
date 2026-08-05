@@ -163,6 +163,8 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
   becomes the *user's* private data repo. `tests/test_license_headers.sh` enforces this and reads
   untracked files too, so a file you just wrote fails the suite before it is ever committed — run
   `bash tests/run.sh license_headers` after adding files.
+- **`NOTICE` is attribution, not terms.** Extend it when third-party code is vendored; never put
+  grants, restrictions or prose in it. `LICENSE` governs.
 - **Don't describe this repo as "open source."** It is public and source-available; the FSL forbids
   reselling it as a competing product. "Open source" in docs or a PR description is now inaccurate.
 - Shell scripts are `bash`, `set -uo pipefail`; match the surrounding style.
