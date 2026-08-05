@@ -1183,13 +1183,13 @@ third-party GitHub repo or — for privacy and potentially compliance reasons, a
 a NAS on a self-hosted box running scrubjay, which can also be accessed from other networks through
 WireGuard tunnels.</p>
 <p>Topologically this is hub-and-spoke, or <em>centralized peer-to-peer</em>: the storage node is the central
-entity necessary to provide the service. What makes it peer-to-peer is the data path rather than the shape — records travel directly
-from your machines to hardware you control, with no third party in between. If you are concerned
+entity necessary to provide the service. Records travel directly from each peer in the scrubjay network
+to the central NAS bearing node with no third party in between. If you are concerned
 about downtime, reliability and the maintenance that self-hosted infrastructure entails, the network
 drive holding the scrubjay storage can also be located on a cloud VPS.</p>
 <h2 id="feature-list">Feature list<a class="headerlink" href="#feature-list" title="Permanent link">&para;</a></h2>
 <p><strong>Basic.</strong> Transcripts are indexed, can be searched, and can be pulled into context via an
-<a href="../archive-mcp/">MCP server</a> running on the NAS host (the central node).</p>
+<a href="../archive-mcp/">MCP server</a> running on the NAS host.</p>
 <p><strong>Quality-of-life.</strong> scrubjay catalogues sessions and keeps track of e.g. the topic, harness and
 token usage. To get an overview across sessions, users can print a session table and browse it
 manually.</p>
