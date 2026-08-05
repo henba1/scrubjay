@@ -165,9 +165,9 @@ The docs also publish an [`llms.txt`](https://henba1.github.io/scrubjay/llms.txt
 
 ## Why the name?
 
-Western scrub jays are the textbook case of **episodic-like memory** in animals. They cache food in
+Western scrub jays are a good example of **episodic-like memory** in animals. They cache food in
 places they control, and later recover it by *what* they buried, *where* they buried it, and *when* —
-including whether it's still worth eating. That is regarded as one of the first evidences that any non-human animal
+including whether it's still worth eating. That is regarded as early evidence that any non-human animal
 remembers a specific past event, and not just a learned habit ([Clayton & Dickinson,
 1998](https://doi.org/10.1038/26216)).
 
