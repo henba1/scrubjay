@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # One-off: build the human-readable Markdown `readable/` tree for transcripts already on the
 # NAS. Run on the box that has the NAS mounted. Idempotent (re-renders, overwrites).

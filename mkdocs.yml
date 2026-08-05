@@ -3,7 +3,7 @@ site_description: The app/logic for syncing Claude Code across machines — conf
 site_url: https://henba1.github.io/scrubjay/
 repo_url: https://github.com/henba1/scrubjay
 repo_name: henba1/scrubjay
-copyright: Copyright &copy; 2026 Hendrik
+copyright: Copyright &copy; 2026 Hendrik Baacke
 
 theme:
   name: material

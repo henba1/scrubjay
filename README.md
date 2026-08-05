@@ -188,7 +188,7 @@ it's a coined compound, so it survives a namespace check, and `sjrecall` reads w
 ## License
 
 **[FSL-1.1-ALv2](LICENSE)** — the [Functional Source License](https://fsl.software/), with an
-Apache-2.0 future licence. © 2026 Hendrik.
+Apache-2.0 future licence. © 2026 Hendrik Baacke.
 
 Source-available rather than open source, and the line is drawn in one specific place:
 

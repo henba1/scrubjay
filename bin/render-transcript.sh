@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Render a Claude transcript .jsonl as a human-readable Markdown conversation / session log:
 # user + assistant text turns, plus the full tool stream — each tool call shows its input

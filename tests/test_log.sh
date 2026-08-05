@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # The session-log line hooks/log-session.sh appends is the whole catalogue — it is what /sjbrowse
 # and /sjrecall read, and what rides the data repo to every machine. This proves the enriched line

@@ -59,7 +59,7 @@ Every shell, Python and JavaScript source file carries an [SPDX](https://spdx.de
 
 ```sh
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 ```
 
 `LICENSE` is the file a copied snippet leaves behind, so the terms are stamped on each file too —

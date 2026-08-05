@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Migrate a machine from the old `dotclaude` names to `scrubjay`, in place. Idempotent: safe to
 # re-run; anything already migrated is skipped. Prints (does NOT perform) the root-owned and

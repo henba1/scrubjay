@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Transcript backend: local copy. For the box that has the NAS mounted (the receiver) —
 # no network hop, no rsync-to-self. Set SCRUBJAY_LOCAL_CHATS to the NAS chats root, e.g.

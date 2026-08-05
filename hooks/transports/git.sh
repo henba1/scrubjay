@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Transcript backend: git. Copy the transcript into the scrubjay-chats clone and push it.
 # Requires SCRUBJAY_CHATS (a clone of the private relay repo). Best-effort; never fails.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Render an opencode session export (`opencode export <sid>`) as a human-readable Markdown
 # conversation — the opencode counterpart of bin/render-transcript.sh, and deliberately the SAME

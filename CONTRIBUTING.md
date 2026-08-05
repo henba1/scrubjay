@@ -22,7 +22,7 @@ public-safe: no real hostnames, personal paths, IPs, or emails — use RFC-safe 
 
   ```sh
   # SPDX-License-Identifier: FSL-1.1-ALv2
-  # Copyright (c) 2026 Hendrik. See LICENSE.
+  # Copyright (c) 2026 Hendrik Baacke. See LICENSE.
   ```
 
   Not in Markdown, JSON, or `skeleton/`. `bash tests/run.sh license_headers` checks this — including
