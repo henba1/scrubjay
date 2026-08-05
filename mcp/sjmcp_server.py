@@ -9,12 +9,13 @@
 """sjmcp — a read interface over the scrubjay archive, exposed via MCP.
 
 scrubjay *writes* every session's records to the NAS (transcripts, plans, cross-machine
-memory); this server is the missing *read* path back into a live Claude Code session. It is
+memory, notes); this server is the missing *read* path back into a live Claude Code session. It is
 **read-only** and runs where the archive is mounted (the archive host). Config comes from the same
 pointers the rest of scrubjay uses (`~/.config/scrubjay/config`), passed in as env:
 
     SCRUBJAY_LOCAL_CHATS   storage root: contains <host>/{readable,plans,<slug>}/, memory/
-    SCRUBJAY_MEMORY        the cross-machine memory clone (fallback memory source)
+    SCRUBJAY_MEMORY        the cross-machine memory clone (fallback memory source; also
+                           <project>/notes/, the /sjnote store)
     SCRUBJAY_DATA          the data repo: logs/<host>.log, hosts/<host>/chats.index.json
 
 Where a tree is absent (e.g. a non-NAS machine has no readable/ archive) the server simply
@@ -73,6 +74,7 @@ def roots() -> Roots:
 #   readable transcript: <project>/<date>_<topic>__<sid8>.md
 #   plan:                <date>_<topic>.md
 #   memory:              <project>/<name>.md   (+ a MEMORY.md index per project)
+#   note:                <project>/notes/<date>_<topic>__<sid8>.md   (the sid8 is optional)
 
 # The handle is 8 chars of the session id — hex for a Claude/Codex UUID, base62 for an opencode
 # `ses_…` id (bin/lib.sh: sj_session_handle). Topics are slugified to [a-z0-9-], so they can never
@@ -87,7 +89,7 @@ def _untopic(slug: str) -> str:
 
 @dataclass
 class Artifact:
-    type: str  # transcript | plan | memory
+    type: str  # transcript | plan | memory | note
     host: str  # "" for memory (cross-machine, not host-keyed)
     project: str
     date: str  # YYYY-MM-DD ("" if unknown)
@@ -172,6 +174,8 @@ def _iter_memories(r: Roots) -> list[Artifact]:
     if not r.memory:
         return out
     for proj_dir in sorted(p for p in r.memory.iterdir() if p.is_dir()):
+        # Deliberately non-recursive: notes/ lives one level down and is a different artifact type
+        # (see _iter_notes), so this glob is what keeps the two from being conflated.
         for md in sorted(proj_dir.glob("*.md")):
             if md.name == "MEMORY.md":  # the per-project index, not a fact
                 continue
@@ -180,8 +184,31 @@ def _iter_memories(r: Roots) -> list[Artifact]:
     return out
 
 
+def _iter_notes(r: Roots) -> list[Artifact]:
+    """Notes: long-form documents written during a session (bin/sj-note.sh), filed under the memory
+    repo but OUTSIDE the auto-loaded index — so they are durable and searchable without spending a
+    session's context. Cross-machine like memory, so host is "". A note keeps a session backlink in
+    its name when one was resolvable; when it wasn't, the name degrades to a plan's <date>_<topic>,
+    and then to the bare stem for a file dropped in by hand on the NAS. All three still list."""
+    out: list[Artifact] = []
+    if not r.memory:
+        return out
+    for proj_dir in sorted(p for p in r.memory.iterdir() if p.is_dir()):
+        nd = proj_dir / "notes"
+        if not nd.is_dir():
+            continue
+        for md in sorted(nd.glob("*.md")):
+            m = _READABLE.match(md.stem) or _PLAN.match(md.stem)
+            date = m.group("date") if m else ""
+            topic = _untopic(m.group("topic")) if m else md.stem
+            sid = m.groupdict().get("sid8", "") if m else ""
+            out.append(Artifact("note", "", proj_dir.name, date, topic, sid or "", str(md),
+                                 size=_human_size(md)))
+    return out
+
+
 def _all_artifacts(r: Roots) -> list[Artifact]:
-    return _iter_transcripts(r) + _iter_plans(r) + _iter_memories(r)
+    return _iter_transcripts(r) + _iter_plans(r) + _iter_memories(r) + _iter_notes(r)
 
 
 # ── session-log catalogue ──────────────────────────────────────────────────────────────────
@@ -449,7 +476,10 @@ def _search_paths(r: Roots, type=None) -> list[Path]:
                 paths.append(host_dir / "readable")
             if type in (None, "plan") and (host_dir / "plans").is_dir():
                 paths.append(host_dir / "plans")
-    if type in (None, "memory") and r.memory:
+    # One root covers both: notes are a subtree of the memory repo, and the grep below recurses.
+    # That is why notes were already turning up in recall before they had a type — as untyped
+    # `{"type": "file"}` hits, because nothing enumerated them. _iter_notes is what names them.
+    if type in (None, "memory", "note") and r.memory:
         paths.append(r.memory)
     return paths
 
@@ -558,8 +588,8 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
         scored.append((score, {**meta, "score": score, "snippets": f["hits"]}))
     scored.sort(key=lambda x: (x[0], x[1].get("date", "")), reverse=True)
     results = [r_ for _, r_ in scored[: int(k)]]
-    note = ("ripgrep" if _rg_available() else "grep") + " prefilter (transcripts·plans·memory + " \
-           "the session-log catalogue) — rank these by reading the snippets; sj_get the best one. " \
+    note = ("ripgrep" if _rg_available() else "grep") + " prefilter (transcripts·plans·memory·notes " \
+           "+ the session-log catalogue) — rank these by reading the snippets; sj_get the best one. " \
            "type=log hits have no transcript here: their host/cwd/date tell you where to find it."
     return {"query": query, "engine": note, "count": len(results), "results": results}
 
@@ -657,11 +687,13 @@ def build_server():
     @mcp.tool()
     def sj_list(type: str | None = None, host: str | None = None, project: str | None = None,
                 since: str | None = None, until: str | None = None, limit: int = 50) -> dict:
-        """List archived artifacts (transcripts, plans, memories) with metadata.
+        """List archived artifacts (transcripts, plans, memories, notes) with metadata.
 
-        Filters: type (transcript|plan|memory|log), host, project (substring), since/until
+        Filters: type (transcript|plan|memory|note|log), host, project (substring), since/until
         (YYYY-MM-DD). Newest first. Use this to browse, then sj_get to pull one in.
-        type=log browses the cross-machine session catalogue (one row per session, all hosts)."""
+        type=log browses the cross-machine session catalogue (one row per session, all hosts).
+        type=note lists long-form documents written with /sjnote — durable, cross-machine, and
+        deliberately NOT loaded into a session unless asked for."""
         return _with_timeout(lambda: core_list(type, host, project, since, until, limit))
 
     @mcp.tool()
@@ -676,7 +708,7 @@ def build_server():
     @mcp.tool()
     def sj_recall(query: str, host: str | None = None, project: str | None = None,
                   since: str | None = None, k: int = 8) -> dict:
-        """Find past sessions/plans/memories matching a topic description.
+        """Find past sessions/plans/memories/notes matching a topic description.
 
         Runs a lexical prefilter and returns candidate files with matched snippets + line
         anchors; YOU rank them by reading the snippets, then sj_get the best match."""
@@ -729,6 +761,10 @@ def build_server():
     def _memory(project: str, name: str) -> str:
         return _read_template(R, "memory", project=project, name=name)
 
+    @mcp.resource("sj://note/{project}/{stem}")
+    def _note(project: str, stem: str) -> str:
+        return _read_template(R, "note", project=project, stem=stem)
+
     return mcp
 
 
@@ -745,6 +781,8 @@ def _uri_for(a: dict) -> str | None:
         return f"sj://plan/{a.get('host','')}/{stem}"
     if t == "memory":
         return f"sj://memory/{a.get('project','')}/{Path(a['path']).stem}"
+    if t == "note":
+        return f"sj://note/{a.get('project','')}/{Path(a['path']).stem}"
     return None
 
 
@@ -754,6 +792,8 @@ def _title_for(a: dict) -> str:
         return f"{a.get('topic','?')} — {a.get('date','')} · {a.get('host','')}"
     if t == "plan":
         return f"plan: {a.get('topic','?')} — {a.get('date','')} · {a.get('host','')}"
+    if t == "note":
+        return f"note: {a.get('topic','?')} — {a.get('date','')} · {a.get('project','')}"
     return f"memory: {a.get('topic','?')} · {a.get('project','')}"
 
 
@@ -764,6 +804,8 @@ def _read_template(r: Roots, kind: str, **kw) -> str:
         p = r.chats / kw["host"] / "plans" / f"{kw['stem']}.md"
     elif kind == "memory" and r.memory:
         p = r.memory / kw["project"] / f"{kw['name']}.md"
+    elif kind == "note" and r.memory:
+        p = r.memory / kw["project"] / "notes" / f"{kw['stem']}.md"
     else:
         return f"(unavailable: {kind})"
     p = _confined(p, r)
@@ -771,7 +813,7 @@ def _read_template(r: Roots, kind: str, **kw) -> str:
 
 
 def _resolve_uri(uri: str, r: Roots) -> Path | None:
-    m = re.match(r"^sj://(transcript|plan|memory)/(.+)$", uri)
+    m = re.match(r"^sj://(transcript|plan|memory|note)/(.+)$", uri)
     if not m:
         return None
     kind, rest = m.group(1), m.group(2).split("/")
@@ -783,6 +825,8 @@ def _resolve_uri(uri: str, r: Roots) -> Path | None:
             return _confined(r.chats / rest[0] / "plans" / f"{'/'.join(rest[1:])}.md", r)
         if kind == "memory" and r.memory and len(rest) >= 2:
             return _confined(r.memory / rest[0] / f"{'/'.join(rest[1:])}.md", r)
+        if kind == "note" and r.memory and len(rest) >= 2:
+            return _confined(r.memory / rest[0] / "notes" / f"{'/'.join(rest[1:])}.md", r)
     except (OSError, IndexError):
         return None
     return None
@@ -796,6 +840,7 @@ def _selftest():
     print("== status =="); print(json.dumps(core_status(r=r), indent=2))
     print("\n== list transcripts (5) =="); print(json.dumps(core_list(type="transcript", limit=5, r=r), indent=2))
     print("\n== recall 'extend scrubjay with an MCP server' =="); print(json.dumps(core_recall("extend scrubjay with an MCP server", k=4, r=r), indent=2))
+    print("\n== list notes (5) =="); print(json.dumps(core_list(type="note", limit=5, r=r), indent=2))
     print("\n== list logs (catalogue, 5) =="); print(json.dumps(core_list(type="log", limit=5, r=r), indent=2))
     print("\n== recall 'VERONA foolbox' (log-only / cross-machine pointer) =="); print(json.dumps(core_recall("VERONA foolbox attack", k=4, r=r), indent=2))
     # search within the known transcript for 'mcp'

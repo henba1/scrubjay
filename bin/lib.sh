@@ -213,6 +213,43 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl>
     "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
 }
 
+# Free text -> a filename-safe slug: lowercase [a-z0-9-], no leading/trailing dashes, truncated to
+# <maxlen> (default 40) without leaving a dangling dash. Every archived artifact's name goes through
+# here, which is what lets `mcp/sjmcp_server.py` parse metadata straight off a filename: the slug can
+# never contain the `__` that separates a topic from its session handle.
+sj_slugify() {  # sj_slugify <text> [maxlen]
+  printf '%s' "$1" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
+    | sed -E "s/^-+//; s/-+$//" | cut -c1-"${2:-40}" | sed -E "s/-+$//"
+}
+
+# First free path of the form <dir>/<stem>.<ext>, adding a -2, -3, … suffix on a clash. Callers use
+# it to keep same-day, same-topic artifacts from overwriting each other.
+sj_unique_path() {  # sj_unique_path <dir> <stem> <ext>
+  local dir="$1" stem="$2" ext="$3" n=2
+  if [ ! -e "$dir/$stem.$ext" ]; then printf '%s/%s.%s' "$dir" "$stem" "$ext"; return; fi
+  while [ -e "$dir/$stem-$n.$ext" ]; do n=$((n + 1)); done
+  printf '%s/%s-%s.%s' "$dir" "$stem" "$n" "$ext"
+}
+
+# The key a project's cross-machine content (memory, notes) is filed under in the memory repo:
+# <mem>/<project_key>/. It MUST agree with what bin/claude-sync.sh links, which is the basename of
+# Claude Code's own ~/.claude/projects/<slug>/ dir — so ask the adapter, whose sjh_project_dir finds
+# that dir by *reading* local transcripts rather than re-encoding the path (Claude's slug encoding
+# is lossy, and a symlinked home makes the naive encoding wrong outright).
+#
+# The fallback matters as much as the happy path: on a host with no Claude Code at all, an opencode
+# or codex session must still land in the SAME directory as a Claude session for the same cwd, or
+# the two harnesses would file the same project under two names and /sjrecall would only ever see
+# half of it. Slugging the resolved cwd is exactly what sjh_project_dir itself falls back to.
+sj_project_key() {  # sj_project_key [cwd]
+  local cwd="${1:-$PWD}" d real
+  if d="$(sj_adapter_call claude sjh_project_dir "$cwd" 2>/dev/null)" && [ -n "$d" ]; then
+    basename "$d"; return
+  fi
+  real="$(sj_realpath "$cwd" || printf '%s' "$cwd")"
+  printf '%s' "$real" | sed 's/[^A-Za-z0-9-]/-/g'
+}
+
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
 #   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
 #   real user prompt, slugified).
@@ -226,8 +263,7 @@ sj_readable_relpath() {  # sj_readable_relpath <transcript> <session_id> [cwd] [
   [ -n "$cwd" ] || cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
   project="$(basename "${cwd:-misc}")"; [ -n "$project" ] && [ "$project" != "/" ] || project="misc"
   [ -n "$topic" ] || topic="$(sj_session_topic "$src")"
-  topic="$(printf '%s' "$topic" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
-            | sed -E "s/^-+//; s/-+$//" | cut -c1-40 | sed -E "s/-+$//")"
+  topic="$(sj_slugify "$topic" 40)"
   [ -n "$topic" ] || topic="session"
   d="$(date -r "$src" +%F 2>/dev/null || date +%F)"
   printf '%s/%s_%s__%s' "$project" "$d" "$topic" "$(sj_session_handle "$sid")"
@@ -249,7 +285,7 @@ sj_session_handle() {  # sj_session_handle <session_id>
 #   left untouched, so it can run on every ship. On a name clash with a *different* file a -N suffix
 #   is added. Best-effort and silent — it must never fail the caller (the ship).
 sj_normalize_plans() {  # sj_normalize_plans <plans_dir>
-  local dir="$1" f base topic d target n
+  local dir="$1" f base topic d target
   [ -d "$dir" ] || return 0
   for f in "$dir"/*.md; do
     [ -f "$f" ] || continue
@@ -257,15 +293,11 @@ sj_normalize_plans() {  # sj_normalize_plans <plans_dir>
     case "$base" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_*) continue ;; esac
     topic="$(grep -m1 -E '^#+[[:space:]]+' "$f" 2>/dev/null \
               | sed -E 's/^#+[[:space:]]+//; s/^[Pp]lan[[:space:]]*[:-][[:space:]]*//')"
-    topic="$(printf '%s' "$topic" | tr "[:upper:]" "[:lower:]" | tr -cs "a-z0-9" "-" \
-              | sed -E "s/^-+//; s/-+$//" | cut -c1-50 | sed -E "s/-+$//")"
+    topic="$(sj_slugify "$topic" 50)"
     [ -n "$topic" ] || topic="${base%.md}"
     d="$(date -r "$f" +%F 2>/dev/null || date +%F)"
     target="$dir/${d}_${topic}.md"
-    if [ -e "$target" ] && [ "$target" != "$f" ]; then
-      n=2; while [ -e "$dir/${d}_${topic}-${n}.md" ]; do n=$((n + 1)); done
-      target="$dir/${d}_${topic}-${n}.md"
-    fi
+    [ ! -e "$target" ] || [ "$target" = "$f" ] || target="$(sj_unique_path "$dir" "${d}_${topic}" md)"
     [ "$target" = "$f" ] || mv -- "$f" "$target" 2>/dev/null || true
   done
 }
