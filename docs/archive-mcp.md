@@ -3,7 +3,7 @@
 `grep`-ing the logs finds a chat by a word you remember typing. The harder case — *"I discussed
 X **somewhere** a while ago, which machine was it even on?"* — is what the **`sjmcp`** MCP server
 solves: a **read** path back into a live session over everything the relay already wrote
-(transcripts, plans, cross-machine memory), so you can recall a past session by *topic* and pull
+(transcripts, plans, cross-machine memory, notes), so you can recall a past session by *topic* and pull
 it — or just the relevant slice — straight into context without leaving Claude.
 
 It's a single-file, **read-only** server (`mcp/sjmcp_server.py`, run via `uv run --script`) that
@@ -21,7 +21,7 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 | Surface | What |
 |---|---|
 | **tools** | `sj_list` (browse w/ filters, incl. `type=log` for the catalogue), `sj_recall` (topic → ranked candidates + anchors), `sj_search_within` (a topic *inside* one session → turn/line anchors), `sj_get` (fetch an artifact or a `turns=`/`lines=` slice), `sj_status` |
-| **resources** | every transcript/plan/memory as an `@`-pickable resource (`sj://transcript/…`, `sj://plan/…`, `sj://memory/…`) with a human, date-sorted title |
+| **resources** | every transcript/plan/memory/note as an `@`-pickable resource (`sj://transcript/…`, `sj://plan/…`, `sj://memory/…`, `sj://note/…`) with a human, date-sorted title |
 | **commands** | `/sjrecall <topic>`, `/sjfind <topic> in <session>`, `/sjbrowse [type]`, `/sjget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](slash-commands.md)) |
 
 ## Registration is automatic, three ways
