@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # The write path end to end: bin/ship-transcript.sh relaying a session into the archive, for both
 # Claude and opencode, via the harness-blind seam. This is what SessionEnd runs, so it is the thing

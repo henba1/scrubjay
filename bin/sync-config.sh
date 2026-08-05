@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Apply the synced config into every coding harness this machine uses ($SCRUBJAY_HARNESSES,
 # default: claude). The per-harness work — which scopes get symlinked, how settings are merged,

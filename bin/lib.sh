@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Shared helpers for the scrubjay app. Source this; do not execute.
 # The app (logic) is this repo; personal content lives in a separate data repo, and

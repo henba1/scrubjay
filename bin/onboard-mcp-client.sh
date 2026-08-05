@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Set up THIS machine (a client with NO local archive — a laptop or HPC login node) to query the scrubjay
 # archive over SSH: the Phase-2 remote path. Idempotent — safe to re-run to enable or repair. It:

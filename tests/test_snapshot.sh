@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # sj-snapshot.sh keeps recoverable history of the archive via zfs/btrfs snapshots. It is root-only
 # and filesystem-side-effecting, so the suite exercises the PURE parts — filesystem detection (with

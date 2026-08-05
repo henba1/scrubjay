@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Apply shared + host-specific Claude config into ~/.claude.
 #   - symlinks  <app>/hooks  and  <data>/claude-md/{CLAUDE.md,commands,agents,skills,output-styles}

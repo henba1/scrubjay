@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # Cross-machine hand-off (bin/sj-resume.sh). The regression that matters here is the one that was a
 # real bug: a session must be read using the harness that PRODUCED it, and a cross-harness hand-off

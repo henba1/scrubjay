@@ -4,7 +4,7 @@
 # dependencies = ["mcp[cli]>=1.2"]
 # ///
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 """sjmcp — a read interface over the scrubjay archive, exposed via MCP.
 

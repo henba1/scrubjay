@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # The licence seam. scrubjay was MIT until v0.2.0-mit and is FSL-1.1-ALv2 after it, so "which terms
 # does this file ship under?" now has two possible answers and no longer answers itself. A per-file

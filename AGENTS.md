@@ -153,7 +153,7 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
 
   ```sh
   # SPDX-License-Identifier: FSL-1.1-ALv2
-  # Copyright (c) 2026 Hendrik. See LICENSE.
+  # Copyright (c) 2026 Hendrik Baacke. See LICENSE.
   ```
 
   `//` instead of `#` for JavaScript. In `mcp/sjmcp_server.py` the header sits *below* the PEP 723

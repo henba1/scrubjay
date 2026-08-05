@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: FSL-1.1-ALv2
-# Copyright (c) 2026 Hendrik. See LICENSE.
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
 # SessionEnd hook — fires once when a coding session ends (any harness; see bin/adapters/).
 #   1) append one human-readable line to <data>/logs/<host>.log  (commit + push)
