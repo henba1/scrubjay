@@ -754,6 +754,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#notes-the-same-repo-deliberately-outside-the-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes — the same repo, deliberately outside the index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mechanics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mechanics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#config-keys-configscrubjayconfig" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -879,6 +901,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#notes-the-same-repo-deliberately-outside-the-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes — the same repo, deliberately outside the index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mechanics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mechanics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#config-keys-configscrubjayconfig" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -977,7 +1021,27 @@ a <strong>custody trade-off</strong> because memory holds <strong>real filesyste
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                          $SCRUBJAY_MEMORY_REMOTE  =  bare repo on the NAS
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                                          (local path on the NAS box · ssh://…over-WG on clients)
 </code></pre></div>
+<h2 id="notes-the-same-repo-deliberately-outside-the-index">Notes — the same repo, deliberately outside the index<a class="headerlink" href="#notes-the-same-repo-deliberately-outside-the-index" title="Permanent link">&para;</a></h2>
+<p><code>&lt;memory&gt;/&lt;project&gt;/notes/</code> holds <strong>notes</strong>: long-form documents written during a session with
+<a href="../slash-commands/"><code>/sjnote</code></a> — an analysis, a briefing, a design rationale. They ride this repo
+rather than the transcript archive for two reasons:</p>
 <ul>
+<li><strong>They can be edited later.</strong> A note is the one authored artefact you may well revise months on,
+  possibly from a different machine, and editing in two places needs a merge. The archive is
+  one-way by design and would silently keep whichever copy arrived last.</li>
+<li><strong>Custody is already right.</strong> Notes hold the same class of content memory does, and this repo is
+  already self-hosted on your NAS (or your own private GitHub repo on the <code>git</code> backend).</li>
+</ul>
+<p>What they do <em>not</em> share with memory is the context cost. The harness loads <code>MEMORY.md</code> — and only
+<code>MEMORY.md</code>, its first 200 lines — at the start of every session; sibling topic files and
+subdirectories are read on demand. So a note is durable and searchable without being paid for in
+every future session. <code>bin/sj-note.sh</code> keeps exactly <strong>one</strong> line in <code>MEMORY.md</code>, a constant-size
+pointer at the directory, and pushes immediately rather than waiting for <code>SessionEnd</code>.</p>
+<p>Read them back with <code>/sjrecall</code>, <code>/sjbrowse note</code>, or <code>sj_list(type="note")</code> — <code>sjmcp</code> enumerates
+them as their own artifact type, distinct from a memory.</p>
+<h2 id="mechanics">Mechanics<a class="headerlink" href="#mechanics" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>bin/sj-note.sh</code> — write one note and publish it. Also <code>/sjnote</code>.</li>
 <li><code>bin/memory-sync.sh pull|push</code> — clones on first use, then pulls/pushes. Best-effort, never blocks.</li>
 <li><code>bin/claude-sync.sh</code> — symlinks each project's memory dir into the clone (<strong>shared</strong>, not per-host),
   and on first run migrates any legacy <code>scrubjay-data/memory/&lt;host&gt;/</code> content into it.</li>

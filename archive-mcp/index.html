@@ -933,7 +933,7 @@
 <p><code>grep</code>-ing the logs finds a chat by a word you remember typing. The harder case — <em>"I discussed
 X </em><em>somewhere</em><em> a while ago, which machine was it even on?"</em> — is what the <strong><code>sjmcp</code></strong> MCP server
 solves: a <strong>read</strong> path back into a live session over everything the relay already wrote
-(transcripts, plans, cross-machine memory), so you can recall a past session by <em>topic</em> and pull
+(transcripts, plans, cross-machine memory, notes), so you can recall a past session by <em>topic</em> and pull
 it — or just the relevant slice — straight into context without leaving Claude.</p>
 <p>It's a single-file, <strong>read-only</strong> server (<code>mcp/sjmcp_server.py</code>, run via <code>uv run --script</code>) that
 reads the same storage pointers as the rest of scrubjay (<code>SCRUBJAY_LOCAL_CHATS</code>,
@@ -960,7 +960,7 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 </tr>
 <tr>
 <td><strong>resources</strong></td>
-<td>every transcript/plan/memory as an <code>@</code>-pickable resource (<code>sj://transcript/…</code>, <code>sj://plan/…</code>, <code>sj://memory/…</code>) with a human, date-sorted title</td>
+<td>every transcript/plan/memory/note as an <code>@</code>-pickable resource (<code>sj://transcript/…</code>, <code>sj://plan/…</code>, <code>sj://memory/…</code>, <code>sj://note/…</code>) with a human, date-sorted title</td>
 </tr>
 <tr>
 <td><strong>commands</strong></td>

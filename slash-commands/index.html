@@ -908,7 +908,7 @@ read-only <a href="../archive-mcp/"><code>sjmcp</code> MCP tools</a>; <strong>li
 <td><em>"I discussed X somewhere, ages ago — which machine even?"</em> Semantic recall across <strong>all</strong> machines: ranks candidates by topic, then pulls the one you pick (or a slice) into context. Start here when you remember the gist but not the where/when.</td>
 </tr>
 <tr>
-<td><code>/sjbrowse [transcript\|plan\|memory] [host= project= since=]</code></td>
+<td><code>/sjbrowse [transcript\|plan\|memory\|note] [host= project= since=]</code></td>
 <td><code>sj_list</code> → <code>sj_get</code></td>
 <td>Eyeballing a <strong>date-sorted list</strong> and grabbing one, when you have no search term in mind — "show me the last few plans on <code>laptop</code>."</td>
 </tr>
@@ -963,6 +963,11 @@ injects it directly with no tool call at all.</p>
 <td><code>/sjmemory</code></td>
 <td>—</td>
 <td>Enable/repair cross-machine memory on <strong>this</strong> machine (idempotent — runs <code>bin/onboard-memory.sh</code>). First-time memory setup, or when memory sync looks broken.</td>
+</tr>
+<tr>
+<td><code>/sjnote [what to capture \| /path/to/file]</code></td>
+<td>—</td>
+<td><strong>Keep a written artefact</strong> — an analysis, a briefing, a design rationale (runs <code>bin/sj-note.sh</code>). Writes it to <code>&lt;memory&gt;/&lt;project&gt;/notes/</code> and publishes immediately, so it survives the session and reaches every machine. Invoke it <em>before</em> the work too: it stands for the rest of the session, so durable output goes there instead of the scratchpad. Notes are <strong>not</strong> loaded into future sessions — read them back with <code>/sjrecall</code> or <code>/sjbrowse note</code>.</td>
 </tr>
 <tr>
 <td><code>/sjdoctor [section…]</code></td>

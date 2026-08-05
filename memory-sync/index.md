@@ -16,6 +16,20 @@ Either way it's the *same* mechanism below — only `SCRUBJAY_MEMORY_REMOTE` dif
                                           (local path on the NAS box · ssh://…over-WG on clients)
 ```
 
+## Notes — the same repo, deliberately outside the index
+
+`<memory>/<project>/notes/` holds **notes**: long-form documents written during a session with [`/sjnote`](https://henba1.github.io/scrubjay/slash-commands/index.md) — an analysis, a briefing, a design rationale. They ride this repo rather than the transcript archive for two reasons:
+
+- **They can be edited later.** A note is the one authored artefact you may well revise months on, possibly from a different machine, and editing in two places needs a merge. The archive is one-way by design and would silently keep whichever copy arrived last.
+- **Custody is already right.** Notes hold the same class of content memory does, and this repo is already self-hosted on your NAS (or your own private GitHub repo on the `git` backend).
+
+What they do *not* share with memory is the context cost. The harness loads `MEMORY.md` — and only `MEMORY.md`, its first 200 lines — at the start of every session; sibling topic files and subdirectories are read on demand. So a note is durable and searchable without being paid for in every future session. `bin/sj-note.sh` keeps exactly **one** line in `MEMORY.md`, a constant-size pointer at the directory, and pushes immediately rather than waiting for `SessionEnd`.
+
+Read them back with `/sjrecall`, `/sjbrowse note`, or `sj_list(type="note")` — `sjmcp` enumerates them as their own artifact type, distinct from a memory.
+
+## Mechanics
+
+- `bin/sj-note.sh` — write one note and publish it. Also `/sjnote`.
 - `bin/memory-sync.sh pull|push` — clones on first use, then pulls/pushes. Best-effort, never blocks.
 - `bin/claude-sync.sh` — symlinks each project's memory dir into the clone (**shared**, not per-host), and on first run migrates any legacy `scrubjay-data/memory/<host>/` content into it.
 - Hooks: `sync-session.sh` pulls before linking; `log-session.sh` pushes at session end.

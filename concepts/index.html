@@ -386,6 +386,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-third-axis-what-gets-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A third axis: what gets loaded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#nas-or-github-your-choice-of-shared-store" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -906,6 +917,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-third-axis-what-gets-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A third axis: what gets loaded
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#nas-or-github-your-choice-of-shared-store" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1020,6 +1042,48 @@ real file paths) — still uses git for the merge, but a git repo <strong>self-h
 over WireGuard</strong> rather than GitHub. Only the non-sensitive authored config rides GitHub
 (<code>scrubjay-data</code>). That's the whole design in one sentence: <strong>author-vs-record picks
 git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.</strong></p>
+<h3 id="a-third-axis-what-gets-loaded">A third axis: what gets loaded<a class="headerlink" href="#a-third-axis-what-gets-loaded" title="Permanent link">&para;</a></h3>
+<p>Among the <em>authored</em> content there is one more distinction, and it decides where a thing goes
+inside the memory repo rather than which repo it goes to:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>memory</strong></th>
+<th><strong>note</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shape</td>
+<td>one fact per file</td>
+<td>a document</td>
+</tr>
+<tr>
+<td>Loaded</td>
+<td><code>MEMORY.md</code> is read at the start of <strong>every</strong> session</td>
+<td><strong>never</strong>, until asked for</td>
+</tr>
+<tr>
+<td>Written by</td>
+<td>the agent, as it learns</td>
+<td>you, via <a href="../slash-commands/"><code>/sjnote</code></a></td>
+</tr>
+<tr>
+<td>Lives in</td>
+<td><code>&lt;memory&gt;/&lt;project&gt;/</code></td>
+<td><code>&lt;memory&gt;/&lt;project&gt;/notes/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Both are authored and both are sensitive, so both take the same route — git, self-hosted. What
+separates them is cost. <code>MEMORY.md</code> is budgeted (the harness loads its first 200 lines) because it
+is paid for in <em>every</em> future session; a two-page analysis kept there is a permanent tax. A note is
+the same durability with none of that: retrieved on demand through
+<a href="../slash-commands/"><code>/sjrecall</code></a> or <code>sj_list(type="note")</code>, invisible otherwise.</p>
+<p>This is also why notes are <em>not</em> archive records. A note is the one authored thing you may well
+want to edit six months later, and editing in two places needs a merge — which is exactly what the
+one-way archive gives up by design.</p>
 <h3 id="nas-or-github-your-choice-of-shared-store">NAS or GitHub — your choice of shared store<a class="headerlink" href="#nas-or-github-your-choice-of-shared-store" title="Permanent link">&para;</a></h3>
 <p>The <em>record</em> half above is where a NAS shines, but a NAS isn't required. The transcript
 transport is <strong>pluggable</strong>, and the two backends are genuinely parallel — you pick one when

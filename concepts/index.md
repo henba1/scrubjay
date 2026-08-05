@@ -11,6 +11,21 @@ Everything scrubjay moves is one of two things — and which one it is decides t
 
 The second axis is **privacy**, and it's orthogonal: anything sensitive goes **straight to your own NAS, never a third party**. So the *records* ride peer-to-peer rsync to the NAS, and the one piece of *authored* content that's sensitive — **memory** (it carries real file paths) — still uses git for the merge, but a git repo **self-hosted on the NAS over WireGuard** rather than GitHub. Only the non-sensitive authored config rides GitHub (`scrubjay-data`). That's the whole design in one sentence: **author-vs-record picks git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub.**
 
+### A third axis: what gets loaded
+
+Among the *authored* content there is one more distinction, and it decides where a thing goes inside the memory repo rather than which repo it goes to:
+
+|            | **memory**                                            | **note**                                                                        |
+| ---------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Shape      | one fact per file                                     | a document                                                                      |
+| Loaded     | `MEMORY.md` is read at the start of **every** session | **never**, until asked for                                                      |
+| Written by | the agent, as it learns                               | you, via [`/sjnote`](https://henba1.github.io/scrubjay/slash-commands/index.md) |
+| Lives in   | `<memory>/<project>/`                                 | `<memory>/<project>/notes/`                                                     |
+
+Both are authored and both are sensitive, so both take the same route — git, self-hosted. What separates them is cost. `MEMORY.md` is budgeted (the harness loads its first 200 lines) because it is paid for in *every* future session; a two-page analysis kept there is a permanent tax. A note is the same durability with none of that: retrieved on demand through [`/sjrecall`](https://henba1.github.io/scrubjay/slash-commands/index.md) or `sj_list(type="note")`, invisible otherwise.
+
+This is also why notes are *not* archive records. A note is the one authored thing you may well want to edit six months later, and editing in two places needs a merge — which is exactly what the one-way archive gives up by design.
+
 ### NAS or GitHub — your choice of shared store
 
 The *record* half above is where a NAS shines, but a NAS isn't required. The transcript transport is **pluggable**, and the two backends are genuinely parallel — you pick one when you onboard:
