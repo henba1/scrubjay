@@ -486,17 +486,30 @@ def _search_paths(r: Roots, type=None) -> list[Path]:
 
 def _grep(query: str, paths: list[Path], globs=("*.md",), max_count_per_file=3
           ) -> list[tuple[str, int, str]]:
-    """Return (file, lineno, line) hits. Case-insensitive, fixed-string, restricted to `globs`."""
+    """Return (file, lineno, line) hits. Case-insensitive, fixed-string, restricted to `globs`.
+
+    `-a` (treat every file as text) is load-bearing, not a micro-optimisation. A transcript can
+    carry a stray NUL byte from captured terminal output — /proc/device-tree/* strings are
+    NUL-terminated — and both backends then classify the *whole file* as binary and skip it
+    silently: rg applies binary detection to files reached by traversal (we always pass
+    directories, never explicit file arguments), and GNU grep suppresses output for binary files
+    in a UTF-8 locale. The session vanishes from recall's corpus while sj_get and sj_search_within,
+    which read in Python with errors="replace", still return it in full — recall and the archive
+    stop being the same set of files. That cost 3.5% of one real archive, biased toward exactly the
+    hardware/forensic sessions worth searching for. These are `*.md` renderings of conversations;
+    there is no real binary here to guard against. Renderers strip NUL at write time too (#66), but
+    only `-a` reaches sessions archived before that fix.
+    """
     if not paths:
         return []
     hits: list[tuple[str, int, str]] = []
     if _rg_available():
         gargs = [a for g in globs for a in ("-g", g)]
-        cmd = ["rg", "-i", "-F", "--no-heading", "--line-number", "-m", str(max_count_per_file),
-               *gargs, "--", query, *map(str, paths)]
+        cmd = ["rg", "-i", "-F", "-a", "--no-heading", "--line-number", "-m",
+               str(max_count_per_file), *gargs, "--", query, *map(str, paths)]
     else:
         gargs = [f"--include={g}" for g in globs]
-        cmd = ["grep", "-r", "-i", "-F", "-n", *gargs, "-m", str(max_count_per_file),
+        cmd = ["grep", "-r", "-i", "-F", "-a", "-n", *gargs, "-m", str(max_count_per_file),
                "--", query, *map(str, paths)]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
