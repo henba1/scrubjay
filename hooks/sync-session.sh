@@ -39,11 +39,21 @@ if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
   done
   # git backend only: refresh the scrubjay-chats clone so the local sjmcp archive spans every
   # machine's sessions (not just this one's) before claude-sync registers/serves it. Best-effort;
-  # --ff-only just no-ops on a diverged tree (e.g. local ships that haven't pushed yet).
+  # --ff-only just no-ops on a diverged tree (e.g. local ships that haven't pushed yet) — but
+  # unlike the DATA repo (which gets a visible warning from sj-catalogue.sh below), a diverged
+  # chats clone used to fail silently: sj_recall/sj_get read this clone directly with no pull and
+  # no staleness check, so sessions that exist on origin (relayed by another machine) would
+  # silently vanish from search here. Surface it the same way the relay-failure breadcrumb does.
   if [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
     chats="$(sj_chats 2>/dev/null || true)"
-    [ -n "$chats" ] && [ -d "$chats/.git" ] && \
-      ( cd "$chats" && sj_timeout 20 git pull --ff-only -q 2>/dev/null ) || true
+    if [ -n "$chats" ] && [ -d "$chats/.git" ]; then
+      if ! ( cd "$chats" && sj_timeout 20 git pull --ff-only -q 2>/dev/null ); then
+        behind="$( cd "$chats" && git rev-list --count HEAD..@'{u}' 2>/dev/null )"
+        if [ -n "${behind:-}" ] && [ "$behind" -gt 0 ] 2>/dev/null; then
+          printf 'scrubjay: the local chats archive is %s commit(s) behind origin and could not fast-forward — it has diverged, likely from local ships that failed to push. /sjrecall and sj_get may silently miss sessions from other machines until this is resolved (cd %s && git pull --rebase), or fix the relay push if it keeps recurring.\n' "$behind" "$chats"
+        fi
+      fi
+    fi
   fi
 fi
 
