@@ -176,8 +176,6 @@ remembers a specific past event, and not just a learned habit ([Clayton & Dickin
 **[FSL-1.1-ALv2](LICENSE)** — the [Functional Source License](https://fsl.software/), with an
 Apache-2.0 future licence. © 2026 Hendrik Baacke.
 
-Source-available rather than open source, and the line is drawn in one specific place:
-
 - **You may** read it, run it, modify it, fork it, and use it inside your own organisation,
   commercially included. All of that is a *Permitted Purpose* under the licence.
 - **You may not** make it available to others as a commercial product or sell a service that implements scrubjay or constituent parts thereof.
