@@ -149,6 +149,12 @@ ok "backend: $BACKEND"
 WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PORT=""; RECV_PATH=""; GEN_KEY=0
 case "$BACKEND" in
   rsync-wg)
+    # The receiver is a role, not a prerequisite you must have solved elsewhere: bin/onboard-receiver.sh
+    # provisions that box (archive root, per-role authorized_keys, dependency report) and prints the
+    # privileged leftovers rather than applying them. Say so here — asking for a "receiver rrsync root"
+    # implies the box is already set up, which is how testers concluded scrubjay didn't cover it.
+    info "This needs an archive host. If you haven't set one up: clone scrubjay on that box and run"
+    info "bin/onboard-receiver.sh there — it provisions it and prints the root-level steps for you."
     ask RECV_USER "receiver SSH user" "scrubjay-rx"
     ask RECV_HOST "receiver host/IP (reachable over WG/LAN)" "192.168.1.10"
     ask RECV_PORT "receiver SSH port" "22"
@@ -300,9 +306,19 @@ fi
 echo; ok "onboarding complete for '$HOST' (backend: $BACKEND)"
 if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
   echo
-  info "Final step — authorize this machine on the receiver. Add this ONE line to the"
-  info "receiver's ~scrubjay-rx/.ssh/authorized_keys (replace <APP> with the receiver's"
-  info "scrubjay checkout path — the wrapper widens the archive to group-read after each push):"
+  info "Final step — authorize this machine on the receiver. Copy this host's PUBLIC key over"
+  info "(it is public — mail it, paste it, whatever), then run ON THE RECEIVER, in its scrubjay"
+  info "clone. That script writes the forced command for you and appends safely:"
+  echo
+  echo "    bin/onboard-receiver.sh --authorize relay <this-host.pub>"
+  echo
+  info "This host's public key ($(sj_pretty_path "$WG_KEY.pub")):"
+  echo
+  echo "    $(cat "$WG_KEY.pub")"
+  echo
+  info "By hand instead — add ONE line to the receiver's ~$RECV_USER/.ssh/authorized_keys,"
+  info "replacing <APP> with its scrubjay checkout path (the wrapper widens the archive to"
+  info "group-read after each push):"
   echo
   echo "    command=\"<APP>/bin/sj-receive.sh $RECV_PATH\",restrict $(cat "$WG_KEY.pub")"
   echo

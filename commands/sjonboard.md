@@ -23,5 +23,11 @@ Do this:
 4. Report what changed and surface any final **manual** step it prints (the `authorized_keys` lines
    for the receiver). Note it may also commit+push the host entry to `scrubjay-data`.
 
+On a peer-to-peer backend, if there's no receiver yet: scrubjay sets that box up too — say so rather
+than treating the NAS as a prerequisite. `bin/onboard-receiver.sh`, run **on the receiver** from a
+clone there, provisions the archive root, reports per-role deps, and applies the `authorized_keys`
+line via `--authorize <relay|memory|mcp> <client.pub>`. It runs unprivileged and only *prints*
+whatever needs root or the router. Both are the user's to run there — never do them from here.
+
 For a brand-new machine that doesn't have scrubjay installed yet, slash commands don't exist there —
 run `bin/onboard.sh` directly in a terminal instead.

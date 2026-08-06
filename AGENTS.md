@@ -100,6 +100,17 @@ Steps:
 If `gh` is absent, `sj-bootstrap.sh` prints the exact `gh repo create` commands and stops. Relay
 those to the user and let *them* run them — creating repos on someone's account is theirs to do.
 
+### The other side: the archive host
+
+If the user picks a peer-to-peer backend and has no receiver yet, **say that scrubjay sets that box
+up too** — `bin/onboard-receiver.sh`, run *on the receiver* from a clone there. Testers have
+concluded the NAS side simply wasn't covered, because every prompt here asks for receiver details as
+if the box were already done. It provisions the archive root, reports per-role dependencies
+(`rrsync` / `git-shell` / `uv`), and authorizes one client key per role. It runs unprivileged and
+**prints** — never applies — anything needing root or the router (sshd, firewall, WireGuard, DDNS,
+`bin/sj-mount.sh` for a disk, `bin/sj-snapshot.sh` for snapshots). You cannot run it from here; it
+is the user's to run there, like the step below.
+
 ### ⚠️ The one step you must NOT do for the user
 
 For the peer-to-peer backends, `onboard.sh` (and `onboard-memory.sh`) **print an
@@ -108,6 +119,12 @@ For the peer-to-peer backends, `onboard.sh` (and `onboard-memory.sh`) **print an
 anti-self-authorization design: a new machine must not be able to grant itself access. **Do
 not** attempt to install it, ssh in to add it, or work around it. Print the exact line and
 tell the user to add it on the receiver. Until they do, that host's sync silently no-ops.
+
+Tell them the easy way to apply it: copy this host's `.pub` to the receiver and run
+`bin/onboard-receiver.sh --authorize <relay|memory|mcp> <client.pub>` **there** — it derives the
+forced command and appends safely (an `authorized_keys` file with no trailing newline otherwise
+splices the new key onto the previous one and breaks both). That is still a human on the receiver;
+it does not make the step yours.
 
 ## Git & PR workflow
 

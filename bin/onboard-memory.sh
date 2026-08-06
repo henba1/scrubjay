@@ -163,8 +163,14 @@ fi
 
 if [ -n "$authorize_key" ] && [ -f "$authorize_key" ]; then
   echo
-  info "Final step — authorize this machine for memory-git on the receiver. Add ONE line to the"
-  info "'$guser' user's ~/.ssh/authorized_keys on the receiver (restricts the key to git only):"
+  info "Final step — authorize this machine for memory-git on the receiver. Copy this host's"
+  info "public key over, then run ON THE RECEIVER, in its scrubjay clone (it writes the forced"
+  info "command for you and appends safely):"
+  echo
+  echo "    bin/onboard-receiver.sh --authorize memory <this-host.pub>"
+  echo
+  info "By hand instead — add ONE line to the '$guser' user's ~/.ssh/authorized_keys on the"
+  info "receiver (restricts the key to git only):"
   echo
   printf '    command="git-shell -c \\"$SSH_ORIGINAL_COMMAND\\"",restrict %s\n' "$(cat "$authorize_key")"
   echo
