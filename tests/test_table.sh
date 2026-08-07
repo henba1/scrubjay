@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 # sj-table.sh queries the rendered catalogue: filter rows, then slice them. The contract worth
 # pinning is that filters compose with slices (filter FIRST, slice the result — "the newest 20
 # opencode sessions" is one question, not two), that a slice still arrives as a readable table,
