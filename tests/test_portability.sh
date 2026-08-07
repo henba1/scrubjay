@@ -160,13 +160,23 @@ check "the index is valid JSON" jq -e . "$idx"
 assert_eq "and dated the project from its transcript" "1" \
   "$(jq -r '[.[] | select(.slug=="-tmp-demo") | select(.last|test("^[0-9]{4}-"))] | length' "$idx" 2>/dev/null)"
 
-section "awk interval expressions {n} — unsupported by mawk, and it fails SILENTLY"
-# Debian/Ubuntu ship mawk as /usr/bin/awk, and mawk has no {n} repetition: a pattern using it
+section "awk interval expressions {n} — not portable, and they fail SILENTLY"
+# Debian/Ubuntu ship mawk as /usr/bin/awk, and mawk had no {n} repetition: a pattern using it
 # matches NOTHING and the script reports an empty result rather than an error. Cost us a
 # zero-row catalogue in sj-table.sh. Spell repetition out, and keep it spelled out.
+#
+# What this section may NOT do is assert that the local awk lacks {n} — the property under test is
+# "this repo does not depend on it", which is a fact about the repo, not about whichever awk is
+# installed. mawk itself proves the difference: it gained POSIX intervals in 2023, so the same
+# assertion passes on the maintainer's mawk 1.3.4-20200120 and fails on a runner's newer one, while
+# the danger is unchanged for anyone still on the older build. So: probe and report, assert only on
+# the spelled-out form and on the shipped scripts.
 probe='| 2026-08-02 10:00 |'
-assert_eq "the {4} form cannot be relied on" "" \
-  "$(printf '%s\n' "$probe" | awk '/^\| [0-9]{4}-/' 2>/dev/null)"
+if [ -z "$(printf '%s\n' "$probe" | awk '/^\| [0-9]{4}-/' 2>/dev/null)" ]; then
+  printf '  \033[2m·\033[0m this awk has no {n} intervals — the spelled-out form is the only one that works here\n'
+else
+  printf '  \033[2m·\033[0m this awk supports {n} intervals — which is why the grep guard below is the real test\n'
+fi
 assert_eq "the spelled-out form matches everywhere" "$probe" \
   "$(printf '%s\n' "$probe" | awk '/^\| [0-9][0-9][0-9][0-9]-/' 2>/dev/null)"
 check_fails "no shipped script uses an awk {n} interval" \
