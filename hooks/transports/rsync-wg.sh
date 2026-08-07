@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Transcript backend: peer-to-peer rsync over a WireGuard/SSH tunnel to the NAS receiver —
 # no third-party server in the path. The receiver pins the destination via a forced
 # command="rrsync -wo <root>" in authorized_keys, so paths sent here are RELATIVE to that

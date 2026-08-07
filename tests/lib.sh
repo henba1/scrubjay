@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Test helpers. Source this at the top of every tests/test_*.sh.
 #
 # The one rule: a test must be HERMETIC. It may not read the developer's ~/.config/scrubjay/config,

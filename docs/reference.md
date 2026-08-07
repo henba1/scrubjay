@@ -73,6 +73,20 @@ git -C ~/.scrubjay/scrubjay-data pull
 grep -i <keyword> ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
+## Keep a written artefact (a note)
+
+`/sjnote` from inside a session is the usual way; the script is also usable directly, and reads
+the body from stdin.
+
+```sh
+~/.scrubjay/scrubjay/bin/sj-note.sh --topic "fsl impact on document b" < analysis.md
+~/.scrubjay/scrubjay/bin/sj-note.sh --from /tmp/…/scratchpad/briefing.md   # promote an existing file
+ls ~/.scrubjay/scrubjay-memory/*/notes/                                    # what's kept, this machine
+```
+
+Notes land in `<memory>/<project>/notes/` and publish immediately. They are **not** loaded into
+future sessions — read them back with `/sjrecall`, `/sjbrowse note`, or `sj_list(type="note")`.
+
 ## Continue another machine's chat here
 
 Stage it, then resume with Claude Code's own picker — see [handoff.md](handoff.md).

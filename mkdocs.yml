@@ -3,7 +3,7 @@ site_description: The app/logic for syncing Claude Code across machines — conf
 site_url: https://henba1.github.io/scrubjay/
 repo_url: https://github.com/henba1/scrubjay
 repo_name: henba1/scrubjay
-copyright: Copyright &copy; 2026 Hendrik
+copyright: Copyright &copy; 2026 Hendrik Baacke
 
 theme:
   name: material
@@ -56,8 +56,10 @@ plugins:
       sections:
         Overview:
           - index.md
+          - projectbrief.md
           - concepts.md
           - harnesses.md
+          - licensing.md
         Setup & operation:
           - onboarding.md
           - day-to-day.md
@@ -75,6 +77,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Project brief: projectbrief.md
   - Concepts: concepts.md
   - Harnesses: harnesses.md
   - Onboarding: onboarding.md
@@ -84,6 +87,7 @@ nav:
   - Slash commands: slash-commands.md
   - "Transcripts: relay + NAS": transports.md
   - Reference: reference.md
+  - Licensing: licensing.md
   - Deep dives:
       - Transcript transport: transcript-transport.md
       - Archive durability: durability.md

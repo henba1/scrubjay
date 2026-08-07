@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # bin/sj-doctor.sh — the health seam. Its whole job is to turn a silently degraded machine into a
 # loudly degraded one, so the tests that matter are the ones proving it FAILS when it should.
 set -uo pipefail

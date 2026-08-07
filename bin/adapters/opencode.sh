@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Harness adapter: opencode. Source this; do not execute. See bin/adapters/README.md.
 #
 # opencode differs from Claude Code in the three ways that matter here, and the adapter exists to
@@ -258,6 +261,30 @@ _sjh_oc_agents() {  # _sjh_oc_agents <dst-agent-dir>
   echo "  gen   $n agents -> $dst/"
 }
 
+# Skills, unlike agents, need no translation: SKILL.md is the agentskills.io open standard and both
+# harnesses read the same frontmatter, so these are symlinked as-is. opencode 1.17.20 also reads
+# ~/.claude/skills itself, but we link into ITS dir anyway — the adapter seam is "each harness owns
+# its own config dir", and that cross-read is an opencode implementation detail we shouldn't depend
+# on. Native opencode skills (data repo's opencode/skills/) win on a name clash, as with agents.
+_sjh_oc_skills() {  # _sjh_oc_skills <dst-skill-dir>
+  local dst="$1" data src name n=0 srcdir
+  data="$(sj_data 2>/dev/null)" || return 0
+  [ -n "$data" ] || return 0
+  mkdir -p "$dst" || return 1
+  for src in "$dst"/*; do [ -L "$src" ] && rm -f "$src"; done   # our stale links; real dirs stay
+  for srcdir in "$data/claude-md/skills" "$data/opencode/skills"; do
+    [ -d "$srcdir" ] || continue
+    for src in "$srcdir"/*/; do
+      src="${src%/}"
+      [ -d "$src" ] || continue
+      name="$(basename "$src")"
+      [ -e "$dst/$name" ] && [ ! -L "$dst/$name" ] && continue   # a real dir the user made: leave it
+      ln -sfn "$src" "$dst/$name" && n=$((n + 1))
+    done
+  done
+  echo "  link  $n skills -> $dst/"
+}
+
 # A data-repo config layer (base or host overlay): its JSON object, or {} when absent. An
 # unparseable layer is skipped with a warning rather than aborting the whole apply.
 _sjh_oc_layer() {  # _sjh_oc_layer <file>
@@ -328,6 +355,7 @@ sjh_apply_config() {
 
   _sjh_oc_commands "$cfgdir/commands" "$data/claude-md/commands"
   _sjh_oc_agents   "$cfgdir/agent"
+  _sjh_oc_skills   "$cfgdir/skills"
 }
 
 # --- session hand-off --------------------------------------------------------------------------

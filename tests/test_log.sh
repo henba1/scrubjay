@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # The session-log line hooks/log-session.sh appends is the whole catalogue — it is what /sjbrowse
 # and /sjrecall read, and what rides the data repo to every machine. This proves the enriched line
 # (topic + harness + model + turns + size), the model-authored-topic override, and the write-once
@@ -45,6 +48,20 @@ line3="$(grep "session=$sid3" "$LOG")"
 # the topic field must contain exactly one opening + closing quote pair and no bare pipe inside it
 assert_contains "quotes are stripped, pipe neutralized" "$line3" '"weird / topic with pipes"'
 assert_contains "trailing fields survive the sanitize" "$line3" "| harness=claude | model="
+
+section "a session that recorded nothing gets no catalogue row"
+# SessionEnd fires for a session that ended without a single user turn (open, /clear or quit
+# straight away) and names a transcript_path the harness never wrote. Nothing is shipped for it,
+# so a row would advertise an archive entry that does not exist.
+sid4="44444444-2222-4333-8444-555555555555"   # named, never written
+SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(payload "$sid4")"
+assert_eq "no row for a transcript that was never written" "0" "$(grep -c "session=$sid4" "$LOG")"
+
+sid5="55555555-2222-4333-8444-555555555555"; : > "$proj/$sid5.jsonl"   # written, zero bytes
+SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(payload "$sid5")"
+assert_eq "no row for an empty transcript" "0" "$(grep -c "session=$sid5" "$LOG")"
 
 section "write-once: re-ending the same session adds no second line"
 n_before="$(grep -c "session=$sid" "$LOG")"
