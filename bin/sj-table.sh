@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 # Query the rendered chat catalogue — filter rows, slice them, print them.
 #
 #   sj-table.sh                             summary only: counts + where the file is
