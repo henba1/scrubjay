@@ -88,4 +88,6 @@ jq -rs '
       | .out ) as $blocks
   | "# " + $title + "\n\n_" + ($blocks | length | tostring) + " turns_\n"
     + ( $blocks | join("") )
-' "$src"
+' "$src" | tr -d '\000'
+# One NUL byte from captured output would make rg/grep treat this rendering as binary and skip it
+# in a recursive search, dropping the session out of /sjrecall. See render-transcript.sh and #66.

@@ -60,4 +60,11 @@ jq -rs '
       | .out ) as $blocks
   | "# " + $title + "\n\n_" + ($blocks | length | tostring) + " turns_\n"
     + ( $blocks | join("") )
-' "$src"
+' "$src" | tr -d '\000'
+# `tr -d '\000'`: captured terminal output can carry a NUL — /proc/device-tree/* strings are
+# NUL-terminated — and the transcript stores it as the escape \u0000, which jq faithfully
+# decodes back to a raw byte. ONE such byte anywhere in the file makes rg and grep treat the whole
+# rendering as *binary* and skip it in a recursive search, so the session silently drops out of
+# /sjrecall's corpus while still reading fine through sj_get. A NUL means nothing in a Markdown
+# transcript; drop it where the file is written, so the archive stays greppable by any tool, not
+# just sjmcp. See #66.
