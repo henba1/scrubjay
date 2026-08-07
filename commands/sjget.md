@@ -17,6 +17,10 @@ Ref + optional slice: **$ARGUMENTS**
 3. Do not call any other tool. Do not summarize or re-print the content — the `sj_get` result
    is already injected. If it errors (e.g. permission denied or unknown ref), report just that
    one line.
+4. A whole large transcript comes back **capped**, with `truncated`, the total line/turn count
+   and a `hint` naming the next slice. Say so in one line and offer the next slice; take it only
+   if the user asks. Re-calling with a larger `max_chars` is the last resort, not the reflex —
+   the slice the user actually wants is cheaper than the file.
 
 Tip: to pull a whole small doc with even less overhead, the user can `@`-mention it from the
 `sjmcp` resource picker instead — no tool call at all.
