@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 # Put whatever is on the clipboard into this project's asset folder, and print the path.
 #
 # The gap it fills: if a file is already on this machine you just type its path — but a screenshot,
@@ -119,13 +121,13 @@ sjp_read() {  # sjp_read <provider> <type>   -> bytes on stdout
 [ "${SCRUBJAY_PASTE_LIB:-0}" = 1 ] && return 0 2>/dev/null || true
 
 # ── main ──────────────────────────────────────────────────────────────────────────────────────
-NAME=""; FROM_STDIN=0; ACTION=paste
+NAME=""; FROM_STDIN=0; ACTION="paste"
 while [ $# -gt 0 ]; do
   case "$1" in
     --name) NAME="${2:-}"; shift ;;
     -)      FROM_STDIN=1 ;;
-    --dir)  ACTION=dir ;;
-    --list) ACTION=list ;;
+    --dir)  ACTION="dir" ;;
+    --list) ACTION="list" ;;
     -h|--help) awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown argument '$1' (try --help)" ;;
   esac

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 # bin/sj-paste.sh — clipboard into the project's asset folder.
 #
 # A real clipboard needs a display, which CI and a headless Pi both lack, so the provider is a seam:
