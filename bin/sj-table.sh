@@ -50,7 +50,7 @@ sjt_parse_slice() {  # sjt_parse_slice "[a:b]" <total>  -> "<start> <count>", or
 
 # ── arguments ─────────────────────────────────────────────────────────────────────────────────
 
-pull=1; want_path=0; mode=summary; n=0; slice=""
+pull=1; want_path=0; mode="summary"; n=0; slice=""
 f_host=""; f_project=""; f_harness=""; f_model=""; f_topic=""; f_since=""; f_until=""
 
 for arg in "$@"; do
@@ -58,10 +58,12 @@ for arg in "$@"; do
     --no-pull)   pull=0 ;;
     --path)      want_path=1 ;;
     -h|--help)   awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1{exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
-    all)         mode=all ;;
-    head=*)      mode=head; n="${arg#head=}" ;;
-    tail=*)      mode=tail; n="${arg#tail=}" ;;
-    \[*:*\])     mode=slice; slice="$arg" ;;
+    # Quoted, all of them: `mode=head` reads as a command substitution to shellcheck (SC2209),
+    # and the quoting stays uniform so a future mode named after a real command can't reintroduce it.
+    all)         mode="all" ;;
+    head=*)      mode="head"; n="${arg#head=}" ;;
+    tail=*)      mode="tail"; n="${arg#tail=}" ;;
+    \[*:*\])     mode="slice"; slice="$arg" ;;
     host=*)      f_host="${arg#host=}" ;;
     project=*)   f_project="${arg#project=}" ;;
     harness=*)   f_harness="${arg#harness=}" ;;
