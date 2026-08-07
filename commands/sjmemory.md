@@ -4,5 +4,6 @@ allowed-tools: Bash(bash:*)
 ---
 !`bash ~/.claude/hooks/../bin/onboard-memory.sh 2>&1; echo "exit: $?"`
 
-If the output contains an `authorized_keys` line (WG client), surface it verbatim and tell me to add it
-on the receiver. Otherwise reply with a single line: ✓ memory ready, or the failing line. Don't analyze.
+If the output contains an `authorized_keys` line (WG client), surface it verbatim, along with the
+`bin/onboard-receiver.sh --authorize memory` line beside it — that's the safe way to apply it, run by
+me on the receiver. Otherwise reply with a single line: ✓ memory ready, or the failing line. Don't analyze.
