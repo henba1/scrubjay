@@ -14,7 +14,10 @@
 # Env knobs:  SCRUBJAY_NOSYNC=1  (skip entirely)   SCRUBJAY_SYNC_NOPULL=1  (sync without pull)
 #             CLAUDE_HOST=<name>
 [ "${SCRUBJAY_NOSYNC:-0}" = "1" ] && exit 0
-cat >/dev/null 2>&1 || true   # drain hook stdin, ignore
+# Read the payload rather than discarding it: step 2c needs this session's own id, so that the
+# reconcile pass cannot mistake the session it is running inside for one that died. Everything
+# else here ignores it. `|| true` — a harness that sends nothing must not wedge the hook.
+input="$(cat 2>/dev/null)" || input=""
 
 # App root. `cd -P` resolves symlinked path components physically, which is the whole game here:
 # we are invoked as ~/.claude/hooks/<this>, and ~/.claude/hooks is a symlink to <app>/hooks
@@ -59,6 +62,20 @@ fi
 #     SCRUBJAY_SYNC_NOPULL, which a second pull here would quietly override.
 #     Derived + .gitignore'd; see bin/sj-catalogue.sh.
 "$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1 || true
+
+# 2c) catalogue + archive any session that ended WITHOUT the session-end hook ever firing (kill -9,
+#     closed terminal, dropped SSH, power cut). Nothing else can notice those: the relay breadcrumb
+#     in (3) is written by a ship that never ran, so the absence is silent. This is the one place
+#     that looks. Cheap when there is nothing to find — a find plus a stat per transcript, no
+#     transcript read — and capped so a backlog cannot turn one session's startup into a bulk
+#     upload. Its stdout is deliberately NOT swallowed: that is how the recovery gets reported.
+#     SCRUBJAY_NORECONCILE=1 opts out. See bin/sj-reconcile.sh.
+if [ "${SCRUBJAY_NORECONCILE:-0}" != "1" ]; then
+  self_sid=""
+  command -v jq >/dev/null 2>&1 && \
+    self_sid="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)"
+  "$APP/bin/sj-reconcile.sh" ${self_sid:+--exclude "$self_sid"} 2>/dev/null || true
+fi
 
 # 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
 #    primary push fails; the relay swallows its own errors (best-effort, must never block a

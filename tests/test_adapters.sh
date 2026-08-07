@@ -15,7 +15,8 @@ section "every adapter implements the contract"
 # An adapter missing one of these fails at runtime, inside a hook, where nobody sees the error.
 REQUIRED="sjh_config_dir sjh_present sjh_apply_config sjh_transcript_ext sjh_session_handle
           sjh_session_slug sjh_session_topic sjh_session_cwd sjh_session_meta sjh_render
-          sjh_extra_artifacts sjh_find_live_transcript sjh_slug sjh_project_dir sjh_import_side
+          sjh_extra_artifacts sjh_find_live_transcript sjh_list_sessions sjh_slug
+          sjh_project_dir sjh_import_side
           sjh_resume_cmd sjh_context_cmd sjh_detect"
 
 for h in $(sj_known_harnesses); do
