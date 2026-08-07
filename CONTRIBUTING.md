@@ -41,6 +41,27 @@ Apache-2.0 conversion, and any other terms the project is offered under. Without
 conversion the licence promises could not be honoured for contributed code. If your employer owns
 your work, please make sure you have their sign-off before contributing.
 
+## Tests
+
+```sh
+tests/run.sh                 # everything
+tests/run.sh adapters ship   # just tests/test_adapters.sh and tests/test_ship.sh
+```
+
+No framework — bash, `jq` and coreutils. Every test file runs in its own process with `$HOME`
+moved into a temp dir (`tests/lib.sh`), so a run on your laptop does what a run on a fresh CI
+runner does and cannot touch your `~/.claude` or your NAS. CI runs the suite on every PR.
+
+Coverage is measured with [`kcov`](https://github.com/SimonKagstrom/kcov) and reported to
+[Codecov](https://codecov.io/gh/henba1/scrubjay). It is **informational** — the number is there
+to show which scripts nothing exercises, not to block a PR on a threshold. To reproduce what CI
+computes:
+
+```sh
+kcov --include-path=bin,hooks coverage tests/run.sh
+$BROWSER coverage/index.html
+```
+
 ## Docs
 
 The documentation site is MkDocs Material under `docs/` (config in `mkdocs.yml`). Build and

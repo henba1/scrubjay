@@ -23,3 +23,10 @@ __pycache__/
 
 # mkdocs build output (CI builds + gh-deploys; the local `site/` is a throwaway artifact)
 site/
+
+# kcov output. Not just noise: the HTML report bundles third-party JavaScript into the tree, and
+# test_license_headers.sh lists sources with `git ls-files --cached --others`, so an unignored
+# report is read as ~10 new .js "source files" with no SPDX header and reddens the suite. That is
+# how the coverage job managed to fail a test the `test` job passed.
+coverage/
+coverage.xml

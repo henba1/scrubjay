@@ -194,3 +194,9 @@ it does not make the step yours.
   `cd -P "$(dirname "${BASH_SOURCE[0]}")/.."`, never `readlink -f`. `tests/test_portability.sh`
   pins these contracts.
 - If you change docs, verify with `pip install -r requirements-docs.txt && mkdocs build --strict`.
+- **Run `tests/run.sh` before you open a PR.** CI runs it on every PR (`.github/workflows/test.yml`),
+  alongside shellcheck+CodeQL code scanning (`code-scanning.yml`) and the lint gate (`lint.yml`).
+  Coverage (kcov → Codecov) is deliberately *informational*: report what it says, don't add tests
+  that only exist to move it. Neither of the code-scanning workflows may grow a `paths:` filter —
+  a skipped run produces no analysis, and the ruleset that requires code scanning results treats
+  that as "missing", which strands docs-only PRs.
