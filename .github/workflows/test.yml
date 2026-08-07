@@ -1,0 +1,168 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# No paths filter, deliberately: this is the gate a PR is judged on, and a "skipped because it
+# didn't touch bin/" run reports as neutral, not green, which makes required-check rules unhappy.
+permissions:
+  contents: read
+
+jobs:
+  # The gate. Fast, and independent of the coverage tooling below — if kcov ever misbehaves it
+  # must not be able to take the pass/fail signal with it.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      # Every tests/test_*.sh runs in its own sandbox ($HOME moved into a temp dir), so the runner
+      # has nothing for them to find and nothing of the runner's is at risk. See tests/lib.sh.
+      - name: tests/run.sh
+        run: bash tests/run.sh
+
+  # Coverage is measured, reported, and *not* enforced. It runs the same suite a second time under
+  # kcov, which traces bash by exporting SHELLOPTS=xtrace + BASH_XTRACEFD — that's what makes it
+  # follow the `bash tests/test_*.sh` children and the bin/ scripts they invoke, rather than
+  # measuring only run.sh itself.
+  coverage:
+    runs-on: ubuntu-latest
+    env:
+      KCOV_VERSION: v43
+    permissions:
+      contents: read
+      id-token: write        # Codecov OIDC — see the upload step
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # Codecov wants the base commit to compute a diff against
+
+      # kcov is built from source, pinned to a tag, because Ubuntu dropped the package in 24.04 —
+      # `apt-get install kcov` fails outright on ubuntu-latest. The alternatives were worse: pinning
+      # the runner to ubuntu-22.04 only defers this to that image's retirement, and upstream's last
+      # prebuilt tarball is v42 from 2023.
+      #
+      # The build is ~90s, so it's cached on the tag. Only the compile is skipped on a hit — the
+      # apt step stays unconditional so the runtime libs kcov links (libdw, libcurl, libbfd) are
+      # guaranteed present rather than assumed from whatever the runner image ships this month.
+      - name: install jq + kcov build deps
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq cmake binutils-dev libcurl4-openssl-dev \
+                                      libdw-dev libelf-dev libiberty-dev zlib1g-dev
+
+      - name: cache kcov
+        id: kcov-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: kcov-${{ env.KCOV_VERSION }}-${{ runner.os }}-${{ runner.arch }}
+
+      - name: build kcov
+        if: steps.kcov-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          # Installed under $HOME rather than /usr/local: actions/cache restores as the runner
+          # user, which cannot write a root-owned prefix.
+          git clone --depth 1 --branch "$KCOV_VERSION" https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          cmake -S /tmp/kcov -B /tmp/kcov/build -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+          cmake --build /tmp/kcov/build -j"$(nproc)"
+          cmake --install /tmp/kcov/build
+
+      - name: put kcov on PATH
+        run: |
+          set -euo pipefail
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/kcov" --version
+
+      # --include-path keeps the measurement on shipped code: the tests themselves are always
+      # 100% covered by construction, and counting them would flatter the number into meaning
+      # nothing. kcov exits with the suite's own status, so a red suite is red here too.
+      #
+      # --bash-parse-files-in-dirs is what makes the percentage honest. Without it kcov only reports
+      # files it watched execute, so a script no test ever loads — onboard.sh, sj-receive.sh, the
+      # remote transports — is not 0%, it is absent, and vanishes from the denominator. The number
+      # then measures "coverage of the code the tests already reach", which only ever goes up and
+      # says nothing. Parsing the directories up front puts every shipped script in the report at
+      # the coverage it truly has.
+      - name: kcov
+        run: kcov --include-path=bin,hooks --bash-parse-files-in-dirs=bin,hooks coverage tests/run.sh
+
+      - name: collect the report
+        run: |
+          set -euo pipefail
+          # kcov writes one cobertura.xml per traced program plus a merged one; take the merge
+          # when it exists, otherwise the single run. Uploading both would double-count.
+          if [ -f coverage/kcov-merged/cobertura.xml ]; then
+            report=coverage/kcov-merged/cobertura.xml
+          else
+            report="$(find coverage -name cobertura.xml -print -quit)"
+          fi
+          [ -n "$report" ] || { echo "kcov produced no cobertura.xml:"; find coverage -maxdepth 2; exit 1; }
+          cp "$report" coverage.xml
+          echo "report: $report"
+
+          # Per-file, worst first. This is the output worth reading: an overall percentage looks
+          # identical whether kcov followed the suite into bin/ or measured run.sh alone, and the
+          # bottom of this list is where the untested scripts announce themselves.
+          #
+          # It also guards the failure mode that would otherwise pass silently — if the trace never
+          # reached the children, only run.sh is measured, and a single-file report is a broken run
+          # however healthy its percentage looks.
+          python3 - <<'PY'
+          import pathlib, sys, xml.etree.ElementTree as ET
+          root = ET.parse("coverage.xml").getroot()
+          rows = sorted(
+              ((c.get("filename"), float(c.get("line-rate"))) for c in root.iter("class")),
+              key=lambda r: r[1],
+          )
+          print(f"TOTAL {float(root.get('line-rate')) * 100:.1f}%  "
+                f"({root.get('lines-covered')}/{root.get('lines-valid')} lines, {len(rows)} files)")
+          print(f"{len(rows)} files measured")
+          for name, rate in rows:
+              print(f"  {rate * 100:5.1f}%  {name}")
+          if len(rows) < 2:
+              sys.exit("only one file measured — kcov did not trace into the test children")
+
+          # A shipped script missing from the report isn't 0%, it's excluded from the denominator —
+          # the exact distortion --bash-parse-files-in-dirs exists to prevent. Warn rather than fail:
+          # kcov quietly skips files its parser chokes on, and that shouldn't redden a good PR.
+          shipped = {str(p) for d in ("bin", "hooks") for p in pathlib.Path(d).rglob("*.sh")}
+          missing = sorted(shipped - {name for name, _ in rows})
+          if missing:
+              print(f"::warning::{len(missing)} shipped scripts absent from the report: {', '.join(missing)}")
+          PY
+
+      # kcov's HTML report, for when the per-file list above raises a question. Kept on failed runs
+      # too, since a coverage job that died is exactly when you want to look at what it produced.
+      - name: keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # The one third-party action in this repo, pinned by commit rather than tag (v7.0.0) — CI
+      # here has write access to nothing, but the principle in lint.yml is that a tag can move
+      # under you and a SHA cannot.
+      #
+      # use_oidc avoids storing an upload token at all. If Codecov's repo settings don't have
+      # OIDC enabled, drop it and add a CODECOV_TOKEN secret instead: token: ${{ secrets.CODECOV_TOKEN }}
+      - name: upload to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          files: ./coverage.xml
+          flags: shell
+          disable_search: true
+          use_oidc: true
+          # Coverage reporting is not a merge gate. A Codecov outage must not turn a good PR red.
+          fail_ci_if_error: false

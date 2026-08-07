@@ -1,0 +1,85 @@
+name: code scanning
+
+# Uploads code scanning results for every commit that could become `main`. Two tools, because no
+# single one covers this repo: CodeQL reads the Python MCP server and the workflows themselves,
+# and neither CodeQL nor anything else GitHub ships understands shell — which is 5k of the ~6k
+# lines here — so shellcheck is converted to SARIF and uploaded alongside it.
+#
+# ⚠️ Do not add a `paths:` filter to this workflow. The "require code scanning results" ruleset
+# rule blocks an update when a required tool has no analysis for the commit; a run that was
+# skipped by a path filter is not an analysis, so a docs-only PR would sit unmergeable forever.
+# Every push to main and every PR must produce results, even empty ones.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Rules and query packs improve over time; re-scan an unchanged main weekly so the alerts
+    # reflect today's rules and not the ones that shipped with the last commit.
+    - cron: "27 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: codeql (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # The only two languages here CodeQL supports. `actions` is not filler: this repo's
+        # workflows run on pull_request and the scanner is what catches an interpolation of
+        # attacker-controlled PR text into a `run:` block.
+        language: [actions, python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  shellcheck:
+    name: shellcheck (sarif)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same source and same severity as the lint gate (see lint.yml) — from the distro, not a
+      # third-party action. Matching -S means the Security tab shows exactly what would fail
+      # lint: no second, softer standard to argue about. Widen to `-S info` here if you'd rather
+      # triage style findings as alerts than have them block a PR.
+      - name: shellcheck -> sarif
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck jq
+          # Actions runs `run:` under `bash -e`, and shellcheck exits 1 on findings — without
+          # dropping errexit for exactly this call the step would die before it could convert them.
+          set +e
+          shellcheck -S warning -f json1 -x \
+            bin/*.sh bin/adapters/*.sh hooks/*.sh hooks/transports/*.sh > shellcheck.json
+          rc=$?
+          set -e
+          # 0 = clean, 1 = findings (both are a successful scan). Anything else is shellcheck
+          # itself failing, and a truncated report must not be uploaded as if it were clean.
+          [ "$rc" -le 1 ] || { echo "shellcheck failed with rc=$rc"; cat shellcheck.json; exit "$rc"; }
+          jq -f .github/shellcheck-to-sarif.jq shellcheck.json > shellcheck.sarif
+          echo "findings: $(jq '.runs[0].results | length' shellcheck.sarif)"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: shellcheck.sarif
+          category: shellcheck
