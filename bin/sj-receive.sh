@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Receiver-side forced command for the write-only transcript relay. Wraps `rrsync -wo <root>`
 # so that after each push the archive perms are normalized: the relay account (e.g. scrubjay-rx)
 # writes files 0600, but the archive OWNER (the human + the MCP server) must read them via the

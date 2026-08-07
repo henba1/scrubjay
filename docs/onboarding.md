@@ -128,6 +128,11 @@ Run `bin/sj-bootstrap.sh` on its own to create/seed the private repos without on
     host's sync silently no-ops. (Receiver also needs a one-time `safe.directory` trust for the memory
     repo — see [memory-sync.md](memory-sync.md).)
 
+    You don't have to paste it by hand. On the receiver, `bin/onboard-receiver.sh --authorize
+    <relay|memory|mcp> <client.pub>` writes the right forced command and appends safely — a file
+    missing its trailing newline otherwise splices the new key onto the previous one and breaks
+    both. Copy the client's `.pub` over (it's public) and run that there.
+
 ??? note "Manual steps (what the script automates)"
     ```sh
     git clone git@github.com:<your-gh-user>/scrubjay.git      ~/.scrubjay/scrubjay
@@ -150,6 +155,25 @@ Run `bin/sj-bootstrap.sh` on its own to create/seed the private repos without on
     otherwise arbitrary (it's only referenced via the pointer file below).
 
 Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub. No root.
+
+## The archive host (the NAS side)
+
+On the peer-to-peer backends the receiver is a scrubjay **role with its own guided setup** — not
+something you must stand up separately before you start. Clone this repo on that box and run:
+
+```sh
+~/.scrubjay/scrubjay/bin/onboard-receiver.sh          # or --print to report, changing nothing
+```
+
+It creates the archive root (setgid, so pushes inherit the group that reads them), reports what
+each role needs (`rrsync` for relay, `git-shell` for memory, `uv` for MCP), and authorizes one
+client key per role via `--authorize <relay|memory|mcp> <client.pub>`. All of that runs as you,
+unprivileged.
+
+What it deliberately does **not** do is anything needing root or the router — sshd and its port,
+the firewall, WireGuard, DDNS, mounting a disk (`bin/sj-mount.sh`), snapshots
+([`bin/sj-snapshot.sh`](durability.md)). It computes those commands and prints them for you to
+run. scrubjay is a sync tool that needs somewhere to put bytes, not a NAS appliance.
 
 ## Pointers (machine-local)
 

@@ -1,0 +1,43 @@
+scrubjay was released under the MIT License from its first commit
+(2026-06-23) up to and including the commit tagged `v0.2.0-mit`.
+
+That grant is irrevocable. Every copy, clone and fork taken at or before
+that tag remains available under the MIT terms reproduced below, forever,
+and nothing in the current LICENSE takes it away. You can check out that
+state at any time:
+
+    git checkout v0.2.0-mit
+
+Commits *after* that tag are licensed under the Functional Source License
+1.1 with an Apache-2.0 future licence (FSL-1.1-ALv2) — see LICENSE. The
+short version: use it for anything you like, including inside your own
+company, but don't sell it back to the world as a competing product or
+service. Each FSL-licensed version converts to Apache-2.0 two years after
+its release.
+
+This file is kept so the project's history stays legible rather than
+looking like the MIT period never happened.
+
+----------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2026 Hendrik Baacke
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

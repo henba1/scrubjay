@@ -100,6 +100,17 @@ Steps:
 If `gh` is absent, `sj-bootstrap.sh` prints the exact `gh repo create` commands and stops. Relay
 those to the user and let *them* run them — creating repos on someone's account is theirs to do.
 
+### The other side: the archive host
+
+If the user picks a peer-to-peer backend and has no receiver yet, **say that scrubjay sets that box
+up too** — `bin/onboard-receiver.sh`, run *on the receiver* from a clone there. Testers have
+concluded the NAS side simply wasn't covered, because every prompt here asks for receiver details as
+if the box were already done. It provisions the archive root, reports per-role dependencies
+(`rrsync` / `git-shell` / `uv`), and authorizes one client key per role. It runs unprivileged and
+**prints** — never applies — anything needing root or the router (sshd, firewall, WireGuard, DDNS,
+`bin/sj-mount.sh` for a disk, `bin/sj-snapshot.sh` for snapshots). You cannot run it from here; it
+is the user's to run there, like the step below.
+
 ### ⚠️ The one step you must NOT do for the user
 
 For the peer-to-peer backends, `onboard.sh` (and `onboard-memory.sh`) **print an
@@ -108,6 +119,12 @@ For the peer-to-peer backends, `onboard.sh` (and `onboard-memory.sh`) **print an
 anti-self-authorization design: a new machine must not be able to grant itself access. **Do
 not** attempt to install it, ssh in to add it, or work around it. Print the exact line and
 tell the user to add it on the receiver. Until they do, that host's sync silently no-ops.
+
+Tell them the easy way to apply it: copy this host's `.pub` to the receiver and run
+`bin/onboard-receiver.sh --authorize <relay|memory|mcp> <client.pub>` **there** — it derives the
+forced command and appends safely (an `authorized_keys` file with no trailing newline otherwise
+splices the new key onto the previous one and breaks both). That is still a human on the receiver;
+it does not make the step yours.
 
 ## Git & PR workflow
 
@@ -146,6 +163,27 @@ tell the user to add it on the receiver. Until they do, that host's sync silentl
   is a tool for agentic coding, much of it is written with one, and the history should say so
   rather than quietly imply otherwise. Configured in `.claude/settings.json` (project scope, so it
   applies to this repo only) — do not "helpfully" strip it.
+- **Every new source file gets the licence header — no exceptions.** scrubjay is FSL-1.1-ALv2 from
+  the tag `v0.2.0-mit` onward (MIT before it; see [`docs/licensing.md`](docs/licensing.md)), so a
+  file no longer answers *"under what terms does this ship?"* on its own. Every new `.sh`, `.py` or
+  `.js` starts with these two lines, directly under the shebang:
+
+  ```sh
+  # SPDX-License-Identifier: FSL-1.1-ALv2
+  # Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+  ```
+
+  `//` instead of `#` for JavaScript. In `mcp/sjmcp_server.py` the header sits *below* the PEP 723
+  `# /// script` block so the metadata stays adjacent to the shebang — same rule for any future
+  script with inline metadata. Do **not** add it to Markdown, JSON, or anything under `skeleton/`:
+  JSON cannot carry a comment, prose is covered by `LICENSE`, and `skeleton/` is seed content that
+  becomes the *user's* private data repo. `tests/test_license_headers.sh` enforces this and reads
+  untracked files too, so a file you just wrote fails the suite before it is ever committed — run
+  `bash tests/run.sh license_headers` after adding files.
+- **`NOTICE` is attribution, not terms.** Extend it when third-party code is vendored; never put
+  grants, restrictions or prose in it. `LICENSE` governs.
+- **Don't describe this repo as "open source."** It is public and source-available; the FSL forbids
+  reselling it as a competing product. "Open source" in docs or a PR description is now inaccurate.
 - Shell scripts are `bash`, `set -uo pipefail`; match the surrounding style.
 - **Stay portable across GNU and BSD userlands.** Supported platforms are Linux and WSL 2, with
   macOS best-effort (see the Platforms table in `docs/onboarding.md`). GNU-only spellings —

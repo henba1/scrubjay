@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Set up a persistent mount of a NAS share for scrubjay's `local` transcript backend, then verify
 # it is live and writable. Re-runnable and idempotent: generates a systemd .mount unit (or an
 # /etc/fstab line) and, with confirmation, sudo-installs + mounts it; if you decline or there is no

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Apply shared + host-specific Claude config into ~/.claude.
-#   - symlinks  <app>/hooks  and  <data>/claude-md/{CLAUDE.md,commands,agents}
+#   - symlinks  <app>/hooks  and  <data>/claude-md/{CLAUDE.md,commands,agents,skills,output-styles}
+#               plus <data>/shared/AGENTS.md as a user-level rule
 #   - merges    <data>/settings/settings.base.json + <data>/hosts/<host>/claude/settings.json
 #     into ~/.claude/settings.json (a real file, arrays unioned)
 # Idempotent. Backs up real (non-symlink) targets only with --force.
@@ -55,12 +59,13 @@ link() {  # link <src> <dst>
   ln -s "$src" "$dst"; echo "  link  $pdst"
 }
 
-# Slash commands come from TWO sources: the app repo ships the generic scrubjay commands
-# (the /dc* family — anyone who installs scrubjay gets them), the data repo holds personal
-# ones. We materialize ~/.claude/commands as a REAL dir of per-file symlinks into both, so the
-# app and personal commands coexist. Data-repo files win on a name clash (personal override).
-link_commands() {  # link_commands <dst-dir> <src-dir>...
-  local dst="$1"; shift
+# Per-FILE symlinks into a real directory, from one or more sources. Slash commands come from TWO
+# of them: the app repo ships the generic scrubjay commands (the /dc* family — anyone who installs
+# scrubjay gets them), the data repo holds personal ones, and both must coexist in one dir. Later
+# sources win on a name clash (so a personal command overrides the app's), and a REAL file the user
+# put there is never touched. Output styles use the same shape with a single source.
+link_files() {  # link_files <dst-dir> <label> <src-dir>...
+  local dst="$1" label="$2"; shift 2
   [ -L "$dst" ] && { rm -f "$dst"; }                 # was a single dir-symlink (old layout)
   mkdir -p "$dst"
   ( shopt -s nullglob
@@ -75,7 +80,32 @@ link_commands() {  # link_commands <dst-dir> <src-dir>...
         ln -sf "$src" "$dst/$name"
       done
     done )
-  echo "  link  $(sj_pretty_path "$dst")/  (app + data commands)"
+  echo "  link  $(sj_pretty_path "$dst")/  ($label)"
+}
+
+# Per-DIRECTORY symlinks — the same idea one level up, for artefacts that are a folder rather than
+# a file. A skill is <name>/SKILL.md plus whatever it bundles, and Claude Code follows a symlinked
+# skill directory (reading SKILL.md from the target) and watches ~/.claude/skills for changes, so a
+# `git pull` of the data repo lands mid-session the way the CLAUDE.md symlink does. A real
+# directory the user created machine-locally is left alone, never replaced.
+link_dirs() {  # link_dirs <dst-dir> <label> <src-dir>...
+  local dst="$1" label="$2"; shift 2
+  [ -L "$dst" ] && { rm -f "$dst"; }
+  mkdir -p "$dst"
+  ( shopt -s nullglob
+    for f in "$dst"/*; do [ -L "$f" ] && rm -f "$f"; done      # drop our stale links, keep real dirs
+    for srcdir in "$@"; do
+      [ -d "$srcdir" ] || continue
+      for src in "$srcdir"/*/; do
+        src="${src%/}"
+        local name; name="$(basename "$src")"
+        if [ -e "$dst/$name" ] && [ ! -L "$dst/$name" ]; then
+          echo "  SKIP  $(sj_pretty_path "$dst/$name") (real directory)"; continue
+        fi
+        ln -sf "$src" "$dst/$name"
+      done
+    done )
+  echo "  link  $(sj_pretty_path "$dst")/  ($label)"
 }
 
 # Point a project's harness memory dir at the synced repo (<data>/memory/<host>/<project>/).
@@ -182,7 +212,26 @@ link "$DATA/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md"
 link "$DATA/claude-md/agents"    "$CLAUDE_DIR/agents"
 link "$APP/hooks"                "$CLAUDE_DIR/hooks"
 # commands: app ships the generic /dc* family, data adds personal ones (data wins on clash)
-link_commands "$CLAUDE_DIR/commands" "$APP/commands" "$DATA/claude-md/commands"
+link_files "$CLAUDE_DIR/commands" "app + data commands" "$APP/commands" "$DATA/claude-md/commands"
+
+# skills: <name>/SKILL.md + whatever it bundles. Claude Code merged custom commands INTO skills, so
+# this is where new work gets authored — an unsynced skills dir is the same drift the commands link
+# was added to stop. Cross-harness by design: the opencode adapter links the same source into its
+# own dir, so neither harness depends on the other's.
+link_dirs "$CLAUDE_DIR/skills" "data skills" "$DATA/claude-md/skills"
+
+# output styles: plain .md files, the same per-file shape as commands.
+link_files "$CLAUDE_DIR/output-styles" "data output styles" "$DATA/claude-md/output-styles"
+
+# shared cross-harness instructions. Claude Code reads CLAUDE.md, NOT AGENTS.md — the convention is
+# opencode's (and codex's), and at user scope Claude implements nothing equivalent. A USER-LEVEL
+# RULE is the mechanism that does apply: ~/.claude/rules/ loads on every session in every project,
+# and the rules dir follows symlinks. So the file that claims to be shared actually is, without
+# scrubjay having to edit the CLAUDE.md the user authored.
+if [ -f "$DATA/shared/AGENTS.md" ]; then
+  mkdir -p "$CLAUDE_DIR/rules"
+  link "$DATA/shared/AGENTS.md" "$CLAUDE_DIR/rules/shared-agents.md"
+fi
 
 # plugins: share *which marketplaces are registered* (the rest of plugins/ is re-fetchable cache,
 # so it stays machine-local). The file is symlinked into the data repo like the other config; if

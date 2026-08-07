@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # bin/memory-sync.sh — the cross-machine memory lifecycle.
 #
 # This file exists because memory sync used to be structurally untestable: tests/lib.sh pinned

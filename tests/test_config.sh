@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Config apply. The property that matters for every harness: idempotent, and additive — scrubjay
 # owns its own keys and never clobbers config the user (or another tool) put there.
 set -uo pipefail
@@ -100,6 +103,45 @@ mkdir -p "$SCRUBJAY_DATA/claude-md/commands"
 printf -- '---\ndescription: personal override\n---\nMINE-WINS marker\n' > "$SCRUBJAY_DATA/claude-md/commands/sjrecall.md"
 sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
 check "data-repo command wins over the app's" grep -q 'MINE-WINS marker' "$OPENCODE_CONFIG_DIR/commands/sjrecall.md"
+
+section "claude: skills, output styles and the shared rule are linked into ~/.claude"
+# Skills are DIRECTORIES (<name>/SKILL.md + bundles), which is why they need their own linker —
+# the per-file one that handles commands would never see them.
+mkdir -p "$SCRUBJAY_DATA/claude-md/skills/deploy" "$SCRUBJAY_DATA/claude-md/output-styles"
+printf -- '---\nname: deploy\ndescription: Ship it.\n---\nSteps.\n' > "$SCRUBJAY_DATA/claude-md/skills/deploy/SKILL.md"
+printf 'reference.md content\n' > "$SCRUBJAY_DATA/claude-md/skills/deploy/reference.md"
+printf -- '---\nname: terse\n---\nBe brief.\n' > "$SCRUBJAY_DATA/claude-md/output-styles/terse.md"
+# A skill the user made on THIS machine only: sync must never eat it.
+mkdir -p "$CLAUDE_CONFIG_DIR/skills/machine-local"
+printf -- '---\nname: machine-local\n---\nLocal.\n' > "$CLAUDE_CONFIG_DIR/skills/machine-local/SKILL.md"
+
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+
+check "skill dir is linked"                  test -L "$CLAUDE_CONFIG_DIR/skills/deploy"
+check "SKILL.md resolves through the link"   test -f "$CLAUDE_CONFIG_DIR/skills/deploy/SKILL.md"
+check "bundled files come with it"           test -f "$CLAUDE_CONFIG_DIR/skills/deploy/reference.md"
+check "a machine-local skill survives"       test -f "$CLAUDE_CONFIG_DIR/skills/machine-local/SKILL.md"
+check "output style is linked"               test -L "$CLAUDE_CONFIG_DIR/output-styles/terse.md"
+check "shared AGENTS.md lands as a user rule" test -L "$CLAUDE_CONFIG_DIR/rules/shared-agents.md"
+check "the rule resolves to the data repo"   test -f "$CLAUDE_CONFIG_DIR/rules/shared-agents.md"
+check "commands still link (no regression)"  test -L "$CLAUDE_CONFIG_DIR/commands/sjrecall.md"
+
+before="$(ls -l "$CLAUDE_CONFIG_DIR/skills" "$CLAUDE_CONFIG_DIR/output-styles")"
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+assert_eq "a second sync changes nothing" "$before" "$(ls -l "$CLAUDE_CONFIG_DIR/skills" "$CLAUDE_CONFIG_DIR/output-styles")"
+
+# Delete the source: our link must be retracted, not left dangling.
+rm -rf "$SCRUBJAY_DATA/claude-md/skills/deploy"
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+check "a removed skill's link is retracted"  bash -c '! test -e "$1"' _ "$CLAUDE_CONFIG_DIR/skills/deploy"
+check "the machine-local skill is still there" test -f "$CLAUDE_CONFIG_DIR/skills/machine-local/SKILL.md"
+
+section "opencode: skills are linked into opencode's own dir too"
+mkdir -p "$SCRUBJAY_DATA/claude-md/skills/deploy"
+printf -- '---\nname: deploy\ndescription: Ship it.\n---\nSteps.\n' > "$SCRUBJAY_DATA/claude-md/skills/deploy/SKILL.md"
+sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
+check "skill linked into opencode"           test -L "$OPENCODE_CONFIG_DIR/skills/deploy"
+check "SKILL.md resolves there"              test -f "$OPENCODE_CONFIG_DIR/skills/deploy/SKILL.md"
 
 section "codex: hooks.json registration is additive and idempotent"
 hooks="$CODEX_HOME/hooks.json"

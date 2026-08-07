@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Sync the cross-machine memory repo (its own git repo — self-hosted on the NAS for local/rsync-wg,
 # a private GitHub repo for the git backend; remote-agnostic, so it just clones/pulls/pushes).
 # Claude's per-project memory dirs are symlinked into this clone by claude-sync.sh, so a

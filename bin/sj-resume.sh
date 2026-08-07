@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Cross-host session hand-off: stage an archived session from ANOTHER machine into this one's
 # ~/.claude/projects/, so Claude Code's own `--resume` / `/resume` picker can continue it here.
 #
