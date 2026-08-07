@@ -947,9 +947,20 @@ machine-readable, the thing you'd resume or feed to a tool. Alongside it, a <cod
 holds the same sessions rendered as Markdown session logs (user + assistant text plus the full
 tool stream — each call shows its input, Bash commands verbatim, and the tool's output inline;
 only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by <strong>project</strong> (the session's working dir),
-each file named <code>&lt;date&gt;_&lt;topic&gt;__&lt;sid8&gt;.md</code> where <code>topic</code> is the first real prompt slugified.
-Rendering happens automatically on every ship (<code>bin/render-transcript.sh</code>, additive — it never
-touches the <code>.jsonl</code>); <code>bin/backfill-readable.sh</code> re-renders transcripts already on the NAS.</p>
+each file named <code>&lt;date&gt;_&lt;topic&gt;__&lt;sid8&gt;.md</code> where <code>topic</code> is the first real prompt slugified and
+<code>date</code> is when the session <strong>started</strong>, read from the transcript's own records.</p>
+<p>That date has to come from the content, because the name is recomputed on <em>every</em> publish — <code>/sjlog</code>
+can run several times before session end — and this tree is additive: nothing prunes it, since the
+<code>rsync-wg</code> receiver's key is write-only by design. A name derived from anything mutable therefore
+adds a file instead of overwriting one, leaving two entries for one session under the same <code>__&lt;sid8&gt;</code>
+handle, the older a truncated copy. File mtime was exactly that: a session logged either side of
+midnight changed dates mid-life, and an archived copy carries the time it was <em>shipped</em> rather than
+the time it ran (<code>cp</code> does not preserve mtime). Reading the session's first record instead makes the
+name a pure function of the session, so re-publishing overwrites by construction.</p>
+<p>Rendering happens automatically on every ship (<code>bin/render-transcript.sh</code>, additive — it never
+touches the <code>.jsonl</code>); <code>bin/backfill-readable.sh</code> re-renders transcripts already on the NAS, and
+prunes duplicates left by the old mtime-based naming (same topic and handle, different date —
+<code>--no-prune</code> to skip that).</p>
 <p>Plans get the same human-friendly treatment: Claude Code saves each plan under three random words
 (<code>rippling-sprouting-whisper.md</code>), so on every ship <code>sj_normalize_plans</code> (in <code>bin/lib.sh</code>) renames
 them <em>in place</em> to <code>&lt;date&gt;_&lt;topic&gt;.md</code> — date from the file's mtime, topic from the plan's first

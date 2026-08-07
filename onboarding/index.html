@@ -1254,32 +1254,33 @@ is transient on HPC login nodes).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>bin/
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  onboard.sh             # interactive new-machine setup (deps, clone, config, register, sync, relay key, memory); also the /sjonboard command
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>  onboard-memory.sh      # enable/repair cross-machine memory on this machine (idempotent; the /sjmemory command)
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  sj-doctor.sh           # read-only end-to-end health check of this machine (the /sjdoctor command); onboarding&#39;s last step
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  onboard-receiver.sh    # set up THIS box as the archive host, and authorize one client key per role (run on the receiver)
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  lib.sh                 # shared helpers: host + data/chats pointers
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  claude-index-chats.sh  # write scrubjay-data/hosts/&lt;host&gt;/chats.index.json
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  claude-register-host.sh# scaffold a new host into the data repo
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -&gt; NAS
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
-<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
-<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
-<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>hooks/
-<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
-<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
-<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
-<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
-<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
-<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
-<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>mcp/
-<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
-<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>skeleton/host/           # template copied when registering a new machine
-<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>  sj-paste.sh            # clipboard -&gt; this project&#39;s asset folder, prints the path (the /sjpaste command)
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>  sj-doctor.sh           # read-only end-to-end health check of this machine (the /sjdoctor command); onboarding&#39;s last step
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>  onboard-receiver.sh    # set up THIS box as the archive host, and authorize one client key per role (run on the receiver)
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  lib.sh                 # shared helpers: host + data/chats pointers
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  claude-sync.sh         # apply data-repo config into ~/.claude (symlinks + merged settings)
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>  claude-index-chats.sh  # write scrubjay-data/hosts/&lt;host&gt;/chats.index.json
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>  claude-register-host.sh# scaffold a new host into the data repo
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>  ship-transcript.sh     # relay a session (transcript + subagents + plans + readable + history + tasks) via the selected backend
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>  memory-sync.sh         # pull/push cross-machine memory via its own NAS-hosted git repo (over WireGuard)
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>  render-transcript.sh   # render a .jsonl as a human-readable Markdown session log (full tool stream)
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>  backfill-readable.sh   # (one-off) build the readable/ tree for transcripts already on the NAS
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>  pull-and-mirror.sh     # (mirror host) pull scrubjay-chats -&gt; NAS
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>  onboard-hpc-client.sh  # set up an HPC node to ship over SSH/ProxyJump (no-WG path): key+ssh_config+pointer
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>  onboard-edge-node.sh   # set up the home edge/bastion (jump user, restricted keys, sshd scope, nft allowlist)
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>  onboard-mcp-client.sh  # client w/o the archive: key+ssh alias + SCRUBJAY_MCP_REMOTE to query the archive host over SSH
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>  sjmcp-serve.sh         # receiver-side forced command: runs the MCP server on the archive host, pipes stdio over SSH
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>hooks/
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>  sync-session.sh        # SessionStart hook: pull data repo + pull memory repo + claude-sync (auto-fresh config)
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>  log-session.sh         # SessionEnd hook: log line + refresh index + push memory + ship session
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>  publish-now.sh         # manual SessionEnd-on-demand (the /sjlog command); reconstructs the hook payload
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>  transports/git.sh      # backend: push to the private scrubjay-chats repo on GitHub (zero-infra; optional NAS mirror)
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>  transports/rsync-wg.sh # backend: peer-to-peer rsync over WireGuard (the NAS receiver)
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>  transports/local.sh    # backend: local copy (the box that has the NAS mounted)
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>mcp/
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>  sjmcp_server.py        # read-only MCP server over the archive (the /sjrecall|/sjfind|/sjbrowse engine; `uv run --script`)
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>skeleton/host/           # template copied when registering a new machine
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>docs/                    # diagrams (overview + transport-wg/-ssh .dot/.svg) and this documentation site
 </code></pre></div>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Moving the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>) is machine-local — nothing

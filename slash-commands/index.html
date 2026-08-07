@@ -922,6 +922,11 @@ read-only <a href="../archive-mcp/"><code>sjmcp</code> MCP tools</a>; <strong>li
 <td><code>sj_get</code> (one call, no search)</td>
 <td>You <strong>already know the item</strong> and just want it pulled in — cheapest way, no recall/ranking. Its edge is <strong>slicing</strong>: fetch only <code>lines=1200-1300</code> or <code>turns=5-10</code> of a huge transcript to keep tokens down.</td>
 </tr>
+<tr>
+<td><code>/sjtable [head=N \| tail=N \| [a:b] \| all] [host= project= harness= model= topic= since= until=]</code></td>
+<td><code>bin/sj-table.sh</code> (no MCP)</td>
+<td><strong>Reading the catalogue as a table</strong>, not picking one item out of it. Filters apply <em>before</em> slices, so <code>harness=opencode head=20</code> is "the newest 20 opencode sessions". Unlike <code>/sjbrowse</code> it shows sessions whose topic was never authored, and it costs no MCP round-trip — it queries the rendered <code>logs/CATALOGUE.md</code>. Bare <code>/sjtable</code> prints a summary, not ~600 rows.</td>
+</tr>
 </tbody>
 </table>
 <blockquote>
@@ -968,6 +973,11 @@ injects it directly with no tool call at all.</p>
 <td><code>/sjnote [what to capture \| /path/to/file]</code></td>
 <td>—</td>
 <td><strong>Keep a written artefact</strong> — an analysis, a briefing, a design rationale (runs <code>bin/sj-note.sh</code>). Writes it to <code>&lt;memory&gt;/&lt;project&gt;/notes/</code> and publishes immediately, so it survives the session and reaches every machine. Invoke it <em>before</em> the work too: it stands for the rest of the session, so durable output goes there instead of the scratchpad. Notes are <strong>not</strong> loaded into future sessions — read them back with <code>/sjrecall</code> or <code>/sjbrowse note</code>.</td>
+</tr>
+<tr>
+<td><code>/sjpaste [name]</code></td>
+<td>—</td>
+<td><strong>Put the clipboard into this project's assets and read it.</strong> For the thing a terminal can't do: a screenshot, a copied PDF, a diagram. Writes to <code>$SCRUBJAY_ASSETS/&lt;project-slug&gt;/</code> (machine-local, not synced) and hands the path straight to the session. Needs a clipboard on the machine running the session — over SSH use <code>cat &lt;file&gt; \| bin/sj-paste.sh -</code> instead.</td>
 </tr>
 <tr>
 <td><code>/sjdoctor [section…]</code></td>
