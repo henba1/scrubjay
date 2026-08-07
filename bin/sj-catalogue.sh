@@ -18,9 +18,10 @@
 # locally from the synced logs, on SessionStart (after the pull) and SessionEnd (after the
 # append). The logs sync; the table is a local view of them.
 #
-# Unlike sj_list, this filters NOTHING: a session whose topic never got summarized still gets a
-# row, with the topic column blank. It is still a real session with a resumable id, and a blank
-# cell is honest where a silent omission is not.
+# This filters NOTHING: a session whose topic never got summarized still gets a row, with the
+# topic column blank. It is still a real session with a resumable id, and a blank cell is honest
+# where a silent omission is not. sj_list used to disagree — it dropped those rows and hid five of
+# every six sessions from `/sjbrowse chats` — and now matches this file row for row.
 #
 # It PULLS the data repo first, because the question this file answers — "what chats exist, on
 # every machine?" — is wrong by definition if another host has pushed since. Rendering stale logs
@@ -75,6 +76,11 @@ trap 'rm -f "$tmp"' EXIT
 # Splitting on ` | ` is safe and matches the other readers (sj_log_catalogue in bin/lib.sh):
 # log-session.sh strips `"` and `|` out of the topic before writing it for exactly this reason.
 # `sort -r` on a leading `YYYY-MM-DD HH:MM` is a correct reverse-chronological sort, lexically.
+#
+# LAST ROW PER session= WINS. bin/sj-topics.sh backfills a missing topic by *appending* a corrected
+# copy of the row rather than editing the original, so that logs/*.log keep the append-only shape
+# `merge=union` depends on. Keying the rows by sid and printing at END collapses a superseded row
+# into its replacement; every other reader (sj_log_catalogue, sjmcp's _iter_logs) does the same.
 awk -F' *\\| *' -v OFS='\t' '
   function human(b) {
     if (b == "" || b+0 <= 0) return ""
@@ -100,8 +106,10 @@ awk -F' *\\| *' -v OFS='\t' '
     project = cwd; sub(/^.*\//, "", project)
     if (project == "") project = "/"
 
-    print $1, $2, project, harness, model, turns, human(size), substr(sid, 1, 8), topic
+    row[sid] = $1 OFS $2 OFS project OFS harness OFS model OFS turns OFS human(size) \
+               OFS substr(sid, 1, 8) OFS topic
   }
+  END { for (s in row) print row[s] }
 ' "$DATA"/logs/*.log 2>/dev/null | sort -r > "$tmp"
 
 rows="$(wc -l < "$tmp" | tr -d ' ')"
@@ -159,11 +167,16 @@ EOF
 
 ---
 
-**Why some topics are blank.** The one-sentence topic is written by the model, and only the
-`/sjlog` path has a model in the loop. A session that just ends (SessionEnd fires with no model
-running) falls back to its first user prompt, and logs `(no text)` when it cannot find one —
-which is most of them. Those rows are kept here, topic blank, because the session is still real
-and still resumable by id. `/sjbrowse` hides them; this file does not.
+**Why some topics are blank.** The one-sentence essence is written by the model, and only the
+`/sjlog` path has a model in the loop. A session that just ends falls back to its first real user
+prompt (or, failing that, to the slash command it ran), and logs `(no text)` when the transcript
+holds neither. Those rows are kept here, topic blank, because the session is still real and still
+resumable by id — and `/sjbrowse chats` now lists them too rather than silently skipping them.
+
+Most of the blanks left are historical: rows written before the fallback could read them, and
+sessions that ended without recording a single turn (`Size` empty or `0`) — those never had a
+transcript to summarize. `bin/sj-topics.sh` fills in the ones whose transcript did reach this
+archive, by appending a corrected row; the newest row for a session id is the one shown.
 
 **Why `Model` / `Turns` / `Size` are blank on older rows.** Those fields were added on
 2026-07-15; `Harness` on 2026-07-14. Lines written before a field existed simply lack it.

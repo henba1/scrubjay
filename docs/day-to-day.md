@@ -31,8 +31,9 @@ The full toggle list is in the [Reference cheatsheet](reference.md#toggle-behavi
 Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log`
 (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`)
 and pushed, so all machines' histories are searchable from any clone of the data repo. The
-`topic` is the first real prompt, or — if you publish with `/sjlog` — a one-sentence essence the
-model writes; the trailing `key=value` fields are additive, so older lines simply have fewer:
+`topic` is the first real prompt — or the slash command the session ran, if you typed nothing —
+or, if you publish with `/sjlog`, a one-sentence essence the model writes; the trailing
+`key=value` fields are additive, so older lines simply have fewer:
 
 ```sh
 git -C ~/.scrubjay/scrubjay-data pull
@@ -41,6 +42,12 @@ grep -i refactor ~/.scrubjay/scrubjay-data/logs/*.log
 
 The full transcript (the `.jsonl`) lives in `scrubjay-chats` / on the NAS under
 `<host>/<slug>/<session>.jsonl`.
+
+Rows logged before the fallback could read them show a blank topic. `bin/sj-topics.sh` fills
+those in from the archived transcripts (`--dry-run` first; `--all-hosts` on the archive box,
+which is usually the only machine that can read every host's sessions). It appends a corrected
+row rather than editing the original, because `logs/*.log` are append-only by design — every
+reader takes the newest row for a session id.
 
 For recall by *topic* (rather than an exact word you remember typing) from inside a live
 session, use the [`sjmcp` MCP server](archive-mcp.md).

@@ -239,6 +239,18 @@ def _all_artifacts(r: Roots) -> list[Artifact]:
 # This is the *complete* cross-machine index — it includes sessions whose full transcript never
 # reached this archive (other machines, un-relayed runs). Recall folds it in: a topic match here
 # links to the transcript when present, else stands alone as a "look on <host>" pointer.
+#
+# A row whose topic was never authored is NOT dropped. It used to be, and that hid 5 of every 6
+# sessions from `/sjbrowse chats` while bin/sj-catalogue.sh showed all of them — the same source,
+# two different answers, with no way for the caller to tell the omission had happened. The row is
+# a real, resumable session; a blank topic is a missing summary, not a missing session. `(no text)`
+# is normalized to "" so the two readers agree on what "no topic" looks like. Recall still skips
+# them at its own call site, where a row with no prose genuinely has nothing to match on.
+#
+# A session may have MORE THAN ONE row: bin/sj-topics.sh backfills a topic by appending a corrected
+# copy rather than editing in place, because logs/*.log ride git with `merge=union` and that only
+# holds while every host appends. _iter_logs resolves them last-wins, as do sj_log_catalogue and
+# bin/sj-catalogue.sh.
 
 _LOG = re.compile(
     r'^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}) \| '
@@ -291,8 +303,8 @@ def _parse_log_line(line: str) -> LogEntry | None:
     if not m:
         return None
     topic = m.group("topic").lstrip("❯>").strip()  # drop stray prompt markers
-    if topic in _NOISE_TOPICS:  # empty / "(no text)" sessions carry nothing to recall on
-        return None
+    if topic in _NOISE_TOPICS:  # never authored — normalize to blank, like bin/sj-catalogue.sh
+        topic = ""
     extra = _parse_extra(m.group("extra") or "")
     return LogEntry(m.group("date"), m.group("time"), m.group("host").strip(),
                     m.group("cwd").strip(), topic, m.group("sid").strip(),
@@ -309,16 +321,19 @@ def _iter_logs(r: Roots) -> list[LogEntry]:
     d = _logs_dir(r)
     if not d:
         return []
-    out: list[LogEntry] = []
+    # Keyed by session id, insertion-ordered, later row replacing earlier: one entry per session
+    # even when a backfilled row supersedes the original. Session ids are unique across hosts, so
+    # this collapses nothing that was not already the same session.
+    out: dict[str, LogEntry] = {}
     for lf in sorted(d.glob("*.log")):
         try:
             for line in lf.read_text(errors="replace").splitlines():
                 e = _parse_log_line(line)
                 if e:
-                    out.append(e)
+                    out[e.sid] = e
         except OSError:
             continue
-    return out
+    return list(out.values())
 
 
 # ── id / path resolution ───────────────────────────────────────────────────────────────────
@@ -847,7 +862,10 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
         for term in terms:
             for _lf, _lineno, text in _grep(term, [logs_dir], globs=("*.log",), max_count_per_file=80):
                 e = _parse_log_line(text)
-                if not e:
+                # A topic-less row is listable (sj_list shows it — it is a real session) but not
+                # recallable: recall ranks on prose, and this row has none. _parse_log_line no
+                # longer drops it, so the filter recall always applied lives here now.
+                if not e or not e.topic:
                     continue
                 key = readable_by_sid.get(e.sid8) or f"log:{e.sid8}"
                 f = per_file.setdefault(key, {"terms": set(), "hits": {}, "n": 0, "log": None,
