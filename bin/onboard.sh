@@ -131,7 +131,8 @@ CHATS_DIR="$BASE/scrubjay-chats"
 if [ -z "${SCRUBJAY_BACKEND:-}" ]; then
   echo; info "Session-relay backend — where each session's records go (pick one):"
   echo "    1) rsync-wg  peer-to-peer to your own NAS over WireGuard — records stay off third parties; needs a NAS"
-  echo "    2) local     this box HAS the NAS mounted — copy straight in, no network hop"
+  echo "    2) local     the archive is a directory this box writes straight into, no network hop —"
+  echo "                 a NAS share mounted here, or this box's own disk (then THIS box is the store)"
   echo "    3) git       push to a private scrubjay-chats repo on GitHub — no NAS or WireGuard to run"
   echo "    4) off       don't ship sessions"
   ask BACKEND_CHOICE "choose 1-4" ""
@@ -161,11 +162,16 @@ case "$BACKEND" in
   local)
     # If the NAS share details are given (or the user opts in), provision + verify the mount via
     # sj-mount.sh (which creates <mountpoint>/<storage-dir> and prints it); otherwise assume the
-    # box already has the NAS mounted and just take the storage path. For an unattended run, preset
+    # box already has a writable archive dir (a mount, or plain local disk) and just take the path.
+    # The prompt says "mount an existing share", not "set up a NAS" — testers read the old wording as
+    # scrubjay offering to install one. For an unattended run, preset
     # SCRUBJAY_NAS_SERVER (+ SCRUBJAY_ASSUME_YES=1 so it installs the mount without prompting).
     # The share is usually not scrubjay's alone, so the archive directory is named, not assumed.
-    if [ -n "${SCRUBJAY_NAS_SERVER:-}" ] || confirm "set up the NAS mount now (this box isn't mounted yet)?" N; then
-      ask SCRUBJAY_NAS_PROTO      "NAS protocol (nfs|cifs)"       "nfs"
+    if [ -n "${SCRUBJAY_NAS_SERVER:-}" ] \
+       || { echo; info "The archive needs a writable directory on this box. If one already exists" \
+                       "(a mounted share, or just a local path), answer no to the next question."; \
+            confirm "mount a share your NAS already serves? (this does NOT set up a NAS)" N; }; then
+      ask SCRUBJAY_NAS_PROTO      "protocol that share is served over (nfs|cifs)" "nfs"
       ask SCRUBJAY_NAS_SERVER     "NAS host/IP"                   ""
       ask SCRUBJAY_NAS_EXPORT     "export/share path on the NAS"  "/export/scrubjay"
       ask SCRUBJAY_NAS_MOUNTPOINT "local mountpoint"              "/mnt/nas1"
@@ -175,7 +181,7 @@ case "$BACKEND" in
       LOCAL_CHATS="$("$APP/bin/sj-mount.sh")" \
         || die "NAS mount setup failed — mount it by hand, then re-run bin/onboard.sh."
     else
-      ask LOCAL_CHATS "NAS storage root (this box's mount)" \
+      ask LOCAL_CHATS "archive dir (existing mount, or a path on this box's disk)" \
         "/mnt/nas1/${SCRUBJAY_STORAGE_DIR:-scrubjay-storage}"
     fi
     ;;
