@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # scrubjay's test runner. No frameworks, no dependencies beyond bash + jq + coreutils.
 #
 #   tests/run.sh                 run everything

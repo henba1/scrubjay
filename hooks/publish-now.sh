@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Manual "publish now" — runs the SessionEnd actions on demand (the /sjlog command) WITHOUT ending
 # the session: log line + chats index + data-repo push + memory push + transcript/plans/history/tasks
 # relay. The SessionEnd hook is normally fed a JSON payload by Claude; here we reconstruct it by

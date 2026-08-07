@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Interactive onboarding for a new machine. Condenses the README "Onboard a new machine"
 # steps into one guided run:
 #   - check deps (git, jq) and Claude Code — offer to install Claude if missing
@@ -128,7 +131,8 @@ CHATS_DIR="$BASE/scrubjay-chats"
 if [ -z "${SCRUBJAY_BACKEND:-}" ]; then
   echo; info "Session-relay backend — where each session's records go (pick one):"
   echo "    1) rsync-wg  peer-to-peer to your own NAS over WireGuard — records stay off third parties; needs a NAS"
-  echo "    2) local     this box HAS the NAS mounted — copy straight in, no network hop"
+  echo "    2) local     the archive is a directory this box writes straight into, no network hop —"
+  echo "                 a NAS share mounted here, or this box's own disk (then THIS box is the store)"
   echo "    3) git       push to a private scrubjay-chats repo on GitHub — no NAS or WireGuard to run"
   echo "    4) off       don't ship sessions"
   ask BACKEND_CHOICE "choose 1-4" ""
@@ -146,6 +150,12 @@ ok "backend: $BACKEND"
 WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PORT=""; RECV_PATH=""; GEN_KEY=0
 case "$BACKEND" in
   rsync-wg)
+    # The receiver is a role, not a prerequisite you must have solved elsewhere: bin/onboard-receiver.sh
+    # provisions that box (archive root, per-role authorized_keys, dependency report) and prints the
+    # privileged leftovers rather than applying them. Say so here — asking for a "receiver rrsync root"
+    # implies the box is already set up, which is how testers concluded scrubjay didn't cover it.
+    info "This needs an archive host. If you haven't set one up: clone scrubjay on that box and run"
+    info "bin/onboard-receiver.sh there — it provisions it and prints the root-level steps for you."
     ask RECV_USER "receiver SSH user" "scrubjay-rx"
     ask RECV_HOST "receiver host/IP (reachable over WG/LAN)" "192.168.1.10"
     ask RECV_PORT "receiver SSH port" "22"
@@ -157,19 +167,28 @@ case "$BACKEND" in
     ;;
   local)
     # If the NAS share details are given (or the user opts in), provision + verify the mount via
-    # sj-mount.sh (which creates <mountpoint>/scrubjay-storage and prints it); otherwise assume the
-    # box already has the NAS mounted and just take the storage path. For an unattended run, preset
+    # sj-mount.sh (which creates <mountpoint>/<storage-dir> and prints it); otherwise assume the
+    # box already has a writable archive dir (a mount, or plain local disk) and just take the path.
+    # The prompt says "mount an existing share", not "set up a NAS" — testers read the old wording as
+    # scrubjay offering to install one. For an unattended run, preset
     # SCRUBJAY_NAS_SERVER (+ SCRUBJAY_ASSUME_YES=1 so it installs the mount without prompting).
-    if [ -n "${SCRUBJAY_NAS_SERVER:-}" ] || confirm "set up the NAS mount now (this box isn't mounted yet)?" N; then
-      ask SCRUBJAY_NAS_PROTO      "NAS protocol (nfs|cifs)"       "nfs"
+    # The share is usually not scrubjay's alone, so the archive directory is named, not assumed.
+    if [ -n "${SCRUBJAY_NAS_SERVER:-}" ] \
+       || { echo; info "The archive needs a writable directory on this box. If one already exists" \
+                       "(a mounted share, or just a local path), answer no to the next question."; \
+            confirm "mount a share your NAS already serves? (this does NOT set up a NAS)" N; }; then
+      ask SCRUBJAY_NAS_PROTO      "protocol that share is served over (nfs|cifs)" "nfs"
       ask SCRUBJAY_NAS_SERVER     "NAS host/IP"                   ""
       ask SCRUBJAY_NAS_EXPORT     "export/share path on the NAS"  "/export/scrubjay"
       ask SCRUBJAY_NAS_MOUNTPOINT "local mountpoint"              "/mnt/nas1"
-      export SCRUBJAY_NAS_PROTO SCRUBJAY_NAS_SERVER SCRUBJAY_NAS_EXPORT SCRUBJAY_NAS_MOUNTPOINT
+      ask SCRUBJAY_STORAGE_DIR    "archive dir name on the share" "scrubjay-storage"
+      export SCRUBJAY_NAS_PROTO SCRUBJAY_NAS_SERVER SCRUBJAY_NAS_EXPORT SCRUBJAY_NAS_MOUNTPOINT \
+             SCRUBJAY_STORAGE_DIR
       LOCAL_CHATS="$("$APP/bin/sj-mount.sh")" \
         || die "NAS mount setup failed — mount it by hand, then re-run bin/onboard.sh."
     else
-      ask LOCAL_CHATS "NAS storage root (this box's mount)" "/mnt/nas1/scrubjay-storage"
+      ask LOCAL_CHATS "archive dir (existing mount, or a path on this box's disk)" \
+        "/mnt/nas1/${SCRUBJAY_STORAGE_DIR:-scrubjay-storage}"
     fi
     ;;
 esac
@@ -293,9 +312,19 @@ fi
 echo; ok "onboarding complete for '$HOST' (backend: $BACKEND)"
 if [ "$BACKEND" = rsync-wg ] && [ -f "$WG_KEY.pub" ]; then
   echo
-  info "Final step — authorize this machine on the receiver. Add this ONE line to the"
-  info "receiver's ~scrubjay-rx/.ssh/authorized_keys (replace <APP> with the receiver's"
-  info "scrubjay checkout path — the wrapper widens the archive to group-read after each push):"
+  info "Final step — authorize this machine on the receiver. Copy this host's PUBLIC key over"
+  info "(it is public — mail it, paste it, whatever), then run ON THE RECEIVER, in its scrubjay"
+  info "clone. That script writes the forced command for you and appends safely:"
+  echo
+  echo "    bin/onboard-receiver.sh --authorize relay <this-host.pub>"
+  echo
+  info "This host's public key ($(sj_pretty_path "$WG_KEY.pub")):"
+  echo
+  echo "    $(cat "$WG_KEY.pub")"
+  echo
+  info "By hand instead — add ONE line to the receiver's ~$RECV_USER/.ssh/authorized_keys,"
+  info "replacing <APP> with its scrubjay checkout path (the wrapper widens the archive to"
+  info "group-read after each push):"
   echo
   echo "    command=\"<APP>/bin/sj-receive.sh $RECV_PATH\",restrict $(cat "$WG_KEY.pub")"
   echo

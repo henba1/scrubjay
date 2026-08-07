@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Set up a persistent mount of a NAS share for scrubjay's `local` transcript backend, then verify
 # it is live and writable. Re-runnable and idempotent: generates a systemd .mount unit (or an
 # /etc/fstab line) and, with confirmation, sudo-installs + mounts it; if you decline or there is no
@@ -13,12 +16,14 @@
 #   SCRUBJAY_NAS_SERVER      NAS host/IP                     (required)
 #   SCRUBJAY_NAS_EXPORT      export/share path on the NAS    (required, e.g. /export/scrubjay)
 #   SCRUBJAY_NAS_MOUNTPOINT  where to mount it locally       (default /mnt/nas1)
+#   SCRUBJAY_STORAGE_DIR     archive dir on the share, may   (default scrubjay-storage)
+#                            nest, never leaves the mount
 #   SCRUBJAY_NAS_OPTS        extra mount options, comma-list (optional)
 #   SCRUBJAY_NAS_CREDS       cifs credentials file           (default /etc/scrubjay-nas.creds)
 #   SCRUBJAY_ASSUME_YES=1    install without prompting        (for unattended onboard)
 #   SCRUBJAY_MOUNT_PRINT=1   never touch the system — print the config + steps only
 #
-# On success it creates <mountpoint>/scrubjay-storage and prints the path to feed
+# On success it creates <mountpoint>/<storage-dir> and prints the path to feed
 # SCRUBJAY_LOCAL_CHATS.  Sourcing with SCRUBJAY_MOUNT_LIB=1 defines the functions without running.
 set -uo pipefail
 
@@ -87,6 +92,38 @@ sjm_unit_name() { systemd-escape -p --suffix=mount "$1"; }
 # Do we drive systemd, or fall back to fstab?
 sjm_use_systemd() { have systemd-escape && have systemctl; }
 
+# The archive directory created on the share — relative to the mountpoint, and nesting is fine
+# (some appliances hand you one fixed top-level share, so `team/scrubjay-storage` is a real shape).
+# What it may NOT do is climb out: this path becomes SCRUBJAY_LOCAL_CHATS, which every other script
+# derives from. Checked here, at the plan stage, so a bad name costs nothing — the alternative is
+# noticing after a .mount unit is installed.
+sjm_storage_dir() {  # sjm_storage_dir [name]
+  local d="${1:-scrubjay-storage}" rest c
+  case "$d" in ""|/*) return 1 ;; esac      # must be relative to the mountpoint
+  d="${d%/}"; [ -n "$d" ] || return 1       # a trailing slash is harmless; a bare "/" is not
+  rest="$d"
+  while [ -n "$rest" ]; do
+    c="${rest%%/*}"
+    case "$c" in ""|.|..) return 1 ;; esac   # no empty, "." or ".." components
+    case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+  done
+  printf '%s' "$d"
+}
+
+# ...and the half a lexical check cannot do. A clean name still escapes through a symlink that is
+# already on the share, and that is only resolvable once the mount is live. The verify block below
+# asserts the MOUNTPOINT is mounted, not that the archive is inside it — so a path that walked out
+# passes every check and then quietly fills the local disk while the NAS stays empty (issue #25).
+# Resolution is `cd -P` + `pwd` on the deepest existing ancestor: portable, and the part that does
+# not exist yet cannot contain a symlink.
+sjm_confined() {  # sjm_confined <mountpoint> <storage-path>
+  local root="" real="$2"
+  root="$(cd -P "$1" 2>/dev/null && pwd)" || return 1
+  while [ ! -d "$real" ] && [ "$real" != / ] && [ "$real" != . ]; do real="$(dirname "$real")"; done
+  real="$(cd -P "$real" 2>/dev/null && pwd)" || return 1
+  case "$real/" in "$root"/*) return 0 ;; *) return 1 ;; esac
+}
+
 [ "${SCRUBJAY_MOUNT_LIB:-0}" = 1 ] && return 0 2>/dev/null || true
 
 # ── main: assemble, install (guarded), verify ────────────────────────────────────────────────
@@ -95,6 +132,7 @@ PROTO="${SCRUBJAY_NAS_PROTO:-nfs}"
 SERVER="${SCRUBJAY_NAS_SERVER:-}"
 EXPORT="${SCRUBJAY_NAS_EXPORT:-}"
 MP="${SCRUBJAY_NAS_MOUNTPOINT:-/mnt/nas1}"
+STORE_DIR="${SCRUBJAY_STORAGE_DIR:-}"
 EXTRA="${SCRUBJAY_NAS_OPTS:-}"
 CREDS="${SCRUBJAY_NAS_CREDS:-/etc/scrubjay-nas.creds}"
 YES="${SCRUBJAY_ASSUME_YES:-0}"
@@ -107,14 +145,16 @@ esac
 [ -n "$SERVER" ] || die "SCRUBJAY_NAS_SERVER is required (the NAS host/IP)."
 [ -n "$EXPORT" ] || die "SCRUBJAY_NAS_EXPORT is required (the export/share path on the NAS)."
 case "$PROTO" in nfs|cifs) : ;; *) die "SCRUBJAY_NAS_PROTO must be nfs or cifs (got '$PROTO')." ;; esac
+STORE_DIR="$(sjm_storage_dir "$STORE_DIR")" \
+  || die "SCRUBJAY_STORAGE_DIR must be a path inside the mountpoint — relative, no '.' or '..' (got '${SCRUBJAY_STORAGE_DIR:-}')."
 
 FSTYPE="$(sjm_fstype "$PROTO")"
 WHAT="$(sjm_what "$PROTO" "$SERVER" "$EXPORT")"
 OPTS="$(sjm_opts "$PROTO" "$CREDS" "$(id -u)" "$(id -g)" "$EXTRA")"
-STORAGE="$MP/scrubjay-storage"
+STORAGE="$MP/$STORE_DIR"
 
 info "NAS mount plan:"
-printf '    %s  ->  %s   (%s)\n    options: %s\n' "$WHAT" "$MP" "$FSTYPE" "$OPTS" >&2
+printf '    %s  ->  %s   (%s)\n    options: %s\n    archive: %s\n' "$WHAT" "$MP" "$FSTYPE" "$OPTS" "$STORAGE" >&2
 
 # CIFS: we never touch the password. Point at the credentials file and stop short of it.
 if [ "$PROTO" = cifs ] && [ ! -f "$CREDS" ]; then
@@ -185,6 +225,11 @@ fi
 if ! mountpoint -q "$MP" 2>/dev/null; then
   die "$MP is not a live mount — the local backend would silently no-op. Fix the mount, then re-run."
 fi
+# The check above is about $MP; the archive is what actually gets written to. Confirm they are the
+# same filesystem before creating anything, or a symlink on the share turns a green run into an
+# archive on the local disk.
+sjm_confined "$MP" "$STORAGE" \
+  || die "$STORAGE resolves outside $MP (a symlink on the share?) — the archive would land off the NAS."
 mkdir -p "$STORAGE" 2>/dev/null || die "cannot create $STORAGE (mount not writable?)."
 probe="$STORAGE/.sjwrite.$$"
 if ( : > "$probe" ) 2>/dev/null; then rm -f "$probe"; else die "$STORAGE is not writable."; fi

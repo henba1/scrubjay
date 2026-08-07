@@ -8,6 +8,11 @@
 !tests/fixtures/*.jsonl
 projects/
 
+# agent worktrees (`EnterWorktree`, or `git worktree add .claude/worktrees/<name>`). A worktree is a
+# whole nested checkout: unignored it reads as untracked content, and any `git add -A` in the parent
+# sweeps it up. Ignore it whether or not you use one.
+.claude/worktrees/
+
 # editor / OS noise
 *.swp
 .DS_Store

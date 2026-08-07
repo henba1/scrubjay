@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Receiver-side entry point for the archive READ path. A remote client with no local archive (a
 # laptop or HPC login node) reaches the archive host by SSHing in and having THIS run as a forced
 # command, so everything executes here (where the archive + uv + config are). Pin it in the owner

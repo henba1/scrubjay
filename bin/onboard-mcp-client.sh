@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Set up THIS machine (a client with NO local archive — a laptop or HPC login node) to query the scrubjay
 # archive over SSH: the Phase-2 remote path. Idempotent — safe to re-run to enable or repair. It:
 #   - derives the connection to the archive host from the working `scrubjay-receiver` relay alias
@@ -82,7 +85,13 @@ export SCRUBJAY_MCP_REMOTE="$ALIAS"
 # The receiver side stays manual (like the relay + memory keys). Print the exact line(s) to install.
 pub="$(cat "$key.pub")"
 echo
-info "Final step — authorize this machine on the archive host. Add ONE line to the '$muser' user's"
+info "Final step — authorize this machine on the archive host. Copy this host's public key over,"
+info "then run ON THE ARCHIVE HOST, in its scrubjay clone (it writes the forced command for you"
+info "and appends safely):"
+echo
+echo "    bin/onboard-receiver.sh --authorize mcp <this-host.pub>"
+echo
+info "By hand instead — add ONE line to the '$muser' user's"
 # shellcheck disable=SC2088  # display text for the reader, not a path this script expands
 info "~/.ssh/authorized_keys ON THE ARCHIVE HOST (pins this key to the read-only server, nothing else):"
 echo

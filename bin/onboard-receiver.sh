@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Set up THIS box as the scrubjay archive host — the thing every other machine relays into.
 #
 # It is the one role that had no guided script: clients have onboard.sh / onboard-memory.sh /
@@ -50,7 +53,9 @@ done
 
 # The archive root: an explicit --path, else what this box already serves, else under $HOME (which
 # needs no root — a mounted disk is a separate, optional concern handled by bin/sj-mount.sh).
-[ -n "$ROOT" ] || ROOT="${SCRUBJAY_LOCAL_CHATS:-$HOME/scrubjay-storage}"
+# SCRUBJAY_STORAGE_DIR names the directory itself, so a box set up by hand here matches one set up
+# through onboard.sh's NAS flow.
+[ -n "$ROOT" ] || ROOT="${SCRUBJAY_LOCAL_CHATS:-$HOME/${SCRUBJAY_STORAGE_DIR:-scrubjay-storage}}"
 
 AK="$HOME/.ssh/authorized_keys"
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Onboard an HPC login node as a scrubjay transcript client that ships over SSH,
 # ProxyJumping through a home edge/bastion to the receiver. HPC nodes usually can't run
 # WireGuard (no root/TUN; outbound UDP commonly blocked), so the transport rides TCP/SSH.
