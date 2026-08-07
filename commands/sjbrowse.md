@@ -16,6 +16,9 @@ Selection / filters: **$ARGUMENTS**
    raw tool JSON:
    - **chats**: `date · host · harness+model · topic · size` (this is the overview the user asked
      for; drop `harness+model`/`size` for a row that predates them rather than showing blanks).
+     A row with an **empty topic** is a real, resumable session whose summary was never authored —
+     list it, showing its `project` and `sid` in place of the topic. Do not silently omit it; that
+     is the bug this listing used to have. `bin/sj-topics.sh` can backfill those topics.
    - **transcript / plan / memory / note**: `date · host · project · topic` (turns/size where
      useful). Notes are cross-machine, so they have no host — show `project` instead.
 4. On the user's pick, call `sj_get` to inject it — for a **chats** row, pass its `sid`; slice a long
