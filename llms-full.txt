@@ -576,6 +576,23 @@ Every subsystem is best-effort and hook-invoked with its output discarded, so a 
 
 Read-only: it never writes, pushes or installs. Each failure comes with a `fix:` hint. On the peer-to-peer backends the usual finding is that this host's key isn't in the receiver's `authorized_keys` yet — which a human with root on the receiver has to fix, by design.
 
+## Recover a session that ended badly
+
+Everything that records a session — its catalogue row, the transcript relay, the readable rendering — hangs off the session-end hook. A `kill -9`, a closed terminal, a dropped SSH connection or a power cut skips it, and nothing else notices: the relay breadcrumb is written by the ship that never ran, so there is no failure to report. The transcript itself is safe on disk the whole time; what is missing is every trace that the session happened.
+
+The start of your next session sweeps these up automatically, and says so when it does. To look, or to sweep now:
+
+```
+~/.scrubjay/scrubjay/bin/sj-doctor.sh sessions       # anything stranded? (read-only)
+~/.scrubjay/scrubjay/bin/sj-reconcile.sh --dry-run   # …and exactly which sessions
+~/.scrubjay/scrubjay/bin/sj-reconcile.sh             # catalogue + archive them now
+~/.scrubjay/scrubjay/bin/sj-reconcile.sh --all       # including the pre-scrubjay back catalogue
+```
+
+The automatic pass only considers sessions untouched for 30 minutes (a live session in another terminal is still writing) and modified in the last 14 days, and it does at most 25 per run so a backlog cannot slow a session's startup. `--all` lifts every one of those limits.
+
+A recovered session is dated when it *died*, not when it was recovered, so it sorts into the catalogue where it belongs. The one thing that cannot be recovered is a `/sjlog` essence — the row falls back to the session's first prompt, exactly as the automatic path does.
+
 ## Find a past chat across every machine
 
 ```
@@ -623,6 +640,7 @@ Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-
 | `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                          |
 | `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                   |
 | `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                      |
+| `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit          |
 
 ## Re-home the scrubjay clones
 
