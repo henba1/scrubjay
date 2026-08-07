@@ -2,7 +2,7 @@
 
 <img src="docs/banner.png" alt="scrubjay — recall what · where · when" width="100%">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: FSL-1.1-ALv2](https://img.shields.io/badge/License-FSL--1.1--ALv2-blue.svg)](LICENSE)
 [![tests](https://github.com/henba1/scrubjay/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/henba1/scrubjay/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/henba1/scrubjay/branch/main/graph/badge.svg)](https://codecov.io/gh/henba1/scrubjay)
 [![Docs](https://img.shields.io/badge/docs-mkdocs--material-2094f3.svg)](https://henba1.github.io/scrubjay/)
@@ -33,7 +33,8 @@ scrubjay fixes both, and keeps it all on hardware you own.
   your own NAS automatically. Later you ask *"what was that fix for the auth timeout?"* and get the
   real conversation back — whichever machine and whichever agent it happened on.
 - **Yours.** Your config and chats live in private repos on your own account; transcripts go
-  straight to your own storage. This repo is only the machinery, which is why it can be public.
+  straight to your own storage. This repo is only the machinery, which is why you can read every
+  line of what runs on your machines.
 
 Three repos, so the machinery can be public without leaking anything you wrote:
 
@@ -166,26 +167,17 @@ The docs also publish an [`llms.txt`](https://henba1.github.io/scrubjay/llms.txt
 
 ## Why the name?
 
-Western scrub jays are the textbook case of **episodic-like memory** in animals. They cache food in
+Western scrub jays are a good example of **episodic-like memory** in animals. They cache food in
 places they control, and later recover it by *what* they buried, *where* they buried it, and *when* —
-including whether it's still worth eating. That was the first solid evidence any non-human animal
+including whether it's still worth eating. That is regarded as early evidence that any non-human animal
 remembers a specific past event, and not just a learned habit ([Clayton & Dickinson,
 1998](https://doi.org/10.1038/26216)).
 
-Which is this system, precisely:
-
-| The bird | scrubjay |
-|---|---|
-| caches food in places it controls | ships records to hardware you own |
-| **what** it cached | the topic — searchable in plain English |
-| **where** it cached | which machine, which project |
-| **when** it cached | the date, and how stale it is |
-
-Hence the tagline: **recall what · where · when.**
-
-The name also has to do a duller job, and does: it's vendor-neutral (nothing here is Claude-only),
-it's a coined compound, so it survives a namespace check, and `sjrecall` reads well in a terminal.
-
 ## License
 
-[MIT](LICENSE) © 2026 Hendrik
+**[FSL-1.1-ALv2](LICENSE)** — the [Functional Source License](https://fsl.software/), with an
+Apache-2.0 future licence. © 2026 Hendrik Baacke.
+
+- **You may** read it, run it, modify it, fork it, and use it inside your own organisation,
+  commercially included. All of that is a *Permitted Purpose* under the licence.
+- **You may not** make it available to others as a commercial product or sell a service that implements scrubjay or constituent parts thereof.

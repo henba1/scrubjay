@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Render a Codex CLI rollout (~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl) as a
 # human-readable Markdown conversation — the codex counterpart of bin/render-transcript.sh and
 # bin/render-opencode.sh, and deliberately the SAME output shape: a `# title` line, a `_N turns_`
@@ -85,4 +88,6 @@ jq -rs '
       | .out ) as $blocks
   | "# " + $title + "\n\n_" + ($blocks | length | tostring) + " turns_\n"
     + ( $blocks | join("") )
-' "$src"
+' "$src" | tr -d '\000'
+# One NUL byte from captured output would make rg/grep treat this rendering as binary and skip it
+# in a recursive search, dropping the session out of /sjrecall. See render-transcript.sh and #66.

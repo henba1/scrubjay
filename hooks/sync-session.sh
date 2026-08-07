@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # SessionStart hook — fires once when a coding session begins (any harness: Claude Code fires it
 # from settings.json; another harness's adapter is responsible for calling it — see bin/adapters/).
 # Keeps this machine's config fresh with zero manual steps:

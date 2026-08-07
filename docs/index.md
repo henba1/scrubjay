@@ -12,6 +12,10 @@ without leaking anything:
 | **scrubjay-data** | `hosts/`, `settings/`, `claude-md/`, `templates/`, `memory/`, `logs/` | private |
 | **scrubjay-chats** | full chat transcripts (`.jsonl`), relayed off each machine | private |
 
+Public and readable, but **source-available rather than open source**: use it for anything,
+including inside your company, just don't resell it as a competing product. See
+[Licensing](licensing.md).
+
 ![scrubjay — system overview](overview.svg)
 
 <sub>Diagram source: [`overview.dot`](overview.dot) — `dot -Tsvg docs/overview.dot -o docs/overview.svg`.</sub>
@@ -26,6 +30,9 @@ without leaking anything:
 
 ## Where to go
 
+- **[Project brief](projectbrief.md)** — what problem it solves, how it differs from a shared git
+  repo or a shared NAS, and what it does *not* do yet. Read this first if you are deciding
+  whether scrubjay is for you.
 - **[Concepts](concepts.md)** — the two-kinds-of-sync model, what scrubjay is, and
   what lives in the database. Start here to understand *why* the system is shaped this way.
 - **[Onboarding](onboarding.md)** — install on a new machine (interactive script or

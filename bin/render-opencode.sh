@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Render an opencode session export (`opencode export <sid>`) as a human-readable Markdown
 # conversation — the opencode counterpart of bin/render-transcript.sh, and deliberately the SAME
 # output shape: a `# <title>` line, a `_N turns_` line, then `## User` / `## Assistant` blocks with
@@ -57,4 +60,6 @@ jq -r '
       | .out ) as $blocks
   | "# " + $title + "\n\n_" + ($blocks | length | tostring) + " turns_\n"
     + ( $blocks | join("") )
-' "$src"
+' "$src" | tr -d '\000'
+# One NUL byte from captured output would make rg/grep treat this rendering as binary and skip it
+# in a recursive search, dropping the session out of /sjrecall. See render-transcript.sh and #66.

@@ -12,6 +12,9 @@ syncs it. This repo holds your actual Claude Code content; the app repo holds on
 | `claude-md/CLAUDE.md` | your global instructions → symlinked to `~/.claude/CLAUDE.md` |
 | `claude-md/agents/` | custom sub-agents → `~/.claude/agents` |
 | `claude-md/commands/` | your own slash commands (merged with the app's `/dc*` set) |
+| `claude-md/skills/<name>/SKILL.md` | your skills → `~/.claude/skills/` *and* opencode's `skills/` |
+| `claude-md/output-styles/` | your output styles → `~/.claude/output-styles/` |
+| `shared/AGENTS.md` | cross-harness instructions → opencode's `instructions[]` + `~/.claude/rules/` |
 | `settings/settings.base.json` | shared settings, merged with the per-host overlay |
 | `hosts/<host>/env.md` | machine-specific notes (paths, quirks) |
 | `hosts/<host>/claude/settings.json` | per-host settings overlay |

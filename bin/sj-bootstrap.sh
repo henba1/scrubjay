@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Create + seed the PRIVATE sibling repos this machine needs, under YOUR GitHub account.
 #
 # scrubjay (the app) is public and you run it straight from upstream — no fork required. Your

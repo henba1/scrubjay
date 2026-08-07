@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
+
 # Set up THIS machine for cross-machine memory (the self-hosted NAS git repo). Idempotent:
 # run it on a fresh machine to turn memory sync on, or on an existing one to enable/repair it —
 # re-running when already configured is a safe no-op.
@@ -160,8 +163,14 @@ fi
 
 if [ -n "$authorize_key" ] && [ -f "$authorize_key" ]; then
   echo
-  info "Final step — authorize this machine for memory-git on the receiver. Add ONE line to the"
-  info "'$guser' user's ~/.ssh/authorized_keys on the receiver (restricts the key to git only):"
+  info "Final step — authorize this machine for memory-git on the receiver. Copy this host's"
+  info "public key over, then run ON THE RECEIVER, in its scrubjay clone (it writes the forced"
+  info "command for you and appends safely):"
+  echo
+  echo "    bin/onboard-receiver.sh --authorize memory <this-host.pub>"
+  echo
+  info "By hand instead — add ONE line to the '$guser' user's ~/.ssh/authorized_keys on the"
+  info "receiver (restricts the key to git only):"
   echo
   printf '    command="git-shell -c \\"$SSH_ORIGINAL_COMMAND\\"",restrict %s\n' "$(cat "$authorize_key")"
   echo
