@@ -410,6 +410,8 @@ One manual step the script can't do for you — authorize the new host on the re
 
 For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each **print an `authorized_keys` line**; you must paste it into the receiver account's `~/.ssh/authorized_keys` (e.g. `scrubjay-rx` on the NAS box, needs sudo). This is deliberate — a new machine must not be able to self-authorize; granting it access requires a human with root on the receiver. Each line is locked to one forced command (`rrsync -wo` for transcripts, `git-shell` for memory), so a leaked key can't get a shell or read the archive back. Until you add the line, that host's sync silently no-ops. (Receiver also needs a one-time `safe.directory` trust for the memory repo — see [memory-sync.md](https://henba1.github.io/scrubjay/memory-sync/index.md).)
 
+You don't have to paste it by hand. On the receiver, `bin/onboard-receiver.sh --authorize <relay|memory|mcp> <client.pub>` writes the right forced command and appends safely — a file missing its trailing newline otherwise splices the new key onto the previous one and breaks both. Copy the client's `.pub` over (it's public) and run that there.
+
 Manual steps (what the script automates)
 
 ```
@@ -432,6 +434,18 @@ git -C ~/.scrubjay/scrubjay-data add -A && git -C ~/.scrubjay/scrubjay-data comm
 `~/.scrubjay/` keeps the machinery out of your project workspace; the clone location is otherwise arbitrary (it's only referenced via the pointer file below).
 
 Prereqs: `bash`, `jq`, `git`, an SSH key on GitHub. No root.
+
+## The archive host (the NAS side)
+
+On the peer-to-peer backends the receiver is a scrubjay **role with its own guided setup** — not something you must stand up separately before you start. Clone this repo on that box and run:
+
+```
+~/.scrubjay/scrubjay/bin/onboard-receiver.sh          # or --print to report, changing nothing
+```
+
+It creates the archive root (setgid, so pushes inherit the group that reads them), reports what each role needs (`rrsync` for relay, `git-shell` for memory, `uv` for MCP), and authorizes one client key per role via `--authorize <relay|memory|mcp> <client.pub>`. All of that runs as you, unprivileged.
+
+What it deliberately does **not** do is anything needing root or the router — sshd and its port, the firewall, WireGuard, DDNS, mounting a disk (`bin/sj-mount.sh`), snapshots ([`bin/sj-snapshot.sh`](https://henba1.github.io/scrubjay/durability/index.md)). It computes those commands and prints them for you to run. scrubjay is a sync tool that needs somewhere to put bytes, not a NAS appliance.
 
 ## Pointers (machine-local)
 
