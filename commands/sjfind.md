@@ -12,7 +12,9 @@ Request: **$ARGUMENTS**  (typically "<topic> in <which session>")
    directly as `ref`. Otherwise call `sj_recall` on the "in <…>" part to locate the session, and
    confirm the match with the user if ambiguous.
 2. Call `sj_search_within(ref, query=<the topic>, context=N)`. It returns passages with **line
-   anchors and the enclosing turn number**.
+   anchors and the enclosing turn number**. `query` is **one literal substring** — no regex, no
+   `a|b`, no multiple words OR-ed. Search one phrase at a time and retry with a shorter one before
+   believing a `matches: 0`.
 3. Present the matches as a short ordered list: turn #, line #, and the excerpt. If there are many,
    summarize where the discussion is densest.
 4. Offer to `sj_get` a `turns=` / `lines=` slice around the best hit to pull it into context.

@@ -20,7 +20,8 @@ Selection / filters: **$ARGUMENTS**
      useful). Notes are cross-machine, so they have no host — show `project` instead.
 4. On the user's pick, call `sj_get` to inject it — for a **chats** row, pass its `sid`; slice a long
    transcript with `turns=`/`lines=`. A chats row whose transcript never reached this machine is a
-   pointer only ("look on <host>"): say so instead of trying to fetch it.
+   pointer only: `sj_get` answers `"no transcript in this archive"` with the `host` that has it —
+   relay that ("look on `<host>`") instead of retrying.
 
 Tip: transcripts/plans/memories/notes are also available as `@`-mention resources (the `sjmcp` resource
 picker), if the user would rather attach one directly. Be concise.
