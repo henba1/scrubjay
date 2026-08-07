@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 # Catalogue + archive the sessions that ended without ever reaching the session-end hook.
 #
 # Why this exists: everything that records a session — the catalogue row, the transcript relay, the

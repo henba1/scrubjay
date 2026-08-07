@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: FSL-1.1-ALv2
+# Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 # bin/sj-reconcile.sh — the pass that catalogues + archives sessions which ended without the
 # session-end hook ever firing (kill -9, closed terminal, power cut).
 #
