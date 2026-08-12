@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: FSL-1.1-ALv2
 # Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
-# One-shot: ship every EXISTING session transcript to the relay AND index any that are
-# missing from the catalogue. The SessionEnd hook only ships/indexes sessions that end
-# after it went live; this backfills the back catalogue.
-# Idempotent — re-running ships only new/changed files and skips already-indexed rows.
+# One-shot: ship every EXISTING session transcript to the relay, then catalogue the ones no row
+# has ever been written for (via bin/sj-reconcile.sh). The SessionEnd hook only records sessions
+# that end after it went live; this covers the back catalogue — both halves of it, since a shipped
+# transcript with no catalogue row is archived but unfindable.
+# Idempotent — re-running ships only new/changed files and writes no second row for a session.
 # Usage: [--host NAME]
 set -uo pipefail
 
@@ -50,30 +51,20 @@ else
   echo "shipped ${#files[@]} transcripts via $backend"
 fi
 
-# Index pass: write a catalogue row for every shipped transcript that has no entry yet.
-# Runs after shipping so the archive and index stay consistent. Append-only and idempotent
-# — sj_log_row's write-once guard (grep session=<sid>) makes re-runs safe. A failure here
-# warns but does not abort, so a bad transcript never blocks the rest of the backfill.
-DATA="$(sj_data 2>/dev/null || true)"
-if [ -z "$DATA" ] || [ ! -d "$DATA" ]; then
-  echo "backfill: no data repo found — skipping catalogue index" >&2
-else
-  LOG="$DATA/logs/$HOST.log"; mkdir -p "$DATA/logs"; touch "$LOG"
-  harness="${SCRUBJAY_HARNESS:-claude}"
-  indexed=0; skipped=0
-  for f in "${files[@]}"; do
-    sid="$(basename "$f" .jsonl)"
-    cwd="$(basename "$(dirname "$f")")"
-    mt="$(sj_mtime "$f")" || mt=""
-    ts=""; [ -n "$mt" ] && ts="$(sj_epoch_stamp "$mt")"
-    if sj_log_row "$LOG" "$sid" "$cwd" "$f" "$harness" "$HOST" "$ts" "" 2>/dev/null; then
-      indexed=$((indexed + 1))
-    else
-      skipped=$((skipped + 1))
-    fi
-  done
-  echo "catalogue index: $indexed new row(s), $skipped already present"
-  if [ "$indexed" -gt 0 ]; then
-    sj_data_push "backfill: index $indexed session(s) from $HOST" || true
-  fi
-fi
+# Index pass. Shipping alone leaves the back catalogue archived but invisible: /sjbrowse, /sjtable
+# and /sjrecall all read logs/<host>.log, not the archive. bin/sj-reconcile.sh already writes that
+# row for a session the catalogue has never heard of — reuse it rather than growing a second writer,
+# since sj_log_row's format has three readers and a fourth author would drift. Delegating also buys
+# the adapter-derived fields (real cwd, model, turns), the single-writer lock, and the catalogue
+# re-render, none of which this loop would get for free.
+#
+# NOT --all, which lifts the liveness guard along with the age window. This script is run by hand
+# from inside a live session, and cataloguing that session mid-flight would freeze its row at a
+# partial turn count — the write-once guard means its real SessionEnd row is never written. So lift
+# the age window explicitly and leave --quiet-mins doing its job. --max is needed because the cap
+# only lifts on the --all path.
+#
+# NOSHIP: everything above is already shipped. A failure here warns; the backfill still succeeded.
+SCRUBJAY_HARNESS=claude SCRUBJAY_NOSHIP=1 \
+  "$APP/bin/sj-reconcile.sh" --within-days 36500 --quiet-mins 30 --max 100000 \
+  || echo "backfill: catalogue index failed — run bin/sj-reconcile.sh --all by hand" >&2
