@@ -925,12 +925,11 @@ locally.</p>
 it shows which scripts nothing exercises, and never blocks a PR. A threshold on a shell codebase
 mostly buys tests that execute lines without asserting anything.</p>
 <h2 id="where-the-coverage-is">Where the coverage is<a class="headerlink" href="#where-the-coverage-is" title="Permanent link">&para;</a></h2>
-<p>One cell per file under <code>bin/</code> and <code>hooks/</code>. Area is the file's line count, colour is its coverage —
-red to green. Hover a cell for the path.</p>
-<object type="image/svg+xml" data="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg" width="100%" aria-label="Coverage grid for bin/ and hooks/">
-  <img src="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg" alt="Coverage grid for bin/ and hooks/" width="100%">
-</object>
-
+<p>The <a href="https://app.codecov.io/github/henba1/scrubjay">coverage grid</a> gives one cell per file under <code>bin/</code> and <code>hooks/</code> — area is the file's
+line count, colour is its coverage, red to green, and each cell names its file on hover. It is not
+embedded here: Codecov serves the graph SVGs with <code>X-Frame-Options: SAMEORIGIN</code>, so a cross-origin
+<code>&lt;object&gt;</code> falls back to a flat image and loses the tooltips that make it readable. Open it on
+Codecov, or fetch <a href="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg">the SVG</a> directly.</p>
 <p>The solid red is one shape: <strong>code that needs a second machine.</strong> Onboarding entry points
 (<code>onboard.sh</code>, <code>onboard-memory.sh</code>, the <code>onboard-*-client.sh</code> set, <code>sj-bootstrap.sh</code>,
 <code>claude-register-host.sh</code>), receiver-side tools (<code>sj-receive.sh</code>, <code>sjmcp-serve.sh</code>,
