@@ -10,11 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://henba1.github.io/scrubjay/mirror-host/">
+        <link rel="canonical" href="https://henba1.github.io/scrubjay/testing/">
       
       
-        <link rel="prev" href="../memory-sync/">
+        <link rel="prev" href="../licensing/">
       
+      
+        <link rel="next" href="../transcript-transport/">
       
       
         
@@ -25,7 +27,7 @@
     
     
       
-        <title>Mirror host (git backend) - scrubjay</title>
+        <title>Test coverage - scrubjay</title>
       
     
     
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mirror-host-optional-also-keep-a-nas-copy-of-the-git-backend" class="md-skip">
+        <a href="#test-coverage-what-the-suite-reaches" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Mirror host (git backend)
+              Test coverage
             
           </span>
         </div>
@@ -633,10 +635,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test coverage
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -652,6 +681,48 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-coverage-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the coverage is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the graph
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -745,37 +816,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Mirror host (git backend)
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../mirror-host/" class="md-nav__link">
         
   
   
@@ -791,59 +835,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#one-time-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One-time setup
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cron-every-30-min" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cron (every 30 min)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#if-you-later-move-to-the-wireguard-transport" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If you later move to the WireGuard transport
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -883,10 +874,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#one-time-setup" class="md-nav__link">
+  <a href="#where-the-coverage-is" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One-time setup
+        Where the coverage is
       
     </span>
   </a>
@@ -894,21 +885,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cron-every-30-min" class="md-nav__link">
+  <a href="#reading-the-graph" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cron (every 30 min)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#if-you-later-move-to-the-wireguard-transport" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        If you later move to the WireGuard transport
+        Reading the graph
       
     </span>
   </a>
@@ -935,37 +915,42 @@
   
 
 
-<h1 id="mirror-host-optional-also-keep-a-nas-copy-of-the-git-backend">Mirror host (optional): also keep a NAS copy of the <code>git</code> backend<a class="headerlink" href="#mirror-host-optional-also-keep-a-nas-copy-of-the-git-backend" title="Permanent link">&para;</a></h1>
-<p><strong>Optional add-on for the <code>git</code> backend.</strong> If you use GitHub as your shared store, the private
-<code>scrubjay-chats</code> repo is already a complete, permanent home for your transcripts — you don't need
-this page. But if you <em>also</em> want a copy on your home NAS (extra durability, or to feed the local
-MCP archive), an always-on <strong>mirror host</strong> (any small home server — make/model doesn't matter)
-bridges the two: it pulls the <code>scrubjay-chats</code> repo every 30 min and mirrors it into
-<code>$NAS1/scrubjay-storage</code>.</p>
-<h2 id="one-time-setup">One-time setup<a class="headerlink" href="#one-time-setup" title="Permanent link">&para;</a></h2>
-<ol>
-<li>SSH key on the mirror host added to GitHub (read access to <code>scrubjay-chats</code>).</li>
-<li>Clone the app for the script:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:&lt;your-gh-user&gt;/scrubjay.git<span class="w"> </span>~/scrubjay
-</code></pre></div></li>
-<li>Make sure the NAS is mounted (e.g. <code>/mnt/nas1/scrubjay-storage</code>).</li>
-<li>Test once (<code>CHATS_REPO_URL</code> is only needed the first run, to clone <code>scrubjay-chats</code>):
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">CHATS_REPO_URL</span><span class="o">=</span>git@github.com:&lt;your-gh-user&gt;/scrubjay-chats.git<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">NAS_DIR</span><span class="o">=</span>/mnt/nas1/scrubjay-storage<span class="w"> </span>~/scrubjay/bin/pull-and-mirror.sh
-</code></pre></div></li>
-</ol>
-<h2 id="cron-every-30-min">Cron (every 30 min)<a class="headerlink" href="#cron-every-30-min" title="Permanent link">&para;</a></h2>
-<p><code>crontab -e</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>*/30 * * * * NAS_DIR=/mnt/nas1/scrubjay-storage CHATS_REPO=$HOME/scrubjay-chats $HOME/scrubjay/bin/pull-and-mirror.sh &gt;&gt; $HOME/claude-mirror.log 2&gt;&amp;1
-</code></pre></div>
-<p>Result: every machine's transcripts land on the NAS at
-<code>scrubjay-storage/&lt;host&gt;/&lt;project-slug&gt;/&lt;session&gt;.jsonl</code> within 30 min of a session
-ending. With the mirror running, the NAS copy doubles your archive; you can then prune/rotate
-the GitHub repo if you like. Without it, the GitHub repo <em>is</em> your archive.</p>
-<h2 id="if-you-later-move-to-the-wireguard-transport">If you later move to the WireGuard transport<a class="headerlink" href="#if-you-later-move-to-the-wireguard-transport" title="Permanent link">&para;</a></h2>
-<p>If you switch machines to push peer-to-peer to the home node (see <code>transcript-transport.md</code>), the
-mirror host no longer pulls from GitHub — the home receiver writes straight to the NAS, and this
-cron job is retired (or repurposed to rsync from the receiver to the NAS).</p>
+<h1 id="test-coverage-what-the-suite-reaches">Test coverage — what the suite reaches<a class="headerlink" href="#test-coverage-what-the-suite-reaches" title="Permanent link">&para;</a></h1>
+<p><a href="https://codecov.io/gh/henba1/scrubjay"><img alt="codecov" src="https://codecov.io/gh/henba1/scrubjay/branch/main/graph/badge.svg" /></a></p>
+<p>The suite is bash, <code>jq</code> and coreutils — no framework. Every test file runs in its own process with
+<code>$HOME</code> moved into a temp dir, so a run on your laptop does what a run on a fresh CI runner does.
+<a href="https://github.com/henba1/scrubjay/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> has the commands, including how to reproduce the coverage number
+locally.</p>
+<p>Coverage is measured with <a href="https://github.com/SimonKagstrom/kcov">kcov</a> and reported to <a href="https://app.codecov.io/github/henba1/scrubjay">Codecov</a>. It is <strong>informational</strong>:
+it shows which scripts nothing exercises, and never blocks a PR. A threshold on a shell codebase
+mostly buys tests that execute lines without asserting anything.</p>
+<h2 id="where-the-coverage-is">Where the coverage is<a class="headerlink" href="#where-the-coverage-is" title="Permanent link">&para;</a></h2>
+<p>One cell per file under <code>bin/</code> and <code>hooks/</code>. Area is the file's line count, colour is its coverage —
+red to green. Hover a cell for the path.</p>
+<object type="image/svg+xml" data="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg" width="100%" aria-label="Coverage grid for bin/ and hooks/">
+  <img src="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg" alt="Coverage grid for bin/ and hooks/" width="100%">
+</object>
+
+<p>The solid red is one shape: <strong>code that needs a second machine.</strong> Onboarding entry points
+(<code>onboard.sh</code>, <code>onboard-memory.sh</code>, the <code>onboard-*-client.sh</code> set, <code>sj-bootstrap.sh</code>,
+<code>claude-register-host.sh</code>), receiver-side tools (<code>sj-receive.sh</code>, <code>sjmcp-serve.sh</code>,
+<code>pull-and-mirror.sh</code>) and the remote transports (<code>hooks/transports/git.sh</code>, <code>rsync-wg.sh</code>) cannot be
+driven from a single sandboxed test run. <code>onboard-receiver.sh</code> is the exception that shows this is a
+reachability limit rather than a policy — its logic is unit-testable, and it is tested.</p>
+<p>Those files read 0% rather than disappearing. That is deliberate: the coverage job passes
+<code>--bash-parse-files-in-dirs=bin,hooks</code>, so kcov puts every shipped script in the report at the
+coverage it truly has. Without it, a script no test ever loads is simply absent from the
+denominator, and the percentage silently becomes "coverage of the code the tests already reach" —
+a number that only ever goes up and says nothing.</p>
+<p>The thinnest <em>reachable</em> code is the readable-Markdown layer — <code>render-transcript.sh</code>,
+<code>render-opencode.sh</code>, <code>render-codex.sh</code> — followed by <code>claude-sync.sh</code>. That is where new tests move
+the number honestly.</p>
+<h2 id="reading-the-graph">Reading the graph<a class="headerlink" href="#reading-the-graph" title="Permanent link">&para;</a></h2>
+<p>The grid always renders the default branch. There is no per-branch or per-PR view — <code>?branch=</code> on
+the SVG URL is accepted and ignored. For per-PR deltas, line-level detail and click-through, use the
+<a href="https://app.codecov.io/github/henba1/scrubjay">Codecov dashboard</a>; PRs get a comment only when coverage actually moves.</p>
+<p><a href="https://codecov.io/gh/henba1/scrubjay/graphs/sunburst.svg">Sunburst</a> and <a href="https://codecov.io/gh/henba1/scrubjay/graphs/icicle.svg">icicle</a> renderings of the same data exist. They encode directory
+nesting, which is nearly flat here, so the grid is usually the one worth looking at.</p>
 
 
 
