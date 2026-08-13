@@ -157,12 +157,28 @@ jobs:
       #
       # use_oidc avoids storing an upload token at all. If Codecov's repo settings don't have
       # OIDC enabled, drop it and add a CODECOV_TOKEN secret instead: token: ${{ secrets.CODECOV_TOKEN }}
+      #
+      # fail_ci_if_error + continue-on-error is the pairing that makes a broken upload *visible*
+      # without making it fatal. With fail_ci_if_error:false the action swallows the CLI's exit
+      # code, and an upload rejected outright — this repo sat at `{"message":"Repository not
+      # found"}` for every run until it was activated on Codecov — looked identical to a healthy
+      # one. Letting the step fail and tolerating it keeps the job green while recording an
+      # outcome the next step can turn into an annotation.
       - name: upload to Codecov
+        id: codecov
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           files: ./coverage.xml
           flags: shell
           disable_search: true
           use_oidc: true
-          # Coverage reporting is not a merge gate. A Codecov outage must not turn a good PR red.
-          fail_ci_if_error: false
+          fail_ci_if_error: true
+
+      # Coverage reporting is not a merge gate: a Codecov outage must not turn a good PR red.
+      # So this warns and exits 0 — the run stays green and the annotation says why the number
+      # on this commit is stale.
+      - name: warn if the upload failed
+        if: steps.codecov.outcome == 'failure'
+        run: |
+          echo "::warning title=Codecov upload failed::The suite ran and coverage.xml was produced, but Codecov did not accept the upload. Coverage for this commit is stale — see the 'upload to Codecov' step for the reason."
