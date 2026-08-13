@@ -13,12 +13,11 @@ mostly buys tests that execute lines without asserting anything.
 
 ## Where the coverage is
 
-One cell per file under `bin/` and `hooks/`. Area is the file's line count, colour is its coverage —
-red to green. Hover a cell for the path.
-
-<object type="image/svg+xml" data="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg" width="100%" aria-label="Coverage grid for bin/ and hooks/">
-  <img src="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg" alt="Coverage grid for bin/ and hooks/" width="100%">
-</object>
+The [coverage grid][codecov] gives one cell per file under `bin/` and `hooks/` — area is the file's
+line count, colour is its coverage, red to green, and each cell names its file on hover. It is not
+embedded here: Codecov serves the graph SVGs with `X-Frame-Options: SAMEORIGIN`, so a cross-origin
+`<object>` falls back to a flat image and loses the tooltips that make it readable. Open it on
+Codecov, or fetch [the SVG][grid] directly.
 
 The solid red is one shape: **code that needs a second machine.** Onboarding entry points
 (`onboard.sh`, `onboard-memory.sh`, the `onboard-*-client.sh` set, `sj-bootstrap.sh`,
@@ -45,6 +44,8 @@ the SVG URL is accepted and ignored. For per-PR deltas, line-level detail and cl
 
 [Sunburst][sunburst] and [icicle][icicle] renderings of the same data exist. They encode directory
 nesting, which is nearly flat here, so the grid is usually the one worth looking at.
+
+[grid]: https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg
 
 [contributing]: https://github.com/henba1/scrubjay/blob/main/CONTRIBUTING.md
 [kcov]: https://github.com/SimonKagstrom/kcov
