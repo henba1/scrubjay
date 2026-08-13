@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: FSL-1.1-ALv2
 # Copyright (c) 2026 Hendrik Baacke. See LICENSE.
 
-# One-shot: ship every EXISTING session transcript to the relay. The SessionEnd hook
-# only ships sessions that end after it went live; this uploads the back catalogue.
-# Idempotent — re-running ships only new/changed files. Usage: [--host NAME]
+# One-shot: ship every EXISTING session transcript to the relay, then catalogue the ones no row
+# has ever been written for (via bin/sj-reconcile.sh). The SessionEnd hook only records sessions
+# that end after it went live; this covers the back catalogue — both halves of it, since a shipped
+# transcript with no catalogue row is archived but unfindable.
+# Idempotent — re-running ships only new/changed files and writes no second row for a session.
+# Usage: [--host NAME]
 set -uo pipefail
 
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,3 +50,21 @@ else
   done
   echo "shipped ${#files[@]} transcripts via $backend"
 fi
+
+# Index pass. Shipping alone leaves the back catalogue archived but invisible: /sjbrowse, /sjtable
+# and /sjrecall all read logs/<host>.log, not the archive. bin/sj-reconcile.sh already writes that
+# row for a session the catalogue has never heard of — reuse it rather than growing a second writer,
+# since sj_log_row's format has three readers and a fourth author would drift. Delegating also buys
+# the adapter-derived fields (real cwd, model, turns), the single-writer lock, and the catalogue
+# re-render, none of which this loop would get for free.
+#
+# NOT --all, which lifts the liveness guard along with the age window. This script is run by hand
+# from inside a live session, and cataloguing that session mid-flight would freeze its row at a
+# partial turn count — the write-once guard means its real SessionEnd row is never written. So lift
+# the age window explicitly and leave --quiet-mins doing its job. --max is needed because the cap
+# only lifts on the --all path.
+#
+# NOSHIP: everything above is already shipped. A failure here warns; the backfill still succeeded.
+SCRUBJAY_HARNESS=claude SCRUBJAY_NOSHIP=1 \
+  "$APP/bin/sj-reconcile.sh" --within-days 36500 --quiet-mins 30 --max 100000 \
+  || echo "backfill: catalogue index failed — run bin/sj-reconcile.sh --all by hand" >&2
