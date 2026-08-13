@@ -89,6 +89,7 @@ nav:
   - Reference: reference.md
   - Licensing: licensing.md
   - Deep dives:
+      - Test coverage: testing.md
       - Transcript transport: transcript-transport.md
       - Archive durability: durability.md
       - Memory sync: memory-sync.md
