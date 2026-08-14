@@ -13,10 +13,8 @@
         <link rel="canonical" href="https://henba1.github.io/scrubjay/testing/">
       
       
-        <link rel="prev" href="../licensing/">
+        <link rel="prev" href="../mirror-host/">
       
-      
-        <link rel="next" href="../transcript-transport/">
       
       
         
@@ -78,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#test-coverage-what-the-suite-reaches" class="md-skip">
+        <a href="#test-coverage" class="md-skip">
           Skip to content
         </a>
       
@@ -635,103 +633,6 @@
                 
   
   
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Test coverage
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Test coverage
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#where-the-coverage-is" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where the coverage is
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reading-the-graph" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reading the graph
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
   
   
     <li class="md-nav__item">
@@ -840,6 +741,92 @@
 
               
             
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test coverage
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test coverage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the graph
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -874,17 +861,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#where-the-coverage-is" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where the coverage is
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#reading-the-graph" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -915,7 +891,7 @@
   
 
 
-<h1 id="test-coverage-what-the-suite-reaches">Test coverage — what the suite reaches<a class="headerlink" href="#test-coverage-what-the-suite-reaches" title="Permanent link">&para;</a></h1>
+<h1 id="test-coverage">Test coverage<a class="headerlink" href="#test-coverage" title="Permanent link">&para;</a></h1>
 <p><a href="https://codecov.io/gh/henba1/scrubjay"><img alt="codecov" src="https://codecov.io/gh/henba1/scrubjay/branch/main/graph/badge.svg" /></a></p>
 <p>The suite is bash, <code>jq</code> and coreutils — no framework. Every test file runs in its own process with
 <code>$HOME</code> moved into a temp dir, so a run on your laptop does what a run on a fresh CI runner does.
@@ -924,30 +900,12 @@ locally.</p>
 <p>Coverage is measured with <a href="https://github.com/SimonKagstrom/kcov">kcov</a> and reported to <a href="https://app.codecov.io/github/henba1/scrubjay">Codecov</a>. It is <strong>informational</strong>:
 it shows which scripts nothing exercises, and never blocks a PR. A threshold on a shell codebase
 mostly buys tests that execute lines without asserting anything.</p>
-<h2 id="where-the-coverage-is">Where the coverage is<a class="headerlink" href="#where-the-coverage-is" title="Permanent link">&para;</a></h2>
-<p>The <a href="https://app.codecov.io/github/henba1/scrubjay">coverage grid</a> gives one cell per file under <code>bin/</code> and <code>hooks/</code> — area is the file's
-line count, colour is its coverage, red to green, and each cell names its file on hover. It is not
-embedded here: Codecov serves the graph SVGs with <code>X-Frame-Options: SAMEORIGIN</code>, so a cross-origin
-<code>&lt;object&gt;</code> falls back to a flat image and loses the tooltips that make it readable. Open it on
-Codecov, or fetch <a href="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg">the SVG</a> directly.</p>
-<p>The solid red is one shape: <strong>code that needs a second machine.</strong> Onboarding entry points
-(<code>onboard.sh</code>, <code>onboard-memory.sh</code>, the <code>onboard-*-client.sh</code> set, <code>sj-bootstrap.sh</code>,
-<code>claude-register-host.sh</code>), receiver-side tools (<code>sj-receive.sh</code>, <code>sjmcp-serve.sh</code>,
-<code>pull-and-mirror.sh</code>) and the remote transports (<code>hooks/transports/git.sh</code>, <code>rsync-wg.sh</code>) cannot be
-driven from a single sandboxed test run. <code>onboard-receiver.sh</code> is the exception that shows this is a
-reachability limit rather than a policy — its logic is unit-testable, and it is tested.</p>
-<p>Those files read 0% rather than disappearing. That is deliberate: the coverage job passes
-<code>--bash-parse-files-in-dirs=bin,hooks</code>, so kcov puts every shipped script in the report at the
-coverage it truly has. Without it, a script no test ever loads is simply absent from the
-denominator, and the percentage silently becomes "coverage of the code the tests already reach" —
-a number that only ever goes up and says nothing.</p>
-<p>The thinnest <em>reachable</em> code is the readable-Markdown layer — <code>render-transcript.sh</code>,
-<code>render-opencode.sh</code>, <code>render-codex.sh</code> — followed by <code>claude-sync.sh</code>. That is where new tests move
-the number honestly.</p>
 <h2 id="reading-the-graph">Reading the graph<a class="headerlink" href="#reading-the-graph" title="Permanent link">&para;</a></h2>
-<p>The grid always renders the default branch. There is no per-branch or per-PR view — <code>?branch=</code> on
-the SVG URL is accepted and ignored. For per-PR deltas, line-level detail and click-through, use the
-<a href="https://app.codecov.io/github/henba1/scrubjay">Codecov dashboard</a>; PRs get a comment only when coverage actually moves.</p>
+<p>The <a href="https://codecov.io/gh/henba1/scrubjay/graphs/tree.svg">coverage grid</a> gives one cell per file under <code>bin/</code> and <code>hooks/</code> — area is the file's
+line count, colour is its coverage, red to green. It always renders the default branch; there is no
+per-branch or per-PR view — <code>?branch=</code> on the SVG URL is accepted and ignored. For per-PR deltas,
+line-level detail and click-through, use the <a href="https://app.codecov.io/github/henba1/scrubjay">Codecov dashboard</a>; PRs get a comment only
+when coverage actually moves.</p>
 <p><a href="https://codecov.io/gh/henba1/scrubjay/graphs/sunburst.svg">Sunburst</a> and <a href="https://codecov.io/gh/henba1/scrubjay/graphs/icicle.svg">icicle</a> renderings of the same data exist. They encode directory
 nesting, which is nearly flat here, so the grid is usually the one worth looking at.</p>
 
