@@ -1,4 +1,4 @@
-# Test coverage — what the suite reaches
+# Test coverage
 
 [![codecov](https://codecov.io/gh/henba1/scrubjay/branch/main/graph/badge.svg)](https://codecov.io/gh/henba1/scrubjay)
 
@@ -11,36 +11,13 @@ Coverage is measured with [kcov][kcov] and reported to [Codecov][codecov]. It is
 it shows which scripts nothing exercises, and never blocks a PR. A threshold on a shell codebase
 mostly buys tests that execute lines without asserting anything.
 
-## Where the coverage is
-
-The [coverage grid][codecov] gives one cell per file under `bin/` and `hooks/` — area is the file's
-line count, colour is its coverage, red to green, and each cell names its file on hover. It is not
-embedded here: Codecov serves the graph SVGs with `X-Frame-Options: SAMEORIGIN`, so a cross-origin
-`<object>` falls back to a flat image and loses the tooltips that make it readable. Open it on
-Codecov, or fetch [the SVG][grid] directly.
-
-The solid red is one shape: **code that needs a second machine.** Onboarding entry points
-(`onboard.sh`, `onboard-memory.sh`, the `onboard-*-client.sh` set, `sj-bootstrap.sh`,
-`claude-register-host.sh`), receiver-side tools (`sj-receive.sh`, `sjmcp-serve.sh`,
-`pull-and-mirror.sh`) and the remote transports (`hooks/transports/git.sh`, `rsync-wg.sh`) cannot be
-driven from a single sandboxed test run. `onboard-receiver.sh` is the exception that shows this is a
-reachability limit rather than a policy — its logic is unit-testable, and it is tested.
-
-Those files read 0% rather than disappearing. That is deliberate: the coverage job passes
-`--bash-parse-files-in-dirs=bin,hooks`, so kcov puts every shipped script in the report at the
-coverage it truly has. Without it, a script no test ever loads is simply absent from the
-denominator, and the percentage silently becomes "coverage of the code the tests already reach" —
-a number that only ever goes up and says nothing.
-
-The thinnest *reachable* code is the readable-Markdown layer — `render-transcript.sh`,
-`render-opencode.sh`, `render-codex.sh` — followed by `claude-sync.sh`. That is where new tests move
-the number honestly.
-
 ## Reading the graph
 
-The grid always renders the default branch. There is no per-branch or per-PR view — `?branch=` on
-the SVG URL is accepted and ignored. For per-PR deltas, line-level detail and click-through, use the
-[Codecov dashboard][codecov]; PRs get a comment only when coverage actually moves.
+The [coverage grid][grid] gives one cell per file under `bin/` and `hooks/` — area is the file's
+line count, colour is its coverage, red to green. It always renders the default branch; there is no
+per-branch or per-PR view — `?branch=` on the SVG URL is accepted and ignored. For per-PR deltas,
+line-level detail and click-through, use the [Codecov dashboard][codecov]; PRs get a comment only
+when coverage actually moves.
 
 [Sunburst][sunburst] and [icicle][icicle] renderings of the same data exist. They encode directory
 nesting, which is nearly flat here, so the grid is usually the one worth looking at.
