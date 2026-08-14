@@ -34,6 +34,20 @@ assert_contains "opencode: renders the tool command" "$out" "cat docker-compose.
 check "opencode: drops reasoning parts" bash -c "! grep -q 'thinking that should not' <<<\"\$1\"" _ "$out"
 check "opencode: drops synthetic user text" bash -c "! grep -q 'injected rules' <<<\"\$1\"" _ "$out"
 
+# A failed `opencode export` writes a zero-byte file. Because this renderer reads one JSON document
+# it runs jq without -s, so an empty file yields zero values to iterate and the program never runs:
+# before the guard the output was nothing at all, which archives as a .md carrying neither a title
+# nor the `_N turns_` line sjmcp parses. A broken export must not look like an empty session.
+: > "$SANDBOX/zero-export.json"
+zout="$(bash "$APP/bin/render-opencode.sh" "$SANDBOX/zero-export.json" 2>/dev/null)"; zrc=$?
+assert_eq "opencode: a zero-byte export exits 0" "0" "$zrc"
+assert_contains "opencode: and reports the export as empty" "$zout" "export empty"
+# the non-empty-but-turnless case is a real session and must still render the shared shape
+printf '%s' '{"info":{"id":"ses_empty"},"messages":[]}' > "$SANDBOX/no-turns.json"
+nout="$(sj_adapter_call opencode sjh_render "$SANDBOX/no-turns.json" 2>/dev/null)"
+assert_contains "opencode: a turnless export still gets a title" "$nout" "# (no prompt)"
+check "opencode: and still reports zero turns" grep -qx '_0 turns_' <<<"$nout"
+
 section "codex renderer"
 render_check codex "$FIXTURES/codex-rollout.jsonl" "retry backoff"
 out="$(sj_adapter_call codex sjh_render "$FIXTURES/codex-rollout.jsonl")"
