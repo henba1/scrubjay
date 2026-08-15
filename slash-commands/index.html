@@ -953,7 +953,7 @@ read-only <a href="../archive-mcp/"><code>sjmcp</code> MCP tools</a>; <strong>li
 <tr>
 <td><code>/sjtable [head=N \| tail=N \| [a:b] \| all] [host= project= harness= model= topic= since= until=]</code></td>
 <td><code>bin/sj-table.sh</code> (no MCP)</td>
-<td><strong>Reading the catalogue as a table</strong>, not picking one item out of it. Filters apply <em>before</em> slices, so <code>harness=opencode head=20</code> is "the newest 20 opencode sessions". Unlike <code>/sjbrowse</code> it shows sessions whose topic was never authored, and it costs no MCP round-trip — it queries the rendered <code>logs/CATALOGUE.md</code>. Bare <code>/sjtable</code> prints a summary, not ~600 rows.</td>
+<td><strong>Reading the catalogue as a table</strong>, not picking one item out of it. Filters apply <em>before</em> slices, so <code>harness=opencode head=20</code> is "the newest 20 opencode sessions". It costs no MCP round-trip — it queries the rendered <code>logs/CATALOGUE.md</code>. Bare <code>/sjtable</code> prints a summary, not ~600 rows.</td>
 </tr>
 </tbody>
 </table>
