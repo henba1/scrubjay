@@ -104,16 +104,34 @@ class Artifact:
         return {k: v for k, v in d.items() if v not in (None, "")}
 
 
-def _human_size(p: Path) -> str:
-    try:
-        n = p.stat().st_size
-    except OSError:
-        return ""
-    for unit in ("B", "K", "M", "G"):
-        if n < 1024 or unit == "G":
-            return f"{n}{unit}" if unit == "B" else f"{n:.0f}{unit}"
+def _fmt_bytes(n: float) -> str:
+    """Bytes → something a reader (human or model) can use without doing the division itself.
+
+    Sizes travelled as raw byte counts (`2063729`), so every caller converted them by hand, per
+    row, and could get it wrong. Rendering once here is both cheaper and authoritative."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" or n >= 100 else f"{n:.1f} {unit}"
         n /= 1024
     return ""
+
+
+def _size_bytes(s) -> float:
+    """The inverse, best-effort — a sort key for `size` whatever shape it arrived in (raw bytes
+    off a log line, or a rendered `2.0 MB`). Unparseable → 0, which sinks rather than raises."""
+    if isinstance(s, (int, float)):
+        return float(s)
+    m = re.match(r"^\s*([0-9]*\.?[0-9]+)\s*([KMGT]?)B?\s*$", str(s or ""), re.I)
+    if not m:
+        return 0.0
+    return float(m.group(1)) * (1024 ** " KMGT".index(m.group(2).upper() or " "))
+
+
+def _human_size(p: Path) -> str:
+    try:
+        return _fmt_bytes(p.stat().st_size)
+    except OSError:
+        return ""
 
 
 def _turns(md: Path) -> int | None:
@@ -400,11 +418,128 @@ def _jsonl_for(readable: Path, r: Roots) -> Path | None:
     return hits[0] if hits else None
 
 
+# ── result budgets ─────────────────────────────────────────────────────────────────────────
+# Every result here is spent out of the caller's context window, so nothing returns unbounded.
+# Two rules, both from having been burned:
+#   1. A cap the caller cannot see is a bug. Anything trimmed says it was trimmed, how much is
+#      left, and the exact argument that fetches the rest.
+#   2. A cap is a budget, not a constant. Each has a parameter and an env override, so a client
+#      with a bigger window (or a script that wants everything) raises it instead of paging.
+# 0 anywhere below means "no cap" — deliberately reachable, never the default.
+
+_LIST_MAX_CHARS = 12_000   # ~3k tokens: a page you can afford to be wrong about
+_GET_MAX_CHARS = 24_000    # ~6k tokens; a 153K transcript used to be returned whole (#50)
+
+
+def _budget(param, env: str, default: int) -> int:
+    if param is not None:
+        try:
+            return max(0, int(param))
+        except (TypeError, ValueError):
+            return default
+    try:
+        return max(0, int(os.environ.get(env, "").strip()))
+    except ValueError:
+        return default
+
+
+# The compact row: what a browse actually chooses on. `cwd` is dropped (it is `…/<project>`, and
+# `project` is right there), so are `harness`/`model` (constant down a page) and the byte `size`.
+# `type` is dropped only when the caller filtered by it, since it would echo the argument back.
+_COMPACT_FIELDS = ("type", "date", "time", "host", "project", "topic", "sid", "path")
+_SORT_FIELDS = ("date", "size", "turns", "host", "project", "topic")
+
+
+def _num(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _field(o, name, default=""):
+    v = o.get(name, default) if isinstance(o, dict) else getattr(o, name, default)
+    return default if v is None else v
+
+
+def _sort_rows(items, sort: str, order: str):
+    """Sort in place by one of _SORT_FIELDS. Unknown key → date, so a typo degrades to the
+    documented default instead of erroring out of a browse."""
+    key = (sort or "date").strip().lower()
+    if key not in _SORT_FIELDS:
+        key = "date"
+    rev = (order or "desc").strip().lower() != "asc"
+
+    def value(o):
+        # size and turns must sort by magnitude — "2.0 MB" vs "412 B" is not a string comparison,
+        # and a log line's turns= arrives as text.
+        if key == "size":
+            return _size_bytes(_field(o, "size", 0))
+        if key == "turns":
+            return _num(_field(o, "turns", 0))
+        if key == "date":
+            # host is the tiebreaker the old sort used; time only exists on log rows.
+            return (str(_field(o, "date")), str(_field(o, "time")), str(_field(o, "host")))
+        return str(_field(o, key)).lower()
+
+    items.sort(key=value, reverse=rev)
+    return key, ("desc" if rev else "asc")
+
+
+def _shape(row: dict, fields: str, drop_type: bool, keep: str = "") -> dict:
+    if (fields or "compact").lower() != "compact":
+        return row
+    # `keep` is whatever the caller sorted on. Ordering a page by a column it cannot see is worse
+    # than the extra characters: the result looks unsorted and gets re-fetched.
+    cols = _COMPACT_FIELDS + ((keep,) if keep and keep not in _COMPACT_FIELDS else ())
+    out = {k: row[k] for k in cols if k in row}
+    if drop_type:
+        out.pop("type", None)
+    return out
+
+
+def _page(rows: list, total: int, offset: int, max_chars: int, hint: str = "") -> dict:
+    """Serialize-measure the page and drop from the tail until it fits the budget, then say so.
+
+    Filter first, slice second, admit the slice third — the order bin/sj-table.sh already uses on
+    the rendered catalogue. One row always survives the trim: a single oversized row is still an
+    answer, and returning nothing at all would read as "no matches"."""
+    # max_chars bounds the whole result, so the envelope (counts, paging hints, the sort label)
+    # is charged for before the rows are. Its exact length is not knowable until the rows are
+    # chosen — `capped` only exists if a row was dropped — so it is reserved generously instead.
+    room = max(1, max_chars - 320) if max_chars else 0
+    kept, used = [], 0
+    for row in rows:
+        n = len(json.dumps(row, ensure_ascii=False, default=str)) + 1
+        if kept and room and used + n > room:
+            break
+        used += n
+        kept.append(row)
+    out = {"total": total, "offset": offset, "shown": len(kept), "items": kept}
+    dropped = len(rows) - len(kept)
+    nxt = offset + len(kept)
+    if dropped:
+        out["capped"] = (f"result capped at {max_chars} chars — {dropped} of the requested rows "
+                         f"were dropped. Raise max_chars, or page with offset.")
+    if nxt < total:
+        out["next_offset"] = nxt
+        out["more"] = f"{total - nxt} more row(s) — re-call with offset={nxt}."
+    if hint:
+        out["fields"] = hint
+    return out
+
+
 # ── core: list ─────────────────────────────────────────────────────────────────────────────
 
 
-def core_list(type=None, host=None, project=None, since=None, until=None, limit=50, r=None):
+def core_list(type=None, host=None, project=None, since=None, until=None, limit=20,
+              offset=0, sort="date", order="desc", fields="compact", max_chars=None, r=None):
     r = r or roots()
+    cap = _budget(max_chars, "SJMCP_LIST_MAX_CHARS", _LIST_MAX_CHARS)
+    off = max(0, int(offset or 0))
+    lim = max(0, int(limit or 0))  # 0 (or nonsense) = no limit; the byte budget still applies
+    compact = (fields or "compact").lower() == "compact"
+    hint = "compact — pass fields='full' for cwd/harness/model/size" if compact else ""
     if type == "log":  # browse the cross-machine session catalogue (not a file-backed artifact)
         rows = []
         for e in _iter_logs(r):
@@ -419,11 +554,13 @@ def core_list(type=None, host=None, project=None, since=None, until=None, limit=
             rows.append({"type": "log", "host": e.host, "project": e.project, "date": e.date,
                          "time": e.time, "topic": e.topic, "sid": e.sid8, "cwd": e.cwd,
                          "harness": e.harness, "model": e.model, "turns": e.turns,
-                         "size": e.size})
-        rows.sort(key=lambda d: (d["date"], d["time"]), reverse=True)
+                         "size": _fmt_bytes(_size_bytes(e.size)) if e.size else ""})
+        skey, sord = _sort_rows(rows, sort, order)
         total = len(rows)
-        rows = rows[: int(limit)] if limit else rows
-        return {"total": total, "shown": len(rows), "items": rows}
+        rows = rows[off: off + lim] if lim else rows[off:]
+        page = _page([_shape(d, fields, True, skey) for d in rows], total, off, cap, hint)
+        page["sort"] = f"{skey} {sord}"
+        return page
     arts = _all_artifacts(r)
     if type:
         arts = [a for a in arts if a.type == type]
@@ -436,15 +573,26 @@ def core_list(type=None, host=None, project=None, since=None, until=None, limit=
         arts = [a for a in arts if a.date and a.date >= since]
     if until:
         arts = [a for a in arts if a.date and a.date <= until]
+    # Sorting on turns is the one key we cannot answer from the filenames, so it — and only it —
+    # pays to read the whole filtered set before ordering it.
+    if (sort or "").strip().lower() == "turns":
+        for a in arts:
+            if a.type == "transcript" and a.turns is None:
+                a.turns = _turns(Path(a.path))
     # newest first; memory (no date) sinks to the end but stays grouped
-    arts.sort(key=lambda a: (a.date or "", a.host), reverse=True)
+    skey, sord = _sort_rows(arts, sort, order)
     total = len(arts)
-    arts = arts[: int(limit)] if limit else arts
-    # fill turns lazily only for the page we return (cheap; keeps listing fast)
-    for a in arts:
-        if a.type == "transcript":
-            a.turns = _turns(Path(a.path))
-    return {"total": total, "shown": len(arts), "items": [a.to_row() for a in arts]}
+    arts = arts[off: off + lim] if lim else arts[off:]
+    # fill turns lazily only for the page we return (cheap; keeps listing fast) — and not at all
+    # in compact mode, where the row does not carry it: that is one file read per row saved.
+    if not compact:
+        for a in arts:
+            if a.type == "transcript" and a.turns is None:
+                a.turns = _turns(Path(a.path))
+    rows = [_shape(a.to_row(), fields, bool(type), skey) for a in arts]
+    page = _page(rows, total, off, cap, hint)
+    page["sort"] = f"{skey} {sord}"
+    return page
 
 
 # ── core: get ──────────────────────────────────────────────────────────────────────────────
@@ -472,7 +620,7 @@ def _slice_turns(text: str, spec: str) -> str:
     return f"[turns {a}-{b} of {len(bounds) - 1}]\n{chunk}"
 
 
-def core_get(ref, format="readable", turns=None, lines=None, r=None):
+def core_get(ref, format="readable", turns=None, lines=None, max_chars=None, r=None):
     r = r or roots()
     path = resolve_ref(ref, r)
     if not path:
@@ -491,7 +639,42 @@ def core_get(ref, format="readable", turns=None, lines=None, r=None):
         body = _slice_lines(text, lines)
     elif turns and format != "raw":
         body = _slice_turns(text, turns)
-    return {"path": str(path), "format": format, "content": body}
+    out = {"path": str(path), "format": format, "content": body}
+    # The cap applies to a slice too. `lines=1-99999` is not a smaller request than no slice at
+    # all, and the failure it used to cause — the client dumping the whole result object to a
+    # file, with the transcript's newlines JSON-escaped into one unreadable line (#50) — did not
+    # care which argument got it there.
+    cap = _budget(max_chars, "SJMCP_GET_MAX_CHARS", _GET_MAX_CHARS)
+    if cap and len(body) > cap:
+        head = body[:cap]
+        head = head[: head.rfind("\n") + 1] or head  # never cut mid-line
+        # A slice prepends one `[lines a-b of N]` / `[turns …]` header; it is not file content,
+        # so it must not shift the line number we hand back as the place to resume from.
+        sliced = bool(lines) or bool(turns and format != "raw")
+        shown = max(0, head.count("\n") - (1 if sliced else 0))
+        start = 1
+        if lines:
+            try:
+                start = max(1, int(lines.partition("-")[0]))
+            except ValueError:
+                start = 1
+        n_lines = len(text.splitlines())
+        n_turns = len(re.findall(r"^## (?:User|Assistant)\b", text, re.M))
+        nxt = start + shown
+        out["content"] = head
+        out["truncated"] = True
+        out["total_lines"] = n_lines
+        if n_turns:
+            out["total_turns"] = n_turns
+        out["hint"] = (
+            f"capped at {cap} chars — you have lines {start}-{nxt - 1} of {n_lines}"
+            + (f" ({n_turns} turns in this file)" if n_turns else "")
+            + (f". Continue with lines='{nxt}-{min(n_lines, nxt + shown - 1)}'"
+               if nxt <= n_lines else ". That is the end of the file")
+            + (", jump straight to a turn with turns='A-B'" if n_turns and format != "raw" else "")
+            + ", locate the right spot first with sj_search_within, or raise max_chars."
+        )
+    return out
 
 
 # ── ripgrep prefilter (grep fallback) ──────────────────────────────────────────────────────
@@ -813,19 +996,30 @@ def build_server():
 
     @mcp.tool()
     def sj_list(type: str | None = None, host: str | None = None, project: str | None = None,
-                since: str | None = None, until: str | None = None, limit: int = 50) -> dict:
+                since: str | None = None, until: str | None = None, limit: int = 20,
+                offset: int = 0, sort: str = "date", order: str = "desc",
+                fields: str = "compact", max_chars: int | None = None) -> dict:
         """List archived artifacts (transcripts, plans, memories, notes) with metadata.
 
         Filters: type (transcript|plan|memory|note|log), host, project (substring), since/until
-        (YYYY-MM-DD). Newest first. Use this to browse, then sj_get to pull one in.
+        (YYYY-MM-DD). Use this to browse, then sj_get to pull one in.
         type=log browses the cross-machine session catalogue (one row per session, all hosts).
         type=note lists long-form documents written with /sjnote — durable, cross-machine, and
-        deliberately NOT loaded into a session unless asked for."""
-        return _with_timeout(lambda: core_list(type, host, project, since, until, limit))
+        deliberately NOT loaded into a session unless asked for.
+
+        Paging: limit (default 20, 0 = no limit) + offset. A result that has more rows carries
+        `next_offset` and `more` — page with those instead of re-listing with a bigger limit.
+        sort: date (default) | size | turns | host | project | topic, with order='desc'|'asc'.
+        fields: 'compact' (default — date/host/project/topic/sid/path) or 'full', which adds
+        cwd/harness/model/size/turns. Ask for 'full' only when the extra columns decide something.
+        The whole result is held under max_chars (default 12000, 0 = uncapped); if rows were
+        dropped to fit, `capped` says so."""
+        return _with_timeout(lambda: core_list(type, host, project, since, until, limit,
+                                               offset, sort, order, fields, max_chars))
 
     @mcp.tool()
     def sj_get(ref: str, format: str = "readable", turns: str | None = None,
-               lines: str | None = None) -> dict:
+               lines: str | None = None, max_chars: int | None = None) -> dict:
         """Fetch an artifact (or a slice) to inject into context.
 
         ref: a sj:// URI, an 8-char session id (as sj_list/sj_recall print it), or a path.
@@ -835,10 +1029,16 @@ def build_server():
         greps, so a recall snippet's `line` goes straight in: lines='<line-20>-<line+20>' fetches
         the passage that matched instead of the whole transcript. Prefer that.
 
+        Content is capped at max_chars (default 24000, 0 = uncapped). Over the cap you get the
+        head of the file plus `truncated`, `total_lines`/`total_turns` and a `hint` naming the
+        exact next slice — a whole transcript is rarely what you wanted, and used to be big
+        enough that the client refused the result outright. For a targeted read, run
+        sj_search_within first and sj_get the turns around the hit.
+
         The archive is host-keyed. A session the catalogue knows but this machine has not got
         locally returns {"error": "no transcript in this archive", "host": …, "hint": …} — that is
         a pointer to the machine that has it, not a bad id; don't retry it here."""
-        return _with_timeout(lambda: core_get(ref, format, turns, lines))
+        return _with_timeout(lambda: core_get(ref, format, turns, lines, max_chars))
 
     @mcp.tool()
     def sj_recall(query: str, host: str | None = None, project: str | None = None,
@@ -885,7 +1085,11 @@ def build_server():
     from pydantic import AnyUrl
 
     def _register_concrete():
-        for a in core_list(limit=10_000)["items"]:
+        # Not a caller's context window: this is the resource picker, which needs every row, so
+        # it opts out of both budgets. It stays on the compact row deliberately — that carries
+        # the type, path, title and date it uses, and skips one file read per transcript (the
+        # turn count) that nothing here ever displays. That read is the whole cost of startup.
+        for a in core_list(limit=0, max_chars=0)["items"]:
             uri = _uri_for(a)
             if not uri:
                 continue
@@ -992,8 +1196,9 @@ def _selftest():
     print("== status =="); print(json.dumps(core_status(r=r), indent=2))
     print("\n== list transcripts (5) =="); print(json.dumps(core_list(type="transcript", limit=5, r=r), indent=2))
     print("\n== recall 'extend scrubjay with an MCP server' =="); print(json.dumps(core_recall("extend scrubjay with an MCP server", k=4, r=r), indent=2))
-    print("\n== list notes (5) =="); print(json.dumps(core_list(type="note", limit=5, r=r), indent=2))
+    print("\n== list notes (5, full rows) =="); print(json.dumps(core_list(type="note", limit=5, fields="full", r=r), indent=2))
     print("\n== list logs (catalogue, 5) =="); print(json.dumps(core_list(type="log", limit=5, r=r), indent=2))
+    print("\n== list logs (page 2, biggest first) =="); print(json.dumps(core_list(type="log", limit=5, offset=5, sort="size", r=r), indent=2))
     print("\n== recall 'VERONA foolbox' (log-only / cross-machine pointer) =="); print(json.dumps(core_recall("VERONA foolbox attack", k=4, r=r), indent=2))
     # search within the known transcript for 'mcp'
     rec = core_recall("read and understand the scrubjay project", k=1, r=r)

@@ -20,9 +20,28 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 
 | Surface | What |
 |---|---|
-| **tools** | `sj_list` (browse w/ filters, incl. `type=log` for the catalogue), `sj_recall` (topic → ranked candidates + anchors), `sj_search_within` (a topic *inside* one session → turn/line anchors), `sj_get` (fetch an artifact or a `turns=`/`lines=` slice), `sj_status` |
+| **tools** | `sj_list` (browse w/ filters, sort + paging, incl. `type=log` for the catalogue), `sj_recall` (topic → ranked candidates + anchors), `sj_search_within` (a topic *inside* one session → turn/line anchors), `sj_get` (fetch an artifact or a `turns=`/`lines=` slice), `sj_status` |
 | **resources** | every transcript/plan/memory/note as an `@`-pickable resource (`sj://transcript/…`, `sj://plan/…`, `sj://memory/…`, `sj://note/…`) with a human, date-sorted title |
 | **commands** | `/sjrecall <topic>`, `/sjfind <topic> in <session>`, `/sjbrowse [type]`, `/sjget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](slash-commands.md)) |
+
+## Every result is bounded, and says so
+
+A tool result is spent out of the session's context window, so neither read tool returns whatever
+the archive happens to hold. Both are **capped, visibly** — a trimmed result carries the count that
+was left behind and the exact argument that fetches it:
+
+| | Default | Override | Paging out |
+|---|---|---|---|
+| `sj_list` | `limit=20` rows, whole result under **12 000 chars** | `max_chars=`, `SJMCP_LIST_MAX_CHARS` | `total` + `next_offset` → re-call with `offset=` |
+| `sj_get` | content under **24 000 chars** | `max_chars=`, `SJMCP_GET_MAX_CHARS` | `total_lines`/`total_turns` + a `hint` naming the next `lines=` slice |
+
+`0` on either means uncapped. `sj_list` rows are **compact** by default — `date · host · project ·
+topic · sid` (+ `path`, and whatever you sorted on); `fields="full"` restores `cwd`, `harness`,
+`model`, `size` and `turns`. It also sorts server-side: `sort` in `date|size|turns|host|project|
+topic` × `order=desc|asc`, so a second ordering costs an argument rather than a second fetch.
+
+For a targeted read of a long session, `sj_search_within` then `sj_get(turns=…)` beats fetching the
+file and raising the cap.
 
 ## How recall ranks — and what the numbers mean
 
