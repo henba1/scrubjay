@@ -12,10 +12,13 @@ Topic / filters: **$ARGUMENTS**
    gave them). If it reports no archive reachable, say so (run `sj_status` to explain which trees
    this machine can see) and stop.
 2. The tool returns candidate files with matched snippets + line anchors. **You** do the semantic
-   ranking: read the snippets and pick the best match(es). Present the top 1–3 as a short list —
-   topic, date, host, and why it matches (quote the telling snippet) — newest/most-relevant first.
+   ranking: read the snippets and pick the best match(es) — `score` is a lexical shortlist, not a
+   verdict. Present the top 1–3 as a short list — topic, date, host, and why it matches (quote the
+   telling snippet) — newest/most-relevant first. A `type=log` hit has no transcript on this
+   machine: offer it as a "you had this on `<host>`" pointer, don't try to `sj_get` it.
 3. Ask which one to pull in (or if the top hit is clearly the one, offer it). On the user's pick,
-   call `sj_get` to inject it. For a long transcript, prefer a `turns=` or `lines=` slice around
-   the relevant anchor rather than the whole file.
+   call `sj_get` — and for a long transcript **slice it**: a snippet's `line` is a line number in
+   the same file, so `lines=<line-20>-<line+20>` fetches the matching passage. Fetch the whole
+   file only when the user wants the whole session.
 
 Be concise. Do not dump raw tool JSON; summarize.
