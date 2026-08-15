@@ -209,18 +209,61 @@ sj_detect_harness() {  # sj_detect_harness <transcript>
 # Reads the Claude Code / JSONL record shape; a harness that stores sessions differently supplies
 # its own extractor as sjh_session_topic (bin/adapters/<harness>.sh).
 #
-# `.message.content` is a string on some records and an ARRAY of content blocks on others — which
-# is the common shape for a typed prompt. Reading only the string form silently drops most
-# sessions, so normalize the array to its joined text blocks first (tool_result / image blocks
-# carry no prompt and are skipped). Then discard the records that are not the user *talking*:
-# the injected `<...>` blocks (system-reminder, command-name, local-command output) and the
-# "Caveat:" preamble.
+# This is the ONLY topic an ordinary session ever gets: SessionEnd fires with no model in the loop,
+# so the model-authored essence exists only on the /sjlog path. Everything it fails to read lands
+# in the catalogue as `(no text)`. So it is worth being careful about three things.
+#
+# 1. `.message.content` is a string on some records and an ARRAY of content blocks on others —
+#    which is the common shape for a typed prompt. Reading only the string form silently drops
+#    most sessions, so normalize the array to its joined text blocks first (tool_result / image
+#    blocks carry no prompt and are skipped).
+#
+# 2. `isMeta` is Claude Code's own marker for a record the user did not type: the `Caveat:`
+#    preamble, hook output, a skill's injected header, and — the one that mattered most — the
+#    expanded *body* of a slash command, which arrives as a user record immediately after the
+#    invocation. Reading that body made `/sjrecall foo` log its own command markdown ("The user
+#    wants to find a past conversation…") as the session's topic: a WRONG topic, which is worse
+#    than a blank one because nothing about it looks broken. Keying on the flag is exact where
+#    guessing from adjacency was not. `isSidechain` marks a subagent's turns — never the session's
+#    own topic. Both are read defensively (`!= true`), so a record lacking the field still counts.
+#
+# 3. The injected `<...>` wrappers are *stripped* rather than used to reject the whole record.
+#    A typed prompt routinely arrives with a `<system-reminder>` block glued to it, and rejecting
+#    on a leading `<` threw the prompt away with the wrapper. Anything still opening with `<` after
+#    the strip is an injected block we don't know, and is skipped as before.
+#
+# When there is no prose at all the topic falls back to the slash command the user actually ran
+# (`/clear`, `/sjresume 065f6e66`). That is what most topic-less sessions in the catalogue turn out
+# to be, and naming the command is honest: it says the session happened and what it was.
+# Prose wins over the command, so a session that runs `/clear` and then does real work is still
+# titled by the work.
 sj_session_topic() {  # sj_session_topic <transcript.jsonl>
-  jq -rs '[ .[] | select(.type=="user") | .message.content
-            | if type=="array" then [ .[] | select(.type=="text") | .text ] | join(" ") else . end
-            | select(type=="string")
-            | sub("^\\s+"; "") | sub("\\s+$"; "")
-            | select(. != "" and ((startswith("<") or startswith("Caveat")) | not)) ][0] // ""' \
+  jq -rs '
+    def clean:
+        gsub("(?s)<local-command-caveat>.*?</local-command-caveat>"; "")
+      | gsub("(?s)<system-reminder>.*?</system-reminder>"; "")
+      | gsub("(?s)<environment_context>.*?</environment_context>"; "")
+      | gsub("(?s)<user-prompt-submit-hook>.*?</user-prompt-submit-hook>"; "")
+      | sub("^\\s+"; "") | sub("\\s+$"; "");
+    def trim: sub("^\\s+"; "") | sub("\\s+$"; "");
+    def cmd:
+      if test("<command-name>") then
+        ((capture("<command-name>(?<v>[^<]*)</command-name>").v | trim) as $n
+         | (if test("<command-args>")
+            then (capture("(?s)<command-args>(?<v>.*?)</command-args>").v | trim) else "" end) as $a
+         | if $n == "" then "" elif $a == "" then $n else $n + " " + $a end)
+      else "" end;
+    [ .[]
+      | select(.type == "user" and .isSidechain != true and .isMeta != true)
+      | .message.content
+      | if type == "array" then [ .[] | select(.type == "text") | .text ] | join("\n") else . end
+      | select(type == "string") ]
+    | ( [ .[] | select(test("<command-name>") | not) | clean
+          | select(. != ""
+                   and ((startswith("<") or startswith("Caveat")
+                         or startswith("[Request interrupted")) | not)) ] | first ) as $prose
+    | ( [ .[] | cmd | select(. != "") ] | first ) as $cmd
+    | $prose // $cmd // ""' \
     "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
 }
 
@@ -493,13 +536,12 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   if declare -F sjh_session_meta >/dev/null 2>&1; then
     IFS=$'\t' read -r model turns < <(sjh_session_meta "$tpath")
   fi
-  # A transcript can hold records without a quotable opening prompt (a resumed session whose first
-  # user record is a caveat block). Those ARE real sessions with a real archive entry, so they keep
-  # their row — only the topic degrades.
-  [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
-  # Keep the line parseable: the topic is quoted, but a stray " or | inside it would derail both
-  # readers (sjmcp's regex and sj_log_catalogue's pipe-split), so neutralize those two chars.
-  topic="${topic//\"/}"; topic="${topic//|//}"
+  # A transcript can hold no user record at all (a resumed session whose only records are the
+  # harness's own). Those ARE real sessions with a real archive entry, so they keep their row —
+  # only the topic degrades. bin/sj-topics.sh can fill it in later, from the archived copy.
+  [ -n "$topic" ] || topic="(no text)"
+  # One writer of the "safe in a row" rule, so the backfill path cannot drift from this one.
+  topic="$(sj_topic_sanitize "$topic")"
   size="$(sj_size "$tpath")" || size=0
 
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
@@ -564,6 +606,32 @@ sj_data_push() {  # sj_data_push <commit-message>
   return 0
 }
 
+# A topic, made safe to sit in a catalogue row. The row quotes the topic and separates its fields
+# with ` | `, so a stray `"` or `|` inside one derails both readers (sjmcp's _LOG regex and the
+# pipe-split in sj_log_catalogue / bin/sj-catalogue.sh) — the field count shifts and the row is
+# read as a different session or as no session at all. Also flattened to one line and capped, so a
+# pasted paragraph cannot become a 4 KB row. One writer of this rule, two callers:
+# hooks/log-session.sh when a session ends, bin/sj-topics.sh when it backfills a missing topic.
+sj_topic_sanitize() {  # sj_topic_sanitize <text> [maxlen]
+  local t="$1"
+  t="$(printf '%s' "$t" | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//')"
+  t="${t//\"/}"; t="${t//|//}"
+  printf '%.*s' "${2:-100}" "$t"
+}
+
+# Rewrite one catalogue row's topic, leaving every other byte of it alone — the date, host, cwd,
+# session id and trailing key=value fields are the original session's facts and must not drift.
+# Anchored on the ` | "` that opens the topic and the `" | session=` that closes it, both of which
+# are unambiguous because sj_topic_sanitize has already removed every other `"` from the field.
+# Fails (1) on a line that is not a session row, so a caller cannot append a mangled one.
+sj_log_retopic() {  # sj_log_retopic <line> <topic>
+  local line="$1" topic="$2" pre post
+  case "$line" in *' | "'*'" | session='*) ;; *) return 1 ;; esac
+  pre="${line%%' | "'*}"
+  post="${line#*'" | session='}"
+  printf '%s | "%s" | session=%s' "$pre" "$topic" "$post"
+}
+
 # Every host's sessions, newest first, from the data repo's logs/ — which already carries
 #   <ts> | <host> | <cwd> | "<topic>" | session=<sid> | harness=<name>
 # for every session ever ended, and rides the data repo to every machine. This is the *catalogue*
@@ -571,6 +639,14 @@ sj_data_push() {  # sj_data_push <commit-message>
 # via transport_resolve. Emits TSV: <ts> <host> <sid> <cwd> <topic> <harness>.
 #
 # `harness=` only exists on lines written since scrubjay went multi-harness; older ones report "-".
+#
+# LAST LINE PER session= WINS. bin/sj-topics.sh gives a topic-less session a topic by *appending* a
+# corrected copy of its row, never by editing the original — logs/*.log ride git with `merge=union`
+# (.gitattributes) precisely because every host only ever appends to its own file, and rewriting a
+# line in place forfeits that and conflicts on the next rebase. The cost of appending is that a
+# session can legitimately have two rows, so every reader of these files resolves them the same
+# way: the later row supersedes the earlier one. See the same rule in bin/sj-catalogue.sh and in
+# mcp/sjmcp_server.py's _iter_logs.
 sj_log_catalogue() {  # sj_log_catalogue [limit]
   local limit="${1:-0}" data
   data="$(sj_data)" || return 1
@@ -582,7 +658,8 @@ sj_log_catalogue() {  # sj_log_catalogue [limit]
       }
       if (sid == "") next
       topic=$4; gsub(/^"|"$/, "", topic)
-      printf "%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, sid, $3, topic, harness }
+      row[sid] = $1 "\t" $2 "\t" sid "\t" $3 "\t" topic "\t" harness }
+    END { for (s in row) print row[s] }
   ' "$data"/logs/*.log 2>/dev/null | sort -r | { [ "$limit" -gt 0 ] && head -n "$limit" || cat; }
 }
 

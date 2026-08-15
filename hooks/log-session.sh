@@ -57,7 +57,8 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   # 1a) append the session's catalogue row (write-once; sj_log_row in bin/lib.sh is the single
   #     writer of that format — bin/sj-reconcile.sh writes the same row for a session that ended
   #     without ever reaching this hook). SCRUBJAY_TOPIC is the model-authored essence /sjlog
-  #     passes in; empty on the automatic path, where the row falls back to the first user prompt.
+  #     passes in; empty on the automatic path, where the row falls back to the session's first
+  #     real user prompt — or, when it typed none, to the slash command it ran.
   sj_log_row "$LOG" "$sid" "$cwd" "$tpath" "$harness" "$host" "$ts" "${SCRUBJAY_TOPIC:-}"
 
   # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended). It indexes
