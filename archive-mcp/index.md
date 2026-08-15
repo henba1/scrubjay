@@ -10,6 +10,28 @@ It's a single-file, **read-only** server (`mcp/sjmcp_server.py`, run via `uv run
 | **resources** | every transcript/plan/memory/note as an `@`-pickable resource (`sj://transcript/…`, `sj://plan/…`, `sj://memory/…`, `sj://note/…`) with a human, date-sorted title                                                                                                  |
 | **commands**  | `/sjrecall <topic>`, `/sjfind <topic> in <session>`, `/sjbrowse [type]`, `/sjget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md))                                          |
 
+## How recall ranks — and what the numbers mean
+
+`sj_recall` scores candidates lexically and hands the shortlist to the model, which does the actual semantic ranking. The score is `10 ×` distinct query terms matched, plus `6 ×` the terms that **co-occur within one 10-line passage**, plus `8` if the session's catalogue line matched, plus the raw hit count capped at `6`. Coverage still dominates; the passage term is what stops a long session that merely *mentions* every word from outranking the short one that answers the question, and the capped hit count keeps repetition from driving rank at all. Each result carries a `why` (`"6/7 terms · 5 in one passage · catalogue line"`) so the ordering is legible rather than magic.
+
+Snippets are chosen the same way: deduped by line, densest first, and spread at least 20 lines apart, so four slots show four parts of the transcript instead of four views of one paragraph.
+
+Two contracts worth knowing, because they save a full fetch:
+
+- **A snippet's `line` is a 1-based line number in that result's `path`** — the same numbering `sj_get(lines="670-700")` uses. Pad it by ~20 lines and fetch the passage, not the file. (Snippets marked `"source": "log"` come from the catalogue, not the file, and carry no line.)
+- **The two search tools take different query languages.** `sj_recall` splits on whitespace and ORs the terms, each a case-insensitive substring, dropping terms of ≤2 characters. `sj_search_within` takes **one literal substring** — no regex, no alternation — so a multi-term query there returns a truthful but misleading `matches: 0`.
+
+### A pointer is not a miss
+
+The archive is host-keyed, and the `logs/` catalogue spans every machine — so a session id can be real, known, and simply not here. `sj_get` / `sj_search_within` say which:
+
+```
+{"error": "no transcript in this archive", "sid": "a2626749", "host": "laptop",
+ "date": "2026-07-24", "cwd": "…", "hint": "transcript not in this archive — recall it on laptop"}
+```
+
+Same wording `sj_recall` puts on its `type=log` results. `"not found or outside the archive"` keeps its narrower meaning: no such thing, anywhere.
+
 ## Registration is automatic, three ways
 
 All done by `claude-sync.sh` at **user scope**, picked by what this machine has:
