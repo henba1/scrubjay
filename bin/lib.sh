@@ -54,6 +54,17 @@ sj_epoch_ymd() {  # sj_epoch_ymd <epoch>
   date -d "@$1" +%Y-%m-%d 2>/dev/null || date -r "$1" +%Y-%m-%d 2>/dev/null
 }
 
+# Epoch seconds -> "YYYY-MM-DD HH:MM" in LOCAL time — the catalogue row's timestamp format.
+# Local, not UTC, because a row written live uses a bare `date`, and a catalogue whose rows are
+# in two different timezones sorts wrong. That is also why a reconciled row dates itself from the
+# transcript's mtime rather than the ISO-8601 timestamps *inside* it: those are UTC, and shifting
+# them to local needs `date -d` (GNU) or `date -j -f` (BSD) — the exact split these shims exist to
+# avoid. mtime is already local-clock-comparable, needs no jq pass, and for a session that died
+# without warning it is precisely the fact we want: when it last wrote anything.
+sj_epoch_stamp() {  # sj_epoch_stamp <epoch>
+  date -d "@$1" '+%Y-%m-%d %H:%M' 2>/dev/null || date -r "$1" '+%Y-%m-%d %H:%M' 2>/dev/null
+}
+
 # In-place sed. GNU treats -i's argument as optional; BSD requires an explicit backup suffix, so
 # `sed -i -e …` on macOS silently eats "-e" as the suffix. Passing '' explicitly is the only form
 # both accept — via two different argument shapes.
@@ -442,6 +453,116 @@ sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when
 # --- session hand-off (bin/sj-resume.sh) ------------------------------------------------------
 # Where a session lives locally, and how a harness encodes a project into a directory name, are
 # harness-specific — they moved to bin/adapters/<harness>.sh (sjh_project_dir / sjh_slug).
+
+# --- the catalogue: one writer, one reader ------------------------------------------------------
+
+# Append this machine's catalogue row for ONE session. The sole writer of the log-line format —
+# hooks/log-session.sh writes it when a session ends, bin/sj-reconcile.sh writes it for a session
+# that ended without ever reaching the hook. It lives here, next to sj_log_catalogue (the reader),
+# because the line IS the interface: sjmcp's _LOG regex and sj_log_catalogue's pipe-split both
+# parse it, and tests/test_log.sh pins its shape. A second place that formatted it would drift.
+#
+# Returns 0 when a row was written, 1 when there was nothing to write (already catalogued, or the
+# session recorded nothing) — callers count on that to decide whether a push is even needed.
+#
+# <ts> and <topic> may be empty: ts defaults to now, topic to the first real user prompt. Both are
+# parameters rather than reads of the ambient environment so the function stays testable — the
+# `/sjlog` essence (SCRUBJAY_TOPIC) is passed in by the hook, not picked up here.
+sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic>
+  local log="$1" sid="$2" cwd="$3" tpath="$4" harness="$5" host="$6" ts="$7" topic="${8:-}"
+  local model="" turns="" size=0
+
+  # A session with no transcript produced no records at all: nothing is shipped for it and nothing
+  # is rendered, so a row would advertise an archive entry that does not exist. This is not
+  # hypothetical — a session ended without a single user turn (open the harness and /clear, or quit
+  # straight away) still fires SessionEnd, naming a transcript_path that was never written. `-s`
+  # covers both the missing file and the empty one.
+  [ -s "${tpath:-}" ] || return 1
+  [ -n "$sid" ] || return 1
+  grep -q "session=$sid" "$log" 2>/dev/null && return 1   # write-once per session
+
+  [ -n "$ts" ] || ts="$(date '+%Y-%m-%d %H:%M')"
+  # Topic: prefer the caller's (a model-authored essence from /sjlog); else the first real user
+  # prompt. The adapter knows how to read its own transcript format; sj_session_topic is the
+  # Claude/JSONL shape and the fallback for a caller with no adapter loaded (backfill).
+  if [ -z "$topic" ]; then
+    if declare -F sjh_session_topic >/dev/null 2>&1; then topic="$(sjh_session_topic "$tpath")"
+    else topic="$(sj_session_topic "$tpath")"; fi
+  fi
+  # model + turns in one pass (the transcript can be tens of MB); TSV, empty fields are fine.
+  if declare -F sjh_session_meta >/dev/null 2>&1; then
+    IFS=$'\t' read -r model turns < <(sjh_session_meta "$tpath")
+  fi
+  # A transcript can hold records without a quotable opening prompt (a resumed session whose first
+  # user record is a caveat block). Those ARE real sessions with a real archive entry, so they keep
+  # their row — only the topic degrades.
+  [ -n "$topic" ] || topic="(no text)"; topic="$(printf '%.100s' "$topic")"
+  # Keep the line parseable: the topic is quoted, but a stray " or | inside it would derail both
+  # readers (sjmcp's regex and sj_log_catalogue's pipe-split), so neutralize those two chars.
+  topic="${topic//\"/}"; topic="${topic//|//}"
+  size="$(sj_size "$tpath")" || size=0
+
+  # Everything after `harness=` is an additive `key=value` field: a line written before a field
+  # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
+  # for a later pass — the readers already tolerate trailing fields they don't know.
+  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s\n' \
+    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" >> "$log"
+}
+
+# Commit + push EVERYTHING in the data repo. Shared by the session-end hook and sj-reconcile.sh:
+# it is ~30 lines of hard-won wedge-proofing (see below) and must not exist twice.
+#
+# .gitignore blocks secrets/transcripts (*.credentials*, *.jsonl, .claude.json), so `git add -A`
+# can never stage those. Best-effort and silent by contract — it must never fail its caller.
+sj_data_push() {  # sj_data_push <commit-message>
+  local msg="$1" data
+  [ "${SCRUBJAY_LOG_NOGIT:-0}" = "1" ] && return 0
+  data="$(sj_data 2>/dev/null)" || return 0
+  [ -n "$data" ] && [ -d "$data/.git" ] || return 0
+  (
+    cd "$data" || exit 0
+
+    # Self-heal before touching anything. A previous session's push fallback may have left an
+    # interrupted rebase/merge (a conflict, or — more insidiously — a commit that went empty and
+    # made rebase pause). If we don't clear it, `git add -A` below commits onto the DETACHED rebase
+    # HEAD (even baking conflict markers into files), every push silently no-ops, and the wedge
+    # compounds one commit per session. This is exactly the July-2026 henpi failure. Aborting is
+    # safe: it just drops the partial replay; our content lives in the working tree and re-commits
+    # cleanly.
+    if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+      git rebase --abort 2>/dev/null || true
+    elif [ -f .git/MERGE_HEAD ]; then
+      git merge --abort 2>/dev/null || true
+    fi
+    # Commits on a detached HEAD can never push — bail rather than orphan work.
+    git symbolic-ref -q HEAD >/dev/null 2>&1 || exit 0
+
+    git add -A 2>/dev/null
+    git diff --cached --quiet 2>/dev/null && exit 0   # nothing to commit
+    # Never commit a tree carrying conflict markers (unambiguous start/end lines).
+    git diff --cached | grep -qE '^\+(<{7} |>{7} )' && exit 0
+    git commit -q -m "$msg" 2>/dev/null || exit 0
+    if ! sj_timeout 20 git push -q 2>/dev/null; then
+      # Remote moved on: rebase our commit onto it and retry. What makes this wedge-proof where a
+      # bare `git pull --rebase` was not is that nothing here can stop on a conflict:
+      #   * append-only logs union both sides (.gitattributes: logs/*.log merge=union);
+      #   * for any *shared* file that genuinely diverged — e.g. plugins/known_marketplaces.json
+      #     or settings — `-X ours` takes origin's copy (during a rebase "ours" is the upstream we
+      #     replay onto) instead of pausing. A machine's auto-sync must never fork shared config;
+      #     deliberate shared edits are made by hand, not by this fallback. A bare pull --rebase
+      #     aborted on the first such conflict and left the machine's commits stacking locally
+      #     forever — the July-2026 hensipi wedge.
+      # Belt and suspenders: if anything still fails, abort so the next session starts clean.
+      if sj_timeout 20 git fetch -q origin 2>/dev/null \
+         && sj_timeout 30 git rebase -X ours -q origin/main 2>/dev/null; then
+        sj_timeout 20 git push -q 2>/dev/null || true
+      else
+        git rebase --abort 2>/dev/null || true
+      fi
+    fi
+  ) >/dev/null 2>&1 || true
+  return 0
+}
 
 # Every host's sessions, newest first, from the data repo's logs/ — which already carries
 #   <ts> | <host> | <cwd> | "<topic>" | session=<sid> | harness=<name>

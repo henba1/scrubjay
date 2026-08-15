@@ -38,6 +38,16 @@ sjh_session_slug() { local cwd="$2"; [ -n "$cwd" ] || cwd="$(sjh_session_cwd "$1
 
 sjh_session_cwd() { jq -r '.info.directory // ""' "$1" 2>/dev/null; }
 
+# Sessions on disk, as TSV `<sid>\t<path>` — deliberately none. opencode keeps sessions in its own
+# storage, not as transcript files; what scrubjay archives is an `opencode export`, produced on
+# demand. There is nothing on disk for bin/sj-reconcile.sh to walk.
+#
+# Nor is there anything to reconcile. The bridge plugin publishes on `session.idle` — after every
+# turn — so a crashed opencode session is already catalogued and archived up to its last turn,
+# which is exactly the guarantee Claude's single SessionEnd cannot make. Empty output here is the
+# correct answer, not a gap: see the harness notes in README.md.
+sjh_list_sessions() { return 0; }
+
 # First real user prompt, one line. Text parts flagged `synthetic` (opencode's own injected context)
 # or `ignored` are not the user talking, so they are skipped — the same cut sj_session_topic makes
 # for Claude's `<system-reminder>` blocks.

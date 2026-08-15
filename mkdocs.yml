@@ -93,3 +93,4 @@ nav:
       - Archive durability: durability.md
       - Memory sync: memory-sync.md
       - Mirror host (git backend): mirror-host.md
+      - Test coverage: testing.md

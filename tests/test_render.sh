@@ -34,6 +34,20 @@ assert_contains "opencode: renders the tool command" "$out" "cat docker-compose.
 check "opencode: drops reasoning parts" bash -c "! grep -q 'thinking that should not' <<<\"\$1\"" _ "$out"
 check "opencode: drops synthetic user text" bash -c "! grep -q 'injected rules' <<<\"\$1\"" _ "$out"
 
+# A failed `opencode export` writes a zero-byte file. Because this renderer reads one JSON document
+# it runs jq without -s, so an empty file yields zero values to iterate and the program never runs:
+# before the guard the output was nothing at all, which archives as a .md carrying neither a title
+# nor the `_N turns_` line sjmcp parses. A broken export must not look like an empty session.
+: > "$SANDBOX/zero-export.json"
+zout="$(bash "$APP/bin/render-opencode.sh" "$SANDBOX/zero-export.json" 2>/dev/null)"; zrc=$?
+assert_eq "opencode: a zero-byte export exits 0" "0" "$zrc"
+assert_contains "opencode: and reports the export as empty" "$zout" "export empty"
+# the non-empty-but-turnless case is a real session and must still render the shared shape
+printf '%s' '{"info":{"id":"ses_empty"},"messages":[]}' > "$SANDBOX/no-turns.json"
+nout="$(sj_adapter_call opencode sjh_render "$SANDBOX/no-turns.json" 2>/dev/null)"
+assert_contains "opencode: a turnless export still gets a title" "$nout" "# (no prompt)"
+check "opencode: and still reports zero turns" grep -qx '_0 turns_' <<<"$nout"
+
 section "codex renderer"
 render_check codex "$FIXTURES/codex-rollout.jsonl" "retry backoff"
 out="$(sj_adapter_call codex sjh_render "$FIXTURES/codex-rollout.jsonl")"
@@ -71,6 +85,101 @@ for spec in \
   check "$h: a recursive grep still finds it" bash -c \
     'grep -rq --include="*.md" -F -- "$2" "$1"' _ "$d" "$anchor"
 done
+
+section "a source the renderer cannot read degrades to a placeholder"
+# bin/ship-transcript.sh pipes the renderer's stdout straight into the archive. A renderer that
+# exited non-zero on a vanished session would abort the ship for every OTHER session in the sweep,
+# so both guards must print something and exit 0 rather than fail.
+nojq="$SANDBOX/nojq"; mkdir -p "$nojq"     # a PATH with no jq on it
+for spec in \
+  "claude:render-transcript.sh:transcript not found:claude-session.jsonl" \
+  "opencode:render-opencode.sh:export not found:opencode-export.json" \
+  "codex:render-codex.sh:rollout not found:codex-rollout.jsonl"; do
+  h="${spec%%:*}"; rest="${spec#*:}"; script="${rest%%:*}"
+  rest="${rest#*:}"; msg="${rest%%:*}"; fx="${rest#*:}"
+
+  out="$(bash "$APP/bin/$script" "$SANDBOX/no-such-session" 2>/dev/null)"; rc=$?
+  assert_eq "$h: a missing source exits 0" "0" "$rc"
+  assert_contains "$h: and names what was missing" "$out" "$msg"
+
+  # $BASH by absolute path: the stripped PATH must not stop us finding the interpreter itself.
+  out="$(PATH="$nojq" "$BASH" "$APP/bin/$script" "$FIXTURES/$fx" 2>/dev/null)"; rc=$?
+  assert_eq "$h: a machine without jq exits 0" "0" "$rc"
+  assert_contains "$h: and says jq is why" "$out" "jq unavailable"
+done
+
+section "a session with no turns still renders the shared shape"
+# sjmcp parses `_N turns_`; an empty session must still carry the line rather than emit nothing.
+printf '' > "$SANDBOX/empty.jsonl"
+printf '%s' '{"info":{"id":"ses_empty"},"messages":[]}' > "$SANDBOX/empty-opencode.json"
+for pair in "claude:$SANDBOX/empty.jsonl" "codex:$SANDBOX/empty.jsonl" "opencode:$SANDBOX/empty-opencode.json"; do
+  h="${pair%%:*}"; fx="${pair#*:}"
+  out="$(sj_adapter_call "$h" sjh_render "$fx" 2>/dev/null)"
+  assert_contains "$h: an empty session still has a title" "$out" "# (no prompt)"
+  check "$h: and still reports zero turns" grep -qx '_0 turns_' <<<"$out"
+done
+
+section "the title is one line, however the prompt was typed"
+# The title is a Markdown heading AND what /sjrecall shows as the session name. A newline in it
+# would split the heading and strand the rest of the prompt as body text.
+# $'...' rather than "$(printf …)": command substitution strips the trailing newline, which is
+# exactly the character this test needs to survive into the renderer.
+long=$'fix the\nbroken   retry\tlogic and also a great many other things that run past the eighty character cap'
+jq -cn --arg t "$long" '{type:"user",message:{content:$t}}' > "$SANDBOX/longtitle.jsonl"
+jq -cn --arg t "$long" '{type:"response_item",payload:{type:"message",role:"user",content:[{type:"input_text",text:$t}]}}' \
+  > "$SANDBOX/longtitle-codex.jsonl"
+jq -n --arg t "$long" '{info:{id:"ses_t"},messages:[{info:{role:"user"},parts:[{type:"text",text:$t}]}]}' \
+  > "$SANDBOX/longtitle-opencode.json"
+for pair in "claude:$SANDBOX/longtitle.jsonl" "codex:$SANDBOX/longtitle-codex.jsonl" "opencode:$SANDBOX/longtitle-opencode.json"; do
+  h="${pair%%:*}"; fx="${pair#*:}"
+  title="$(sj_adapter_call "$h" sjh_render "$fx" 2>/dev/null | head -1)"
+  check "$h: the title collapses the whitespace" grep -qF 'fix the broken retry logic' <<<"$title"
+  assert_eq "$h: the title is capped at 80 chars" "82" "${#title}"   # "# " + 80
+done
+
+section "tool output folds into the assistant stream"
+# The invariant behind the whole readable layer: a tool_result arrives as a `type:"user"` record,
+# but it is OUTPUT, not a prompt. If it opened a `## User` block the transcript would read as the
+# user having said what the tool printed, and the turn count would double-count every tool call.
+cat > "$SANDBOX/tools.jsonl" <<'JSONL'
+{"type":"user","message":{"content":"run the thing"}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"first assistant block"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"second assistant block"}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","is_error":true,"content":"boom: exit 1"}]}}
+JSONL
+out="$(sj_adapter_call claude sjh_render "$SANDBOX/tools.jsonl")"
+assert_eq "claude: tool output opens no second ## User" "1" "$(grep -cx '## User' <<<"$out")"
+assert_eq "claude: consecutive assistant records merge into one block" "1" "$(grep -cx '## Assistant' <<<"$out")"
+assert_contains "claude: a failed tool is labelled an error" "$out" "**⎿ error:**"
+assert_contains "claude: the error output survives" "$out" "boom: exit 1"
+
+section "codex renders every tool shape it can receive"
+# Only `function_call` with a bash -lc argv is covered by the fixture; these are the other three
+# wire shapes, and each takes a different branch of render_call/output_text.
+cat > "$SANDBOX/codex-tools.jsonl" <<'JSONL'
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"check disk"}]}}
+{"type":"response_item","payload":{"type":"local_shell_call","action":{"command":["bash","-lc","df -h /srv"]}}}
+{"type":"response_item","payload":{"type":"function_call","name":"grepper","arguments":"{\"command\":[\"rg\",\"-n\",\"TODO\"]}"}}
+{"type":"response_item","payload":{"type":"function_call_output","output":[{"text":"line one"},{"text":"line two"}]}}
+JSONL
+out="$(sj_adapter_call codex sjh_render "$SANDBOX/codex-tools.jsonl")"
+assert_contains "codex: local_shell_call is labelled shell" "$out" "**→ shell**"
+assert_contains "codex: and its bash -lc script is unwrapped" "$out" "df -h /srv"
+assert_contains "codex: a non-bash argv is joined, not dumped as JSON" "$out" "rg -n TODO"
+assert_contains "codex: array-form tool output is joined into text" "$out" "line one
+line two"
+
+section "opencode renders a failed tool and falls back for a title"
+cat > "$SANDBOX/oc-error.json" <<'JSON'
+{"info":{"id":"ses_e","title":"fallback title"},
+ "messages":[{"info":{"role":"assistant"},"parts":[
+   {"type":"tool","tool":"bash","state":{"status":"error","input":{"command":"systemctl restart nope"},"error":"Unit nope not found"}}]}]}
+JSON
+out="$(sj_adapter_call opencode sjh_render "$SANDBOX/oc-error.json")"
+assert_contains "opencode: an errored tool is labelled an error" "$out" "**⎿ error:**"
+assert_contains "opencode: and carries the error text" "$out" "Unit nope not found"
+# with no user turn to name the session, the export's own title is the only thing left
+assert_contains "opencode: the title falls back to info.title" "$(head -1 <<<"$out")" "fallback title"
 
 section "the turn count sjmcp reads is real"
 # sjmcp trusts the `_N turns_` line; if a renderer miscounts, recall shows the wrong size.

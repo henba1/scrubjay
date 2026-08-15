@@ -247,6 +247,9 @@ _LOG = re.compile(
     r'(?P<extra>(?: \| [^|]*)*)\s*$'
 )
 _NOISE_TOPICS = {"", "(no text)"}
+# One wording for one condition, shared by recall (which degrades to a pointer) and get /
+# search_within (which fail with one). A caller that learns it from either recognises it in both.
+_POINTER_NOTE = "transcript not in this archive — recall it on {host}"
 
 
 def _parse_extra(extra: str) -> dict[str, str]:
@@ -338,16 +341,22 @@ def _confined(p: Path, r: Roots) -> Path | None:
     return None
 
 
+# The handle as sj_list/sj_recall print it: hex for Claude/Codex, base62 for opencode. This must
+# stay as wide as _READABLE's sid8 group — a narrower `[0-9a-f]{8}` rejected exactly the handles
+# the other two tools hand out (an opencode sid8 with a letter past `f`).
+_SID8 = re.compile(r"[0-9A-Za-z_-]{8}")
+
+
 def resolve_ref(ref: str, r: Roots) -> Path | None:
     ref = ref.strip()
     if ref.startswith("sj://"):
         return _resolve_uri(ref, r)
-    # bare session id (8 hex) → find the readable for it
-    if re.fullmatch(r"[0-9a-f]{8}", ref):
+    # bare session id → find the readable for it. On a miss we fall through rather than return:
+    # an 8-character string is also a plausible relative path.
+    if _SID8.fullmatch(ref):
         for a in _iter_transcripts(r):
-            if a.sid == ref:
+            if a.sid == ref or a.sid.lower() == ref.lower():
                 return Path(a.path)
-        return None
     p = Path(ref).expanduser()
     if p.is_absolute():
         return _confined(p, r) if p.exists() else None
@@ -357,6 +366,32 @@ def resolve_ref(ref: str, r: Roots) -> Path | None:
         if cand.exists():
             return _confined(cand, r)
     return None
+
+
+def _log_for_ref(ref: str, r: Roots) -> LogEntry | None:
+    """The catalogue row for a session id, if the catalogue knows it. Only consulted when a ref
+    failed to resolve — that is the difference between "this session is on another machine" and
+    "no such session"."""
+    ref = ref.strip()
+    if "/" in ref or "." in ref or len(ref) < 8:
+        return None
+    key = ref.replace("-", "").lower()
+    for e in _iter_logs(r):
+        if e.sid8 == key[:8] or e.sid.lower() == ref.lower():
+            return e
+    return None
+
+
+def unresolved(ref: str, r: Roots) -> dict:
+    """The error body for a ref that didn't resolve. The archive is keyed by host, so a sid the
+    catalogue knows but this machine hasn't got locally is a *pointer*, not a bad id — say which,
+    and in the same words `core_recall` uses for the same condition."""
+    e = _log_for_ref(ref, r)
+    if e:
+        return {"error": "no transcript in this archive", "sid": e.sid8, "host": e.host,
+                "date": e.date, "topic": e.topic, "cwd": e.cwd,
+                "hint": _POINTER_NOTE.format(host=e.host)}
+    return {"error": f"not found or outside the archive: {ref!r}"}
 
 
 # ── jsonl <-> readable mapping ─────────────────────────────────────────────────────────────
@@ -589,7 +624,7 @@ def core_get(ref, format="readable", turns=None, lines=None, max_chars=None, r=N
     r = r or roots()
     path = resolve_ref(ref, r)
     if not path:
-        return {"error": f"not found or outside the archive: {ref!r}"}
+        return unresolved(ref, r)
     if format == "raw":
         jl = _jsonl_for(path, r) if path.suffix == ".md" else path
         if not jl or not jl.exists():
@@ -721,6 +756,61 @@ def _index_meta(path: str, by_path: dict) -> dict:
     return {"type": "file", "path": path, "topic": Path(path).stem}
 
 
+# ── scoring ────────────────────────────────────────────────────────────────────────────────
+# The prefilter's job is to hand the calling model a shortlist worth reading. The original score
+# — `len(terms) * 10 + n` — made raw hit count the tiebreak at equal term coverage, so a long
+# session that *mentions* every term repeatedly outranked the short one that actually answers the
+# query (#53: 91 vs 76 on a real archive). Repetition is not relevance. What is:
+#
+#   coverage    how many distinct query terms the file matches at all      (unchanged, dominant)
+#   passage     the most terms that co-occur inside one _PASSAGE_LINES window — a topic discussed
+#               in one place, rather than a word that recurs in ten unrelated ones
+#   log         the hit came from the session catalogue: a human-written one-line summary of the
+#               whole session, consistently higher signal than a grep hit in body text
+#   hits        raw count, capped — a weak tiebreak, no longer a rank driver
+_W_TERM, _W_PASSAGE, _W_LOG, _HITS_CAP = 10, 6, 8, 6
+_PASSAGE_LINES = 10   # lines within which two term hits count as "the same passage"
+_SNIPPET_SPREAD = 20  # keep chosen snippets at least this far apart, so 4 slots show 4 places
+_MAX_TRACKED_LINES = 60
+
+
+def _passage_terms(hits: dict[int, set]) -> int:
+    """The most distinct terms co-occurring within a _PASSAGE_LINES window of each other."""
+    if not hits:
+        return 0
+    lines = sorted(hits)
+    best = 0
+    for i, start in enumerate(lines):
+        window: set = set()
+        for ln in lines[i:]:
+            if ln - start > _PASSAGE_LINES:
+                break
+            window |= hits[ln]
+        best = max(best, len(window))
+    return best
+
+
+def _pick_snippets(hits: dict[int, dict], limit: int = 4) -> list[dict]:
+    """Choose the snippets the caller ranks by. Densest lines first (most query terms), deduped by
+    line, and spread out: a candidate within _SNIPPET_SPREAD lines of one already chosen is skipped
+    while other regions remain. Without this, the single densest line claims a slot once per term
+    it matches and three of four slots show one paragraph (#53)."""
+    ranked = sorted(hits.items(), key=lambda kv: (-len(kv[1]["terms"]), kv[0]))
+    chosen: list[int] = []
+    for lineno, _h in ranked:
+        if len(chosen) >= limit:
+            break
+        if any(abs(lineno - c) < _SNIPPET_SPREAD for c in chosen):
+            continue
+        chosen.append(lineno)
+    for lineno, _h in ranked:  # short of a full set? relax the spread rule rather than return fewer
+        if len(chosen) >= limit:
+            break
+        if lineno not in chosen:
+            chosen.append(lineno)
+    return [{"line": ln, "text": hits[ln]["text"]} for ln in sorted(chosen)]
+
+
 def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     r = r or roots()
     terms = [t for t in re.split(r"\s+", query.strip()) if len(t) > 2] or [query]
@@ -729,16 +819,23 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     # rather than re-walking the whole tree per candidate (recall used to be O(hits × corpus)).
     arts = _all_artifacts(r)
     by_path = {a.path: a for a in arts}
-    # Union hits across the individual terms (OR), then score files by distinct-term coverage +
-    # hit count. This is the lexical *prefilter*; the calling model does the semantic ranking.
+    # Union hits across the individual terms (OR), keyed by line so a line matching several terms
+    # is one hit that knows it matched several — that is what the passage score reads. This is the
+    # lexical *prefilter*; the calling model still does the semantic ranking.
     per_file: dict[str, dict] = {}
     for term in terms:
-        for path, lineno, text in _grep(term, paths):
-            f = per_file.setdefault(path, {"terms": set(), "hits": [], "n": 0, "log": None})
+        # 8 rather than 3 per term: the extra lines are the evidence _passage_terms scores on, and
+        # they are discarded again by _pick_snippets, so nothing extra reaches the caller.
+        for path, lineno, text in _grep(term, paths, max_count_per_file=8):
+            f = per_file.setdefault(path, {"terms": set(), "hits": {}, "n": 0, "log": None,
+                                           "log_hits": []})
             f["terms"].add(term.lower())
             f["n"] += 1
-            if len(f["hits"]) < 4:
-                f["hits"].append({"line": lineno, "text": text.strip()[:240]})
+            hit = f["hits"].get(lineno)
+            if hit:
+                hit["terms"].add(term.lower())
+            elif len(f["hits"]) < _MAX_TRACKED_LINES:
+                f["hits"][lineno] = {"text": text.strip()[:240], "terms": {term.lower()}}
 
     # Fold in the session-log catalogue. A topic match in the log keys onto the *transcript* when
     # one exists here (so a session surfaces even if only its first-prompt/topic matched, not its
@@ -748,18 +845,22 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
     if logs_dir:
         readable_by_sid = {a.sid: a.path for a in arts if a.type == "transcript" and a.sid}
         for term in terms:
-            for _lf, lineno, text in _grep(term, [logs_dir], globs=("*.log",), max_count_per_file=80):
+            for _lf, _lineno, text in _grep(term, [logs_dir], globs=("*.log",), max_count_per_file=80):
                 e = _parse_log_line(text)
                 if not e:
                     continue
                 key = readable_by_sid.get(e.sid8) or f"log:{e.sid8}"
-                f = per_file.setdefault(key, {"terms": set(), "hits": [], "n": 0, "log": None})
+                f = per_file.setdefault(key, {"terms": set(), "hits": {}, "n": 0, "log": None,
+                                              "log_hits": []})
                 f["terms"].add(term.lower())
                 f["n"] += 1
                 f["log"] = e
-                snip = {"line": lineno, "text": f"🗒 log · {e.host} · {e.date} · {e.project}: {e.topic}"[:240]}
-                if snip not in f["hits"] and len(f["hits"]) < 5:
-                    f["hits"].append(snip)
+                # No `line`: this text lives in <host>.log, not in the artifact `path` points at,
+                # and every other snippet's line is a line in that file (see sj_recall's docstring).
+                snip = {"source": "log",
+                        "text": f"🗒 log · {e.host} · {e.date} · {e.project}: {e.topic}"[:240]}
+                if snip not in f["log_hits"] and len(f["log_hits"]) < 2:
+                    f["log_hits"].append(snip)
 
     scored = []
     for key, f in per_file.items():
@@ -769,7 +870,7 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
             meta = {"type": "log", "host": log.host, "project": log.project, "date": log.date,
                     "topic": log.topic, "sid": log.sid8, "cwd": log.cwd,
                     "path": str((logs_dir / f"{log.host}.log")) if logs_dir else "",
-                    "note": "transcript not in this archive — recall it on this host"}
+                    "note": _POINTER_NOTE.format(host=log.host)}
         else:
             meta = _index_meta(key, by_path)
             if log:  # enrich a transcript hit with the log's exact cwd (readables keep only basename)
@@ -780,13 +881,26 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
             continue
         if since and (meta.get("date", "") or "") < since:
             continue
-        score = len(f["terms"]) * 10 + f["n"]
-        scored.append((score, {**meta, "score": score, "snippets": f["hits"]}))
+        passage = _passage_terms({ln: h["terms"] for ln, h in f["hits"].items()})
+        score = (_W_TERM * len(f["terms"])
+                 + _W_PASSAGE * max(0, passage - 1)   # one term alone is not co-occurrence
+                 + (_W_LOG if log else 0)
+                 + min(f["n"], _HITS_CAP))
+        why = f"{len(f['terms'])}/{len(terms)} terms"
+        if passage > 1:
+            why += f" · {passage} in one passage"
+        if log:
+            why += " · catalogue line"
+        scored.append((score, {**meta, "score": score, "why": why,
+                               "snippets": _pick_snippets(f["hits"]) + f["log_hits"]}))
     scored.sort(key=lambda x: (x[0], x[1].get("date", "")), reverse=True)
     results = [r_ for _, r_ in scored[: int(k)]]
     note = ("ripgrep" if _rg_available() else "grep") + " prefilter (transcripts·plans·memory·notes " \
            "+ the session-log catalogue) — rank these by reading the snippets; sj_get the best one. " \
-           "type=log hits have no transcript here: their host/cwd/date tell you where to find it."
+           "A snippet's `line` is a line number in `path`: pass it to sj_get(lines='N-M') to fetch " \
+           "just that passage instead of the whole file. `score`/`why` are lexical only — term " \
+           "coverage, co-occurrence in one passage, catalogue hits — so treat them as a shortlist, " \
+           "not a verdict. type=log hits have no transcript here: their host/cwd/date say where."
     return {"query": query, "engine": note, "count": len(results), "results": results}
 
 
@@ -797,7 +911,7 @@ def core_search_within(ref, query, context=2, r=None):
     r = r or roots()
     path = resolve_ref(ref, r)
     if not path:
-        return {"error": f"not found or outside the archive: {ref!r}"}
+        return unresolved(ref, r)
     try:
         lines = path.read_text(errors="replace").splitlines()
     except OSError as e:
@@ -908,14 +1022,22 @@ def build_server():
                lines: str | None = None, max_chars: int | None = None) -> dict:
         """Fetch an artifact (or a slice) to inject into context.
 
-        ref: a sj:// URI, a session id (8 hex), or a path. format: 'readable' (default) or
-        'raw' (the .jsonl). Slice with turns='5-10' or lines='1200-1300'.
+        ref: a sj:// URI, an 8-char session id (as sj_list/sj_recall print it), or a path.
+        format: 'readable' (default) or 'raw' (the .jsonl).
+
+        Slice with turns='5-10' or lines='1200-1300'. lines= indexes the same file sj_recall
+        greps, so a recall snippet's `line` goes straight in: lines='<line-20>-<line+20>' fetches
+        the passage that matched instead of the whole transcript. Prefer that.
 
         Content is capped at max_chars (default 24000, 0 = uncapped). Over the cap you get the
         head of the file plus `truncated`, `total_lines`/`total_turns` and a `hint` naming the
         exact next slice — a whole transcript is rarely what you wanted, and used to be big
         enough that the client refused the result outright. For a targeted read, run
-        sj_search_within first and sj_get the turns around the hit."""
+        sj_search_within first and sj_get the turns around the hit.
+
+        The archive is host-keyed. A session the catalogue knows but this machine has not got
+        locally returns {"error": "no transcript in this archive", "host": …, "hint": …} — that is
+        a pointer to the machine that has it, not a bad id; don't retry it here."""
         return _with_timeout(lambda: core_get(ref, format, turns, lines, max_chars))
 
     @mcp.tool()
@@ -923,15 +1045,32 @@ def build_server():
                   since: str | None = None, k: int = 8) -> dict:
         """Find past sessions/plans/memories/notes matching a topic description.
 
-        Runs a lexical prefilter and returns candidate files with matched snippets + line
-        anchors; YOU rank them by reading the snippets, then sj_get the best match."""
+        query: whitespace-separated terms, OR-ed. Each is a case-insensitive **substring**
+        (`percentage` matches `percentage_used`), not a regex; terms of 2 characters or fewer are
+        dropped. Describe the topic in a few distinctive words.
+
+        Runs a lexical prefilter and returns candidates with matched snippets. `score` and `why`
+        are lexical only (term coverage, co-occurrence within one passage, catalogue hits) — a
+        shortlist, not a verdict: YOU rank them by reading the snippets, then sj_get the best.
+
+        A snippet's `line` is a 1-based line number in that result's `path` — the same file and
+        numbering sj_get reads, so pass it to sj_get(lines='N-M') (pad by ~20 lines) to pull just
+        that passage rather than the whole file. Snippets marked "source": "log" come from the
+        session catalogue and carry no line. type=log results have no transcript on this machine:
+        their host/date/cwd say where to find it."""
         return _with_timeout(lambda: core_recall(query, host, project, since, k))
 
     @mcp.tool()
     def sj_search_within(ref: str, query: str, context: int = 2) -> dict:
         """Find where a topic appears *within* one session/plan/memory.
 
-        Returns matching passages with line anchors and the enclosing turn number."""
+        query: ONE case-insensitive literal substring — not a regex, not several terms. `a|b`
+        matches the characters `a|b`. Search one phrase at a time; `matches: 0` on a multi-term
+        query means the phrase is absent, not the topic.
+
+        Returns matching passages with line anchors (usable as sj_get(lines=…)) and the enclosing
+        turn number. A session the catalogue knows but this machine has not got locally returns
+        {"error": "no transcript in this archive", "host": …} — look on that host, don't retry."""
         return _with_timeout(lambda: core_search_within(ref, query, context))
 
     @mcp.tool()

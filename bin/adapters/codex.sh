@@ -36,6 +36,23 @@ sjh_session_handle() { printf '%.8s' "$1"; }   # session ids are UUIDs: the firs
 sjh_slug()         { printf '%s' "$1" | sed 's/[^A-Za-z0-9-]/-/g'; }
 sjh_session_slug() { local cwd="$2"; [ -n "$cwd" ] || cwd="$(sjh_session_cwd "$1")"; sjh_slug "$cwd"; }
 
+# Every rollout on disk, as TSV `<sid>\t<path>` — see bin/sj-reconcile.sh. The sid comes out of the
+# opening session_meta line rather than the filename: `rollout-<ts>-<uuid>.jsonl` embeds it, but the
+# timestamp in front of it also contains dashes, so parsing the name is guesswork where the record
+# is authoritative. Codex publishes on `Stop` (per turn), so in practice this finds almost nothing —
+# only a session killed inside its very first turn. That it finds anything at all is the point.
+sjh_list_sessions() {
+  local root f sid
+  root="$(sjh_config_dir)/sessions"
+  [ -d "$root" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sid="$(jq -r 'select(.type == "session_meta") | .payload.session_id // .payload.id // empty' \
+             "$f" 2>/dev/null | head -1)"
+    [ -n "$sid" ] && printf '%s\t%s\n' "$sid" "$f"
+  done < <(find "$root" -type f -name 'rollout-*.jsonl' 2>/dev/null)
+}
+
 # The session's cwd is recorded once, in the `session_meta` line that opens every rollout.
 sjh_session_cwd() {  # sjh_session_cwd <rollout.jsonl>
   jq -r 'select(.type == "session_meta") | .payload.cwd // empty' "$1" 2>/dev/null | head -1

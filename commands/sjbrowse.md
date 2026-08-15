@@ -27,8 +27,9 @@ Selection / filters: **$ARGUMENTS**
 5. On the user's pick, call `sj_get` to inject it — for a **chats** row, pass its `sid`; slice a long
    transcript with `turns=`/`lines=`. `sj_get` caps its content: if the result comes back
    `truncated`, follow the `hint` it gives (or narrow with `sj_search_within` first) rather than
-   re-fetching with a bigger `max_chars`. A chats row whose transcript never reached this machine
-   is a pointer only ("look on <host>"): say so instead of trying to fetch it.
+   re-fetching with a bigger `max_chars`. A chats row whose transcript never reached this machine is
+   a pointer only: `sj_get` answers `"no transcript in this archive"` with the `host` that has it —
+   relay that ("look on `<host>`") instead of retrying.
 
 Tip: transcripts/plans/memories/notes are also available as `@`-mention resources (the `sjmcp` resource
 picker), if the user would rather attach one directly. Be concise.

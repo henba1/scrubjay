@@ -44,6 +44,10 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `transports/<backend>.sh` (`git` / `rsync-wg` / `local`) — **the transport seam.** A backend
   defines `transport_ship` (write) plus `transport_resolve` / `transport_fetch` (read — used only
   by session hand-off).
+- `bin/sj-reconcile.sh` — catalogues + archives sessions that ended without the session-end hook
+  firing (crash, closed terminal, power cut). Run from SessionStart, bounded; `--all` sweeps the
+  back catalogue. `sj_log_row` in `bin/lib.sh` is the single writer of the catalogue line, shared
+  with `hooks/log-session.sh`.
 - `bin/sj-resume.sh` — cross-machine session hand-off: stage another host's archived transcript into
   this machine's `~/.claude/projects/` so `claude --resume` continues it. See `docs/handoff.md`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).

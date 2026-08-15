@@ -22,6 +22,13 @@ set -uo pipefail
 src="${1:?usage: render-opencode.sh <export.json>}"
 command -v jq >/dev/null 2>&1 || { echo "(jq unavailable — cannot render $src)"; exit 0; }
 [ -f "$src" ] || { echo "(export not found: $src)"; exit 0; }
+# A zero-byte export means `opencode export` FAILED — say so rather than rendering it as a session
+# that simply had no turns. This renderer reads one JSON document, so it runs jq WITHOUT -s (the
+# other two read .jsonl streams and slurp; -s here would nest the document and break .messages).
+# The cost is that an empty file gives jq zero values to iterate, the program never runs, and
+# without this guard the renderer emitted nothing at all — a 0-byte .md indistinguishable from a
+# genuinely empty session, and missing the `_N turns_` line mcp/sjmcp_server.py reads.
+[ -s "$src" ] || { echo "(export empty — opencode export produced nothing: $src)"; exit 0; }
 
 jq -r '
   def hdr($r): if $r == "user" then "## User" else "## Assistant" end;

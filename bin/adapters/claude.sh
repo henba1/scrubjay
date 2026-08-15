@@ -38,6 +38,23 @@ sjh_slug() { printf '%s' "$1" | sed 's/[^A-Za-z0-9-]/-/g'; }
 # The slug a session archives under: the one Claude actually chose, read straight off the path.
 sjh_session_slug() { basename "$(dirname "$1")"; }
 
+# Every session this harness has on disk, as TSV `<sid>\t<path>` — the input to bin/sj-reconcile.sh,
+# which is looking for sessions that ended without the hook ever running. `-mindepth 2 -maxdepth 2`
+# is load-bearing: it is exactly projects/<slug>/<sid>.jsonl, so the nested subagent transcripts
+# (projects/<slug>/<sid>/agent-*.jsonl) are excluded. Those are shipped as artifacts of their parent
+# session and are not sessions in their own right; catalogueing one would invent a session that a
+# user can neither resume nor recognize.
+sjh_list_sessions() {
+  local proj f sid
+  proj="$(sjh_config_dir)/projects"
+  [ -d "$proj" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sid="$(basename "$f" .jsonl)"
+    printf '%s\t%s\n' "$sid" "$f"
+  done < <(find "$proj" -mindepth 2 -maxdepth 2 -type f -name '*.jsonl' 2>/dev/null)
+}
+
 # The ~/.claude/projects/ dir that holds sessions for <cwd> (default: $PWD). Prefer *asking the
 # archive of local sessions* — find the dir whose transcripts record this cwd — because that is
 # exact and survives the edge cases sjh_slug() cannot see (e.g. a symlinked home: snellius records
