@@ -482,6 +482,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#every-result-is-bounded-and-says-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every result is bounded, and says so
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-recall-ranks-and-what-the-numbers-mean" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -922,6 +933,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#every-result-is-bounded-and-says-so" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every result is bounded, and says so
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-recall-ranks-and-what-the-numbers-mean" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1040,7 +1062,7 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 <tbody>
 <tr>
 <td><strong>tools</strong></td>
-<td><code>sj_list</code> (browse w/ filters, incl. <code>type=log</code> for the catalogue), <code>sj_recall</code> (topic → ranked candidates + anchors), <code>sj_search_within</code> (a topic <em>inside</em> one session → turn/line anchors), <code>sj_get</code> (fetch an artifact or a <code>turns=</code>/<code>lines=</code> slice), <code>sj_status</code></td>
+<td><code>sj_list</code> (browse w/ filters, sort + paging, incl. <code>type=log</code> for the catalogue), <code>sj_recall</code> (topic → ranked candidates + anchors), <code>sj_search_within</code> (a topic <em>inside</em> one session → turn/line anchors), <code>sj_get</code> (fetch an artifact or a <code>turns=</code>/<code>lines=</code> slice), <code>sj_status</code></td>
 </tr>
 <tr>
 <td><strong>resources</strong></td>
@@ -1052,6 +1074,40 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 </tr>
 </tbody>
 </table>
+<h2 id="every-result-is-bounded-and-says-so">Every result is bounded, and says so<a class="headerlink" href="#every-result-is-bounded-and-says-so" title="Permanent link">&para;</a></h2>
+<p>A tool result is spent out of the session's context window, so neither read tool returns whatever
+the archive happens to hold. Both are <strong>capped, visibly</strong> — a trimmed result carries the count that
+was left behind and the exact argument that fetches it:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Default</th>
+<th>Override</th>
+<th>Paging out</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sj_list</code></td>
+<td><code>limit=20</code> rows, whole result under <strong>12 000 chars</strong></td>
+<td><code>max_chars=</code>, <code>SJMCP_LIST_MAX_CHARS</code></td>
+<td><code>total</code> + <code>next_offset</code> → re-call with <code>offset=</code></td>
+</tr>
+<tr>
+<td><code>sj_get</code></td>
+<td>content under <strong>24 000 chars</strong></td>
+<td><code>max_chars=</code>, <code>SJMCP_GET_MAX_CHARS</code></td>
+<td><code>total_lines</code>/<code>total_turns</code> + a <code>hint</code> naming the next <code>lines=</code> slice</td>
+</tr>
+</tbody>
+</table>
+<p><code>0</code> on either means uncapped. <code>sj_list</code> rows are <strong>compact</strong> by default — <code>date · host · project ·
+topic · sid</code> (+ <code>path</code>, and whatever you sorted on); <code>fields="full"</code> restores <code>cwd</code>, <code>harness</code>,
+<code>model</code>, <code>size</code> and <code>turns</code>. It also sorts server-side: <code>sort</code> in <code>date|size|turns|host|project|
+topic</code> × <code>order=desc|asc</code>, so a second ordering costs an argument rather than a second fetch.</p>
+<p>For a targeted read of a long session, <code>sj_search_within</code> then <code>sj_get(turns=…)</code> beats fetching the
+file and raising the cap.</p>
 <h2 id="how-recall-ranks-and-what-the-numbers-mean">How recall ranks — and what the numbers mean<a class="headerlink" href="#how-recall-ranks-and-what-the-numbers-mean" title="Permanent link">&para;</a></h2>
 <p><code>sj_recall</code> scores candidates lexically and hands the shortlist to the model, which does the actual
 semantic ranking. The score is <code>10 ×</code> distinct query terms matched, plus <code>6 ×</code> the terms that
