@@ -14,10 +14,11 @@ Selection / filters: **$ARGUMENTS**
    If nothing is reachable, run `sj_status` and explain which trees this machine can see.
 3. Render the page **once**, as a numbered list, in the order `sj_list` returned it. Keep it
    scannable — don't dump raw tool JSON, and don't re-type fields the row already shows:
-   - **chats**: `date · host · topic`. A row with an **empty topic** is a real, resumable session
-     whose summary was never authored — list it, showing its `project` and `sid` in place of the
-     topic. Do not silently omit it; that is the bug this listing used to have.
-     `bin/sj-topics.sh` can backfill those topics.
+   - **chats**: `date · host · sid · topic`. **Always show the `sid`** — every row has one, and it
+     is the handle the user needs for `sj_get`, `/sjget` and `/sjresume`. A row with an **empty
+     topic** is a real, resumable session whose summary was never authored — list it with its
+     `project` in place of the topic. Do not silently omit it; that is the bug this listing used to
+     have. `bin/sj-topics.sh` can backfill those topics.
    - **transcript / plan / memory / note**: `date · host · project · topic`. Notes are
      cross-machine, so they have no host — show `project` instead.
 
