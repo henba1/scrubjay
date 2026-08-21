@@ -1076,8 +1076,8 @@ them as their own artifact type, distinct from a memory.</p>
 <li>Hooks: <code>sync-session.sh</code> pulls before linking; <code>log-session.sh</code> pushes at session end.</li>
 </ul>
 <h2 id="config-keys-configscrubjayconfig">Config keys (<code>~/.config/scrubjay/config</code>)<a class="headerlink" href="#config-keys-configscrubjayconfig" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_MEMORY</span><span class="p">:=</span><span class="nv">$HOME</span><span class="p">/.scrubjay/scrubjay-memory</span><span class="si">}</span><span class="s2">&quot;</span><span class="w">          </span><span class="c1"># local working clone</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>:<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SCRUBJAY_MEMORY_REMOTE</span><span class="p">:=...</span><span class="si">}</span><span class="s2">&quot;</span><span class="w">                              </span><span class="c1"># the bare repo (see below)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>:<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SCRUBJAY_MEMORY</span><span class="p">:=</span><span class="nv">$HOME</span><span class="p">/.scrubjay/scrubjay-memory</span><span class="si">}</span><span class="s2">"</span><span class="w">          </span><span class="c1"># local working clone</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>:<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SCRUBJAY_MEMORY_REMOTE</span><span class="p">:=...</span><span class="si">}</span><span class="s2">"</span><span class="w">                              </span><span class="c1"># the bare repo (see below)</span>
 </code></pre></div>
 <p>If <code>SCRUBJAY_MEMORY_REMOTE</code> is unset, memory sync is <strong>off</strong> — the dir is just machine-local.</p>
 <h2 id="setup-automated">Setup — automated<a class="headerlink" href="#setup-automated" title="Permanent link">&para;</a></h2>
@@ -1112,10 +1112,10 @@ is just a convenience view (don't edit it — it's overwritten on the next push)
 <p>WG client — git needs <strong>full git-over-SSH</strong>, and the transcript relay key can't be reused (its
 forced <code>rrsync -wo</code> command blocks git). <code>onboard-memory.sh</code> makes the key + alias; you add its
 public key on the receiver, restricted to git:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># on the receiver, in the git user&#39;s ~/.ssh/authorized_keys (printed for you by onboard-memory.sh):</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">command</span><span class="o">=</span><span class="s2">&quot;git-shell -c \&quot;</span><span class="nv">$SSH_ORIGINAL_COMMAND</span><span class="s2">\&quot;&quot;</span>,restrict<span class="w"> </span>ssh-ed25519<span class="w"> </span>AAAA...<span class="w"> </span>&lt;host&gt;<span class="w"> </span>memory-git
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># on the receiver, in the git user's ~/.ssh/authorized_keys (printed for you by onboard-memory.sh):</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">command</span><span class="o">=</span><span class="s2">"git-shell -c \"</span><span class="nv">$SSH_ORIGINAL_COMMAND</span><span class="s2">\""</span>,restrict<span class="w"> </span>ssh-ed25519<span class="w"> </span>AAAA...<span class="w"> </span>&lt;host&gt;<span class="w"> </span>memory-git
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># then on the client:  SCRUBJAY_MEMORY_REMOTE=scrubjay-memory:/srv/scrubjay-chats/memory.git</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">#   (/srv/scrubjay-chats is the receiver&#39;s symlink to the scrubjay-storage folder)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">#   (/srv/scrubjay-chats is the receiver's symlink to the scrubjay-storage folder)</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>bin/memory-sync.sh<span class="w"> </span>pull<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>bin/claude-sync.sh
 </code></pre></div>
 <p>From then on the client pulls others' memory at session start and publishes its own at session end.
@@ -1124,7 +1124,7 @@ resolve in the clone (memory files are small Markdown, so this is rare).</p>
 <p>GitHub-only (<code>git</code> backend) — the simplest of the three: no bare repo, no key, no receiver admin. The
 <strong>one prerequisite is yours to do first</strong>, because GitHub won't create the repo for you:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># 1) create an EMPTY private repo on GitHub — a SEPARATE one, not scrubjay-chats. Name it scrubjay-memory</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1">#    (that&#39;s the default onboard-memory.sh derives). e.g. with the gh CLI:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1">#    (that's the default onboard-memory.sh derives). e.g. with the gh CLI:</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>gh<span class="w"> </span>repo<span class="w"> </span>create<span class="w"> </span>&lt;owner&gt;/scrubjay-memory<span class="w"> </span>--private
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># 2) then run the onboarder (or /sjmemory) on this machine — it derives the remote, sets the config</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">#    keys, and the first push populates the empty repo. Override the derived name with MEM_GIT_REMOTE.</span>

@@ -1018,7 +1018,7 @@ harness's renderer emits the same <code># title</code> / <code>_N turns_</code> 
 inside opencode, and <strong>your setup follows you there too</strong>.</p>
 <p>If opencode is on <code>PATH</code> when you onboard, it's detected automatically and there's nothing more to
 do. To add it to a machine that's already set up:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;: &quot;${SCRUBJAY_HARNESSES:=claude opencode}&quot;&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.config/scrubjay/config
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s1">': "${SCRUBJAY_HARNESSES:=claude opencode}"'</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.config/scrubjay/config
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>bin/sync-config.sh
 </code></pre></div>
 <p><code>sync-config.sh</code> then writes the following into <code>~/.config/opencode/</code> — additively, and it never

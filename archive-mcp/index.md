@@ -14,14 +14,21 @@ It's a single-file, **read-only** server (`mcp/sjmcp_server.py`, run via `uv run
 
 A tool result is spent out of the session's context window, so neither read tool returns whatever the archive happens to hold. Both are **capped, visibly** — a trimmed result carries the count that was left behind and the exact argument that fetches it:
 
-|           | Default                                              | Override                             | Paging out                                                            |
-| --------- | ---------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------- |
-| `sj_list` | `limit=20` rows, whole result under **12 000 chars** | `max_chars=`, `SJMCP_LIST_MAX_CHARS` | `total` + `next_offset` → re-call with `offset=`                      |
-| `sj_get`  | content under **24 000 chars**                       | `max_chars=`, `SJMCP_GET_MAX_CHARS`  | `total_lines`/`total_turns` + a `hint` naming the next `lines=` slice |
+|                              | Default                                              | Override                                      | Paging out                                                            |
+| ---------------------------- | ---------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------- |
+| `sj_list`                    | `limit=20` rows, whole result under **12 000 chars** | `max_chars=`, `SJMCP_LIST_MAX_CHARS`          | `total` + `next_offset` → re-call with `offset=`                      |
+| `sj_get`                     | content under **24 000 chars**                       | `max_chars=`, `SJMCP_GET_MAX_CHARS`           | `total_lines`/`total_turns` + a `hint` naming the next `lines=` slice |
+| `sj_get(format="condensed")` | content under **48 000 chars**                       | `max_chars=`, `SJMCP_GET_CONDENSED_MAX_CHARS` | same `hint`, over its own line numbering                              |
 
 `0` on either means uncapped. `sj_list` rows are **compact** by default — `date · host · project · topic · sid` (+ `path`, and whatever you sorted on); `fields="full"` restores `cwd`, `harness`, `model`, `size` and `turns`. It also sorts server-side: `sort` in `date|size|turns|host|project| topic` × `order=desc|asc`, so a second ordering costs an argument rather than a second fetch.
 
 For a targeted read of a long session, `sj_search_within` then `sj_get(turns=…)` beats fetching the file and raising the cap.
+
+### Reading a *whole* session: `format="condensed"`
+
+About half a transcript by weight is tool traffic — the command, and the output it printed. Every adapter's renderer emits that as a fenced block under a `**→ tool**` / `**⎿ output:**` marker, which makes it separable: `format="condensed"` keeps the conversation verbatim and folds each of those blocks to its first two lines. A median session (43 KB readable) lands around 22 KB, so it arrives in one fetch instead of two — that is the format's whole reason to exist, and why it pages at its own larger budget.
+
+What it does *not* touch: a fence the assistant wrote into its own answer (no tool marker above it), and anything that isn't a transcript render — condensing a memory or note is a no-op that reports `format: "readable"` rather than clipping the code block that *is* the content. A condensed result carries `elided` saying how many blocks were folded and how to get the full text back. Its line and turn numbers index the condensed view, so a `line` from `sj_recall` or `sj_search_within` belongs with `format="readable"`.
 
 ## How recall ranks — and what the numbers mean
 
@@ -44,6 +51,8 @@ The archive is host-keyed, and the `logs/` catalogue spans every machine — so 
 ```
 
 Same wording `sj_recall` puts on its `type=log` results. `"not found or outside the archive"` keeps its narrower meaning: no such thing, anywhere.
+
+A session id resolves in either spelling — the 8-char handle the tools print, or the whole id you paste from `claude --resume` or a catalogue line. They differ only in punctuation, so a full id that did not resolve would report the *pointer* above and name another host for a session sitting right there.
 
 ## Registration is automatic, three ways
 

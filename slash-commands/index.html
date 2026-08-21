@@ -946,9 +946,9 @@ read-only <a href="../archive-mcp/"><code>sjmcp</code> MCP tools</a>; <strong>li
 <td>You know <strong>which</strong> session and want the <strong>exact spot</strong> a subject came up — returns turn/line anchors inside that one transcript instead of the whole thing.</td>
 </tr>
 <tr>
-<td><code>/sjget &lt;sid8 \| path \| sj://uri&gt; [turns=A-B \| lines=A-B]</code></td>
+<td><code>/sjget &lt;sid \| path \| sj://uri&gt; [turns=A-B \| lines=A-B] [full]</code></td>
 <td><code>sj_get</code> (one call, no search)</td>
-<td>You <strong>already know the item</strong> and just want it pulled in — cheapest way, no recall/ranking. Its edge is <strong>slicing</strong>: fetch only <code>lines=1200-1300</code> or <code>turns=5-10</code> of a huge transcript to keep tokens down.</td>
+<td>You <strong>already know the item</strong> and just want it pulled in — cheapest way, no recall/ranking. A session id works as the 8-char handle or the whole <code>--resume</code> id. Named with no slice, it fetches the session <strong>condensed</strong> — every word of the conversation, tool calls and their output folded to a couple of lines — which is what gets a whole session into one call; <code>full</code> asks for the tool traffic too. Its other edge is <strong>slicing</strong>: <code>lines=1200-1300</code> or <code>turns=5-10</code> of a huge transcript, fetched verbatim.</td>
 </tr>
 <tr>
 <td><code>/sjtable [head=N \| tail=N \| [a:b] \| all] [host= project= harness= model= topic= since= until=]</code></td>

@@ -1027,11 +1027,11 @@
 <p>Start a conversation on the laptop, finish it on the workstation. <code>/sjresume</code> stages a session that
 was archived from <strong>another</strong> machine into this one, so Claude Code's own <code>--resume</code> picks it up
 with its full history — subagents, task list and file history included.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># on the machine you&#39;re leaving (only if the session is still open — SessionEnd does this for you)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># on the machine you're leaving (only if the session is still open — SessionEnd does this for you)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>/sjlog
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># on the machine you&#39;re moving to, from the project directory</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>/sjresume<span class="w">                     </span><span class="c1"># pick from the other machines&#39; recent sessions</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># on the machine you're moving to, from the project directory</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>/sjresume<span class="w">                     </span><span class="c1"># pick from the other machines' recent sessions</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>/sjresume<span class="w"> </span>4677b53a<span class="w">            </span><span class="c1"># …or name it</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>/sjresume<span class="w"> </span>the<span class="w"> </span>foolbox<span class="w"> </span>refactor<span class="w">  </span><span class="c1"># …or describe it (semantic recall)</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
@@ -1091,7 +1091,7 @@ validated — same record count, every line still parses — before anything is 
 fails, the verbatim archive copy is installed instead and you're told.</p>
 <p>Anything the importer can't infer goes in <code>~/.config/scrubjay/config</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># old:new, one per line — e.g. a home that is /home/you here and /gpfs/home2/you there</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">SCRUBJAY_PATH_MAP</span><span class="o">=</span><span class="s2">&quot;/gpfs/home2/you:/home/you&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">SCRUBJAY_PATH_MAP</span><span class="o">=</span><span class="s2">"/gpfs/home2/you:/home/you"</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Symlinked homes are handled automatically</p>
@@ -1155,8 +1155,8 @@ the box already, so reading it back is just a copy.</p>
 <p><code>/sjresume</code> is a thin wrapper — it resolves a description to a session id and calls the script. You
 can run it yourself; it must be run <strong>from the project directory on this machine</strong>, since that is
 what the other host's paths get rewritten <em>to</em>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sj-resume.sh<span class="w"> </span>--list<span class="w"> </span><span class="o">[</span>n<span class="o">]</span><span class="w">        </span><span class="c1"># what&#39;s resumable, from other machines (default 15)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sj-resume.sh<span class="w"> </span>&lt;sid<span class="p">|</span>sid8&gt;<span class="w">        </span><span class="c1"># stage it into the project dir you&#39;re standing in</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sj-resume.sh<span class="w"> </span>--list<span class="w"> </span><span class="o">[</span>n<span class="o">]</span><span class="w">        </span><span class="c1"># what's resumable, from other machines (default 15)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sj-resume.sh<span class="w"> </span>&lt;sid<span class="p">|</span>sid8&gt;<span class="w">        </span><span class="c1"># stage it into the project dir you're standing in</span>
 </code></pre></div>
 <table>
 <thead>

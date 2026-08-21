@@ -966,7 +966,7 @@ go live on the pull alone — <code>claude-sync.sh</code> only has real work whe
 or a <em>new</em> command/agent file appeared (it relinks <code>commands/</code> from the app + data sources). You can still run
 either by hand (both idempotent); the hooks just mean you don't have to:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>bin/claude-sync.sh<span class="w">         </span><span class="c1"># re-apply config (auto-runs at SessionStart)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>bin/claude-index-chats.sh<span class="w">  </span><span class="c1"># refresh this host&#39;s chats.index.json (auto-runs at SessionEnd)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>bin/claude-index-chats.sh<span class="w">  </span><span class="c1"># refresh this host's chats.index.json (auto-runs at SessionEnd)</span>
 </code></pre></div>
 <p>Escape hatches (env, in <code>~/.config/scrubjay/config</code> or inline): <code>SCRUBJAY_NOSYNC=1</code>
 (skip the start-of-session pull+sync), <code>SCRUBJAY_SYNC_NOPULL=1</code> (sync without pulling).
