@@ -291,7 +291,7 @@ class LogEntry:
 
     @property
     def sid8(self) -> str:
-        return self.sid.replace("-", "")[:8].lower()
+        return _handle(self.sid)
 
     @property
     def project(self) -> str:
@@ -361,16 +361,34 @@ def _confined(p: Path, r: Roots) -> Path | None:
 # the other two tools hand out (an opencode sid8 with a letter past `f`).
 _SID8 = re.compile(r"[0-9A-Za-z_-]{8}")
 
+# A *whole* session id, the way `claude --resume` and the catalogue's `session=` field spell it:
+# a UUID, or opencode's `ses_<base62>`. Both carry the same 8-char handle the archive is filed by.
+_SID_FULL = re.compile(r"(?:ses_)?[0-9A-Za-z][0-9A-Za-z-]{8,}")
+
+
+def _handle(sid: str) -> str:
+    """The 8-char handle an id is filed under — `sjh_session_handle` (bin/adapters/*.sh) in Python.
+    `ses_` is a prefix rather than part of the id, and a UUID's dashes are punctuation."""
+    s = sid.strip()
+    if s.startswith("ses_"):
+        s = s[4:]
+    return s.replace("-", "")[:8].lower()
+
 
 def resolve_ref(ref: str, r: Roots) -> Path | None:
     ref = ref.strip()
     if ref.startswith("sj://"):
         return _resolve_uri(ref, r)
-    # bare session id → find the readable for it. On a miss we fall through rather than return:
-    # an 8-character string is also a plausible relative path.
-    if _SID8.fullmatch(ref):
+    # bare session id → find the readable for it. Both spellings resolve: the 8-char handle the
+    # other tools print, and the whole id you paste from `--resume`, `sj_list(fields="full")` or
+    # the catalogue. They differ only in punctuation, but a full id used to miss here, fall through
+    # to the path branch, and come back as "no transcript in this archive" — which names another
+    # host and reads as "it is not on this machine" for a session sitting right there.
+    # On a miss we still fall through rather than return: a bare word is a plausible relative path.
+    if _SID8.fullmatch(ref) or _SID_FULL.fullmatch(ref):
+        want = {ref.lower(), _handle(ref)}
         for a in _iter_transcripts(r):
-            if a.sid == ref or a.sid.lower() == ref.lower():
+            if a.sid.lower() in want:
                 return Path(a.path)
     p = Path(ref).expanduser()
     if p.is_absolute():
@@ -390,9 +408,9 @@ def _log_for_ref(ref: str, r: Roots) -> LogEntry | None:
     ref = ref.strip()
     if "/" in ref or "." in ref or len(ref) < 8:
         return None
-    key = ref.replace("-", "").lower()
+    key = _handle(ref)
     for e in _iter_logs(r):
-        if e.sid8 == key[:8] or e.sid.lower() == ref.lower():
+        if e.sid8 == key or e.sid.lower() == ref.lower():
             return e
     return None
 
@@ -444,6 +462,10 @@ def _jsonl_for(readable: Path, r: Roots) -> Path | None:
 
 _LIST_MAX_CHARS = 12_000   # ~3k tokens: a page you can afford to be wrong about
 _GET_MAX_CHARS = 24_000    # ~6k tokens; a 153K transcript used to be returned whole (#50)
+# `format="condensed"` buys about twice the conversation per character, so it gets its own budget
+# rather than paging at a cap sized for verbatim text. At 48k it holds a median session (43K
+# readable, ~22K condensed) in one fetch, which is the whole point of the format.
+_GET_CONDENSED_MAX_CHARS = 48_000
 
 
 def _budget(param, env: str, default: int) -> int:
@@ -613,6 +635,58 @@ def core_list(type=None, host=None, project=None, since=None, until=None, limit=
 # ── core: get ──────────────────────────────────────────────────────────────────────────────
 
 
+# ── condensed transcripts ──────────────────────────────────────────────────────────────────
+# About half a readable transcript by weight is tool traffic — the command and the output it
+# printed, which every adapter's renderer emits as a fenced block under a `**→ tool**` /
+# `**⎿ output:**` marker. That is what you want when you are reading *how* something was done,
+# and pure cost when you are reading what was *said*. `format="condensed"` keeps the conversation
+# verbatim and folds each of those blocks to its first lines, which is what lets a whole session
+# arrive in one fetch instead of two.
+
+_TOOL_MARK = re.compile(r"^\*\*(?:→|⎿)")
+_COND_KEEP = 2      # lines kept from each folded block — enough for the command, not its output
+_COND_WIDTH = 200   # ...each clipped to this: a tool's JSON input is one very long line
+
+
+def _condense(text: str) -> tuple[str, int]:
+    """Fold tool blocks. Returns (text, blocks folded).
+
+    Only a fence *introduced by a tool marker* is touched, so an assistant that wrote code into
+    its answer keeps it verbatim. The closing fence is the next ``` line, which is how markdown
+    itself reads the file — a tool output containing a fence of its own already renders wrong."""
+    out: list[str] = []
+    buf: list[str] = []
+    opener = ""
+    armed = infence = False
+    folded = 0
+    for ln in text.splitlines():
+        if infence:
+            if ln.startswith("```"):
+                infence = False
+                folded += 1
+                out.append(opener)
+                for k in buf[:_COND_KEEP]:
+                    out.append(k if len(k) <= _COND_WIDTH else k[:_COND_WIDTH] + " …")
+                if len(buf) > _COND_KEEP:
+                    out.append(f"… (+{len(buf) - _COND_KEEP} lines elided)")
+                out.append("```")
+            else:
+                buf.append(ln)
+            continue
+        if armed and ln.startswith("```"):
+            infence, opener, buf, armed = True, ln, [], False
+            continue
+        if _TOOL_MARK.match(ln):
+            armed = True
+        elif ln.strip():
+            armed = False
+        out.append(ln)
+    if infence:  # a fence that never closed: hand the lines back rather than eat them
+        out.append(opener)
+        out.extend(buf)
+    return "\n".join(out) + ("\n" if text.endswith("\n") else ""), folded
+
+
 def _slice_lines(text: str, spec: str) -> str:
     lines = text.splitlines()
     lo, _, hi = spec.partition("-")
@@ -649,17 +723,33 @@ def core_get(ref, format="readable", turns=None, lines=None, max_chars=None, r=N
         text = path.read_text(errors="replace")
     except OSError as e:
         return {"error": str(e)}
+    folded = 0
+    if format == "condensed":
+        # Nothing else in the archive has tool blocks to fold, and a memory or note whose code
+        # fence got clipped would be silently wrong — so condensing a non-transcript is a no-op
+        # that reports the format it actually returned.
+        if re.search(r"^## (?:User|Assistant)\b", text, re.M):
+            text, folded = _condense(text)
+        else:
+            format = "readable"
     body = text
     if lines:
         body = _slice_lines(text, lines)
     elif turns and format != "raw":
         body = _slice_turns(text, turns)
     out = {"path": str(path), "format": format, "content": body}
+    if folded:
+        # Rule 1 of the budgets below: anything trimmed says so, and names the way back.
+        out["elided"] = (f"{folded} tool blocks folded to their first {_COND_KEEP} lines — "
+                         "line and turn numbers here index this condensed view, not the readable "
+                         "file; re-fetch with format='readable' for the full text")
     # The cap applies to a slice too. `lines=1-99999` is not a smaller request than no slice at
     # all, and the failure it used to cause — the client dumping the whole result object to a
     # file, with the transcript's newlines JSON-escaped into one unreadable line (#50) — did not
     # care which argument got it there.
-    cap = _budget(max_chars, "SJMCP_GET_MAX_CHARS", _GET_MAX_CHARS)
+    cap = (_budget(max_chars, "SJMCP_GET_CONDENSED_MAX_CHARS", _GET_CONDENSED_MAX_CHARS)
+           if format == "condensed"
+           else _budget(max_chars, "SJMCP_GET_MAX_CHARS", _GET_MAX_CHARS))
     if cap and len(body) > cap:
         head = body[:cap]
         head = head[: head.rfind("\n") + 1] or head  # never cut mid-line
@@ -1040,18 +1130,25 @@ def build_server():
                lines: str | None = None, max_chars: int | None = None) -> dict:
         """Fetch an artifact (or a slice) to inject into context.
 
-        ref: a sj:// URI, an 8-char session id (as sj_list/sj_recall print it), or a path.
-        format: 'readable' (default) or 'raw' (the .jsonl).
+        ref: a sj:// URI, a session id — the 8-char handle sj_list/sj_recall print, or the whole
+        id from `--resume`/the catalogue — or a path.
+        format: 'readable' (default), 'condensed', or 'raw' (the .jsonl).
+
+        'condensed' keeps the conversation verbatim and folds each tool call and tool output to
+        its first lines. That is about half the characters, so it is how you read a *whole*
+        session; it carries its own larger budget (default 48000) for exactly that reason. Its
+        line and turn numbers index the condensed view, so use 'readable' with a number you got
+        from sj_recall or sj_search_within.
 
         Slice with turns='5-10' or lines='1200-1300'. lines= indexes the same file sj_recall
         greps, so a recall snippet's `line` goes straight in: lines='<line-20>-<line+20>' fetches
         the passage that matched instead of the whole transcript. Prefer that.
 
-        Content is capped at max_chars (default 24000, 0 = uncapped). Over the cap you get the
-        head of the file plus `truncated`, `total_lines`/`total_turns` and a `hint` naming the
-        exact next slice — a whole transcript is rarely what you wanted, and used to be big
-        enough that the client refused the result outright. For a targeted read, run
-        sj_search_within first and sj_get the turns around the hit.
+        Content is capped at max_chars (default 24000 readable / 48000 condensed, 0 = uncapped).
+        Over the cap you get the head of the file plus `truncated`, `total_lines`/`total_turns`
+        and a `hint` naming the exact next slice — an unbounded transcript used to be big enough
+        that the client refused the result outright. For a targeted read, run sj_search_within
+        first and sj_get the turns around the hit.
 
         The archive is host-keyed. A session the catalogue knows but this machine has not got
         locally returns {"error": "no transcript in this archive", "host": …, "hint": …} — that is

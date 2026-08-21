@@ -38,6 +38,18 @@ done
 
 RD="$SCRUBJAY_LOCAL_CHATS/hostpi/readable/dotclaude"; mkdir -p "$RD"
 printf '# t\n_4 turns_\n## User\nshort and sweet\n' > "$RD/2026-08-01_a-small-one__aaaa0001.md"
+# A transcript shaped like a real render: prose, tool calls with long output, and one fenced block
+# the *assistant* wrote — which condensing must leave alone.
+{ printf '# t\n_2 turns_\n\n## User\n\nwhat does the log say\n\n## Assistant\n\n'
+  printf 'here is what I ran\n\n**\xe2\x86\x92 Bash**\n\n```bash\ngrep -n boom /var/log/syslog\n```\n\n'
+  printf '**\xe2\x8e\xbf output:**\n\n```text\n'
+  i=0; while [ "$i" -lt 300 ]; do printf 'syslog line %d — noise noise noise\n' "$i"; i=$((i + 1)); done
+  printf '```\n\nand the fix is\n\n```python\nassistant_wrote_this = 1\nsecond_line = 2\nthird_line = 3\n```\n'
+} > "$RD/2026-08-03_a-tooly-one__aaaa0003.md"
+# A memory: no turns, no tool blocks — and a fenced block that is the content itself.
+MEM="$SCRUBJAY_LOCAL_CHATS/memory/dotclaude"; mkdir -p "$MEM"
+printf 'the shim to use\n\n```sh\nsj_mtime() { :; }\nsecond_line=2\nthird_line=3\n```\n' \
+  > "$MEM/portability-shims.md"
 { printf '# t\n_120 turns_\n'; i=0; while [ "$i" -lt 4000 ]; do
     printf '## User\nline %d — lorem ipsum dolor sit amet consectetur adipiscing\n' "$i"; i=$((i + 1)); done
 } > "$RD/2026-08-02_a-big-one__aaaa0002.md"
@@ -83,6 +95,19 @@ os.environ["SJMCP_LIST_MAX_CHARS"] = "900"
 env_list = m.core_list(type="log", limit=60)
 del os.environ["SJMCP_GET_MAX_CHARS"], os.environ["SJMCP_LIST_MAX_CHARS"]
 
+# The same session, named three ways: the handle the other tools print, the whole UUID a user
+# pastes from `claude --resume`, and opencode's `ses_`-prefixed spelling of the same handle.
+by_handle = m.core_get("aaaa0003")
+by_uuid = m.core_get("aaaa0003-1111-2222-3333-444444444444")
+by_ses = m.core_get("ses_aaaa0003zzzz")
+readable = m.core_get("aaaa0003", max_chars=0)
+condensed = m.core_get("aaaa0003", format="condensed")
+mem = [a for a in m._all_artifacts(m.roots()) if a.type == "memory"][0].path
+cond_mem = m.core_get(mem, format="condensed")
+os.environ["SJMCP_GET_CONDENSED_MAX_CHARS"] = "200"
+cond_env = m.core_get("aaaa0003", format="condensed")
+del os.environ["SJMCP_GET_CONDENSED_MAX_CHARS"]
+
 json.dump({
     "default_limit": default["shown"], "total": default["total"],
     "default_keys": sorted(default["items"][0]),
@@ -107,6 +132,20 @@ json.dump({
     "whole_truncated": "truncated" in whole,
     "small_truncated": "truncated" in m.core_get(small),
     "env_get_chars": len(env_get["content"]), "env_list_chars": chars(env_list),
+    "by_handle_path": by_handle.get("path", ""), "by_uuid_path": by_uuid.get("path", ""),
+    "by_ses_path": by_ses.get("path", ""),
+    "readable_chars": len(readable["content"]),
+    "cond_chars": len(condensed["content"]),
+    "cond_truncated": "truncated" in condensed,
+    "cond_format": condensed["format"], "cond_elided": condensed.get("elided", ""),
+    "cond_keeps_command": "grep -n boom /var/log/syslog" in condensed["content"],
+    "cond_keeps_prose": "and the fix is" in condensed["content"],
+    "cond_keeps_own_fence": "third_line = 3" in condensed["content"],
+    "cond_drops_output": "syslog line 299" in condensed["content"],
+    "cond_says_how_much": "elided" in condensed["content"],
+    "cond_mem_format": cond_mem["format"], "cond_mem_elided": cond_mem.get("elided", ""),
+    "cond_mem_intact": "third_line=3" in cond_mem["content"],
+    "cond_env_chars": len(cond_env["content"]), "cond_env_truncated": "truncated" in cond_env,
 }, open(sys.argv[1], "w"), indent=1)
 PY
 rc=$?
@@ -185,5 +224,39 @@ assert_eq "max_chars=0 still returns the whole file" "false" "$(j .whole_truncat
 assert_eq "a small artifact is untouched — no cap noise on the common case" "false" "$(j .small_truncated)"
 check "SJMCP_GET_MAX_CHARS overrides the default" \
   bash -c '[ "$1" -le 5000 ]' _ "$(j .env_get_chars)"
+
+# ── sj_get: a session id in whatever spelling the user has ─────────────────────────────────────
+# A whole id used to miss the sid branch, fall through to the path branch, and come back as
+# "no transcript in this archive" — which names another host, so a session sitting right there
+# read as one that had never been relayed.
+section "sj_get resolves a session id in either spelling"
+assert_eq "the 8-char handle resolves" "false" "$(j '.by_handle_path == ""')"
+assert_eq "the whole UUID resolves to the same file" "$(j .by_handle_path)" "$(j .by_uuid_path)"
+assert_eq "and so does opencode's ses_ spelling" "$(j .by_handle_path)" "$(j .by_ses_path)"
+
+# ── sj_get: condensed ──────────────────────────────────────────────────────────────────────────
+# Tool traffic is most of a transcript's weight and none of its argument. Folding it is what puts
+# a whole session in one fetch — so the test is that the *conversation* survives intact.
+section "format=condensed folds tool traffic, not the conversation"
+assert_eq "it says which format it returned" "condensed" "$(j .cond_format)"
+check "and it is materially smaller than the readable file" \
+  bash -c '[ "$1" -lt "$(( $2 / 2 ))" ]' _ "$(j .cond_chars)" "$(j .readable_chars)"
+assert_eq "the tool call itself is kept — you can see what ran" "true" "$(j .cond_keeps_command)"
+assert_eq "its 300 lines of output are not" "false" "$(j .cond_drops_output)"
+assert_eq "the elision is visible in the text, not silent" "true" "$(j .cond_says_how_much)"
+assert_contains "and the result says how to get the full text back" "$(j .cond_elided)" "format='readable'"
+assert_contains "warning that its line numbers are its own" "$(j .cond_elided)" "condensed view"
+assert_eq "assistant prose is untouched" "true" "$(j .cond_keeps_prose)"
+# The marker is what makes a block tool output; a fence the assistant wrote has none.
+assert_eq "so is a code block the assistant wrote itself" "true" "$(j .cond_keeps_own_fence)"
+assert_eq "a session that fits arrives whole, in one call" "false" "$(j .cond_truncated)"
+# Condensed is the "read the whole thing" format, so it pages at its own, larger budget.
+check "SJMCP_GET_CONDENSED_MAX_CHARS overrides that budget" \
+  bash -c '[ "$1" -le 200 ]' _ "$(j .cond_env_chars)"
+assert_eq "and a condensed result that still overran says so" "true" "$(j .cond_env_truncated)"
+# Memories and notes have no tool blocks; clipping a fence there would silently eat the content.
+assert_eq "condensing a non-transcript is a no-op..." "readable" "$(j .cond_mem_format)"
+assert_eq "...that does not claim to have elided anything" "" "$(j .cond_mem_elided)"
+assert_eq "...and leaves its code block whole" "true" "$(j .cond_mem_intact)"
 
 finish
