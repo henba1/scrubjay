@@ -121,3 +121,70 @@ test('a publish result draws its steps', async $ => {
   expect(failed?.props.color).toBe('error')
   await ui.unmount()
 })
+
+// Shapes as this session's transcript stored them: /sjlog's Bash result and /sjrecall's MCP result
+// (a list of text blocks holding the JSON). Values are placeholders; structure is verbatim.
+const recalled = (hosts: string[]) => [
+  {
+    type: 'text',
+    text: JSON.stringify(
+      {
+        query: 'verbose progress mod',
+        engine: 'grep prefilter …',
+        count: hosts.length,
+        results: hosts.map((host, i) => ({
+          type: 'transcript',
+          host,
+          project: 'scrubjay',
+          date: `2026-10-${String(16 - i).padStart(2, '0')}`,
+          topic: `topic ${i}`,
+          sid: `0000000${i}`,
+          path: `2026-10-16_topic-${i}__0000000${i}.md`,
+          size: '312 KB',
+          score: 50 - i,
+          why: '3/3 terms',
+          snippets: [{ line: 7, text: 'snippet' }],
+        })),
+      },
+      null,
+      2,
+    ),
+  },
+]
+
+describe('as this session recorded them', () => {
+  test('the /sjrecall result', async () => {
+    const hosts = ['laptop', 'laptop', 'laptop', 'laptop', 'laptop', 'scrubjay-rx', 'laptop', 'desktop']
+    const s = summarize(RECALL, recalled(hosts))
+    expect(s.line).toBe('8 candidates from 3 hosts')
+    expect(s.rows).toEqual(['2026-10-16 · laptop · topic 0', '2026-10-15 · laptop · topic 1', '2026-10-14 · laptop · topic 2'])
+  })
+
+  test('the /sjlog result', async () => {
+    const rep = reportOf(
+      'scrubjay publish · 5cf29556 · 3s\n  – memory     nothing to publish\n  ✓ relay      shipped via local\n  ✓ catalogue  row for 5cf29556\n  ✓ data       in sync with origin\nexit: 0',
+    )
+    expect(rep?.steps.map(s => `${s.state} ${s.name}`)).toEqual(['skip memory', 'ok relay', 'ok catalogue', 'ok data'])
+    expect(rep?.rest).toEqual([])
+  })
+})
+
+describe('only a command that runs a script is drawn as one', () => {
+  test('the invocations the commands use', async () => {
+    expect(scriptOf('SCRUBJAY_TOPIC="Verbose sj commands" bash ~/.claude/hooks/publish-now.sh 2>&1; echo "exit: $?"')?.verb).toBe('Publish')
+    expect(scriptOf('cd /x && bash hooks/sync-session.sh --report </dev/null 2>&1')?.verb).toBe('Sync')
+    expect(scriptOf('bash "$(cd "$(dirname "$(readlink -f ~/.claude/hooks)")" && pwd)/bin/sj-resume.sh" 1a2b3c4d')?.verb).toBe('Resume')
+    expect(scriptOf('bash ~/.claude/hooks/../bin/sj-note.sh --topic "fsl impact" <<\'EOF\'')?.detail).toBe('fsl impact')
+  })
+
+  test('commands that merely name one', async () => {
+    for (const cmd of [
+      'sed -n 1,40p hooks/publish-now.sh',
+      'shellcheck -S warning hooks/sync-session.sh hooks/log-session.sh',
+      'grep -n "echo" hooks/sync-session.sh | head',
+      'git diff hooks/publish-now.sh',
+    ]) {
+      expect(scriptOf(cmd)).toBe(null)
+    }
+  })
+})

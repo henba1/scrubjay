@@ -40,8 +40,18 @@ const SCRIPTS: ReadonlyArray<{ re: RegExp; verb: string; op?: string }> = [
 
 export type Script = { verb: string; op?: string; detail: string }
 
+// A segment *runs* a script when, past any VAR=value assignments, the script is the command itself
+// or what bash/sh is handed (a quoted path may hold spaces: "$(cd -P …)/bin/sj-doctor.sh"). Naming
+// it anywhere else (`sed -n 1p hooks/publish-now.sh`, `shellcheck …`) is not running it.
+const RUNS = (re: RegExp) =>
+  new RegExp(
+    String.raw`^\s*(?:[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)\s+)*(?:(?:ba)?sh\s+(?:-\S+\s+)*)?(?:"[^"]*?|\S*?)` +
+      re.source,
+  )
+
 export function scriptOf(command: string): Script | null {
-  const hit = SCRIPTS.find(s => s.re.test(command))
+  const segments = command.split(/&&|\|\||;|\n/)
+  const hit = SCRIPTS.find(s => segments.some(seg => RUNS(s.re).test(seg)))
   if (!hit) return null
   // The one argument worth showing: /sjlog's authored topic, /sjnote's topic.
   const topic = /SCRUBJAY_TOPIC="([^"]*)"/.exec(command) ?? /--topic "([^"]*)"/.exec(command)

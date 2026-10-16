@@ -19,6 +19,7 @@ const runAtom = atom({ plugin: 'scrubjay-ui', key: 'run' } as const, null)
 const activityAtom = atom({ plugin: 'scrubjay-ui', key: 'activity' } as const, null)
 
 const OPS = ['publish', 'sync'] as const
+const COMMAND: Record<string, string> = { sjlog: 'publish', sjsync: 'sync' }
 const POLL_MS = 250
 const LINGER_MS = 5000 // the finished run stays on the band this long
 const GIVE_UP_MS = 90_000 // a watch that never sees its run begin stops
@@ -73,6 +74,14 @@ async function poll($: EngineInterface): Promise<void> {
   if (run.endedAt === undefined) return
   stop()
   const failed = run.steps.filter(s => s.state === 'fail')
+  // The command's own activity line ("started") would outlive the run on the band: close it out.
+  const done = run.steps.filter(s => s.state === 'ok').length
+  const secs = Math.round(((run.endedAt ?? now) - run.startedAt) / 1000)
+  await setActivity($, {
+    command: run.op,
+    line: `${done} done${failed.length ? ` · ${failed.length} failed` : ''} · ${secs}s`,
+    tone: failed.length ? 'error' : 'ok',
+  })
   if (failed.length && toasted !== run.startedAt) {
     toasted = run.startedAt
     $.ui.toast(
@@ -114,7 +123,7 @@ export const register: Register = on => {
 
   on('skill.prompt', async ($, e, next) => {
     if (/^sj[a-z]+$/.test(e.skill)) {
-      await setActivity($, { command: e.skill.slice(2), line: 'started', tone: 'run' })
+      await setActivity($, { command: COMMAND[e.skill] ?? e.skill.slice(2), line: 'started', tone: 'run' })
       if (e.skill === 'sjlog' || e.skill === 'sjsync') await watch($)
     }
 
