@@ -33,3 +33,19 @@ read-only [`sjmcp` MCP tools](archive-mcp.md); **lifecycle** commands just run t
 | `/sjnote [what to capture \| /path/to/file]` | — | **Keep a written artefact** — an analysis, a briefing, a design rationale (runs `bin/sj-note.sh`). Writes it to `<memory>/<project>/notes/` and publishes immediately, so it survives the session and reaches every machine. Invoke it *before* the work too: it stands for the rest of the session, so durable output goes there instead of the scratchpad. Notes are **not** loaded into future sessions — read them back with `/sjrecall` or `/sjbrowse note`. |
 | `/sjpaste [name]` | — | **Put the clipboard into this project's assets and read it.** For the thing a terminal can't do: a screenshot, a copied PDF, a diagram. Writes to `$SCRUBJAY_ASSETS/<project-slug>/` (machine-local, not synced) and hands the path straight to the session. Needs a clipboard on the machine running the session — over SSH use `cat <file> \| bin/sj-paste.sh -` instead. |
 | `/sjdoctor [section…]` | — | **Check that this machine's sync actually works** (runs `bin/sj-doctor.sh`). With no argument it verifies everything: config, the data repo, the memory clone, relay reachability, adapters and the last recorded outcomes. Name sections — `config`, `data`, `memory`, `relay`, `harnesses`, `outcomes` — to check just those, which skips the slow network probes for the rest. Read-only and safe to run any time; reach for it when something *should* have synced and didn't. |
+
+## What the commands show while they run
+
+`/sjlog` and `/sjsync` print a step report: one line per step, `✓` done, `✗` failed, `–` skipped
+with the reason. Steps are recorded in `~/.scrubjay/run/<op>.tsv` as they finish (`sj_step` in
+`bin/lib.sh`). The archive commands say one line before and after each `sjmcp` call. Both work in
+every harness.
+
+In Claude Code, the optional **scrubjay-ui** mod draws the same in the native interface: a named
+row per archive call (`⏺ Recall("retry backoff") · scrubjay`) with a one-line result instead of raw
+JSON, the live steps of a publish or sync above the prompt, and a toast when a step fails —
+including the SessionStart sync, which otherwise fails unseen.
+
+```
+/plugin install scrubjay-ui --marketplace henba1/scrubjay
+```

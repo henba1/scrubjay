@@ -23,10 +23,10 @@ list_sources() {
   if git -C "$APP" rev-parse --git-dir >/dev/null 2>&1; then
     # --others as well as --cached: a file an agent just wrote is not staged yet, and catching it
     # now is the whole point. --exclude-standard keeps .gitignore'd scratch files out.
-    git -C "$APP" ls-files --cached --others --exclude-standard '*.sh' '*.py' '*.js'
+    git -C "$APP" ls-files --cached --others --exclude-standard '*.sh' '*.py' '*.js' '*.ts' '*.tsx' ':!*.d.ts'
   else
     # A tarball export still deserves the check; mirror the ls-files exclusions by hand.
-    (cd "$APP" && find . -type f \( -name '*.sh' -o -name '*.py' -o -name '*.js' \) \
+    (cd "$APP" && find . -type f \( -name '*.sh' -o -name '*.py' -o -name '*.js' -o -name '*.ts' -o -name '*.tsx' \) -not -name '*.d.ts' \
       -not -path './.git/*' -not -path './skeleton/*' | sed 's|^\./||')
   fi
 }

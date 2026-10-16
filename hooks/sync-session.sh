@@ -13,7 +13,10 @@
 #
 # Env knobs:  SCRUBJAY_NOSYNC=1  (skip entirely)   SCRUBJAY_SYNC_NOPULL=1  (sync without pull)
 #             CLAUDE_HOST=<name>
+# --report (the /sjsync command): print the step report at the end. Never on the hook path —
+# stdout there is the session's context, and a clean sync has nothing to tell it.
 [ "${SCRUBJAY_NOSYNC:-0}" = "1" ] && exit 0
+report=0; [ "${1:-}" = "--report" ] && report=1
 # Read the payload rather than discarding it: step 2c needs this session's own id, so that the
 # reconcile pass cannot mistake the session it is running inside for one that died. Everything
 # else here ignores it. `|| true` — a harness that sends nothing must not wedge the hook.
@@ -28,6 +31,19 @@ APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 DATA="$(sj_data 2>/dev/null || true)"
 sj_load_config   # in THIS shell: sj_data loads it only in its own subshell, so the backend check below saw the default
+sj_progress_begin sync
+
+# One repo's fast-forward pull, reported as a step (run in the background by the loop below).
+pull_step() {  # pull_step <step> <repo> <timeout-secs>
+  local before after
+  before="$(git -C "$2" rev-parse HEAD 2>/dev/null)"
+  if ( cd "$2" && sj_timeout "$3" git pull --ff-only -q 2>/dev/null ); then
+    after="$(git -C "$2" rev-parse HEAD 2>/dev/null)"
+    if [ "$before" = "$after" ]; then sj_step "$1" ok "up to date"; else sj_step "$1" ok "updated"; fi
+  else
+    sj_step "$1" fail "pull failed (diverged, dirty or unreachable)"
+  fi
+}
 
 # 1) pull latest from other machines (best-effort, fast). DATA = your config/content;
 #    APP = the scripts & hooks themselves, so hook/script fixes also propagate on their
@@ -38,28 +54,31 @@ if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
   # (stdout lands in the session's context, so the assistant surfaces it).
   sj_is_clone || printf 'scrubjay: the app at %s is not a git clone, so it can never self-update. Source tarballs are not a supported install — reinstall with `git clone`.\n' "$APP"
   # Independent repos, each a network round-trip — pull them concurrently (chats below too).
-  for repo in "$DATA" "$APP"; do
-    [ -n "$repo" ] && [ -d "$repo/.git" ] && \
-      { ( cd "$repo" && sj_timeout 15 git pull --ff-only -q 2>/dev/null ) || true; } &
+  for pair in "data:$DATA" "app:$APP"; do
+    step="${pair%%:*}"; repo="${pair#*:}"
+    [ -n "$repo" ] && [ -d "$repo/.git" ] && { sj_step "$step" run; pull_step "$step" "$repo" 15 & }
   done
   # git backend only: refresh the scrubjay-chats clone so the local sjmcp archive spans every
   # machine's sessions (not just this one's) before claude-sync registers/serves it. Best-effort;
   # --ff-only just no-ops on a diverged tree (e.g. local ships that haven't pushed yet).
   if [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
     chats="$(sj_chats 2>/dev/null || true)"
-    [ -n "$chats" ] && [ -d "$chats/.git" ] && \
-      { ( cd "$chats" && sj_timeout 20 git pull --ff-only -q 2>/dev/null ) || true; } &
+    [ -n "$chats" ] && [ -d "$chats/.git" ] && { sj_step chats run; pull_step chats "$chats" 20 & }
   fi
 fi
 
 # 1b) pull cross-machine memory from its own NAS-hosted git repo (no-op if not configured),
 #     BEFORE claude-sync links the per-project memory dirs at it, so others' memory is present.
 #     Concurrent with the pulls above; `wait` joins them all before anything reads the results.
+sj_step memory run
 { "$APP/bin/memory-sync.sh" pull >/dev/null 2>&1 || true; } &
 wait
 
+
 # 2) apply into each harness's config root (idempotent; mostly a no-op thanks to symlinks)
-"$APP/bin/sync-config.sh" >/dev/null 2>&1 || true
+sj_step config run
+if "$APP/bin/sync-config.sh" >/dev/null 2>&1; then sj_step config ok "applied"
+else sj_step config fail "sync-config.sh failed"; fi
 
 # 2b) re-render logs/CATALOGUE.md — the human-browsable chat table — now that the pull in (1)
 #     has brought in other machines' log lines. --no-pull: (1) already did it, and honors
@@ -78,7 +97,9 @@ if [ "${SCRUBJAY_NORECONCILE:-0}" != "1" ]; then
   self_sid=""
   command -v jq >/dev/null 2>&1 && \
     self_sid="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)"
+  sj_step reconcile run
   "$APP/bin/sj-reconcile.sh" ${self_sid:+--exclude "$self_sid"} 2>/dev/null || true
+  sj_step reconcile ok "orphaned sessions checked"
 fi
 
 # 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
@@ -128,4 +149,6 @@ if [ -s "$mfile" ] && grep -q 'result=fail' "$mfile" 2>/dev/null; then
   printf 'scrubjay: cross-machine memory sync FAILED — this machine may be running on a stale view of memory, and anything it writes may not reach the others. Check SCRUBJAY_MEMORY_REMOTE and the memory-git SSH key. Breadcrumb: %s\n' "$(cat "$mfile")"
 fi
 
+sj_progress_end
+[ "$report" = 1 ] && sj_progress_render
 exit 0

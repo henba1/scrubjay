@@ -35,5 +35,10 @@ Selection / filters: **$ARGUMENTS**
    a pointer only: `sj_get` answers `"no transcript in this archive"` with the `host` that has it —
    relay that ("look on `<host>`") instead of retrying.
 
+**Narrate as you go.** Before each tool call write one short line naming what you are about to do
+and with what, e.g. `→ recalling "retry backoff" across all hosts since 2026-09-01`; after it, one
+line with the outcome (`✓ 6 candidates from 3 hosts`, `✗ archive unreachable`). The user should
+see scrubjay working, not a silent pause.
+
 Tip: transcripts/plans/memories/notes are also available as `@`-mention resources (the `sjmcp` resource
 picker), if the user would rather attach one directly. Be concise.

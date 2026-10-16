@@ -21,4 +21,9 @@ Topic / filters: **$ARGUMENTS**
    the same file, so `lines=<line-20>-<line+20>` fetches the matching passage. Fetch the whole
    file only when the user wants the whole session.
 
+**Narrate as you go.** Before each tool call write one short line naming what you are about to do
+and with what, e.g. `→ recalling "retry backoff" across all hosts since 2026-09-01`; after it, one
+line with the outcome (`✓ 6 candidates from 3 hosts`, `✗ archive unreachable`). The user should
+see scrubjay working, not a silent pause.
+
 Be concise. Do not dump raw tool JSON; summarize.

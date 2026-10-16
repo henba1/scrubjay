@@ -38,6 +38,11 @@ Target: **$ARGUMENTS**
    transcript. Pass that on honestly: the content carries over, the session id and tool history do
    not. Do not describe it as a resume.
 
+**Narrate as you go.** Before each tool call write one short line naming what you are about to do
+and with what, e.g. `→ recalling "retry backoff" across all hosts since 2026-09-01`; after it, one
+line with the outcome (`✓ 6 candidates from 3 hosts`, `✗ archive unreachable`). The user should
+see scrubjay working, not a silent pause.
+
 Notes worth passing on only if they apply:
 - The archive is only as fresh as the last publish. If the session is still open on the other
   machine, they should run `/sjlog` there first — otherwise the last few turns aren't in the archive

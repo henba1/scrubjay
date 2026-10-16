@@ -35,7 +35,8 @@ EOF
 or, to promote an existing file:
 `bash ~/.claude/hooks/../bin/sj-note.sh --from /path/to/file --topic "…"`.
 The script names the file, backlinks it to this session, updates the one-line `notes/` pointer in
-`MEMORY.md`, and publishes immediately. It prints the path — report that path back.
+`MEMORY.md`, and publishes immediately. It prints the path — report that path back. Say one line before running it
+(`→ saving note "fsl impact on document b"`) so the user sees the write happen.
 
 **Prose: neutral and concise.** Scientific register — state the finding and the reasoning that
 supports it; drop the framing, the recap of what was asked, and the closing summary. Structure with

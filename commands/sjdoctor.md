@@ -7,8 +7,9 @@ allowed-tools: Bash(bash:*), Bash(echo:*)
 
 Report the result to the user:
 
-- exit 0 → reply `✓ scrubjay healthy` plus any `-` informational lines that matter (a write-only
-  host with no read channel, a harness that is configured but not installed).
+- exit 0 → the verdict line, then one line per section with its result (`✓ config · 3 checks`),
+  plus any `-` informational lines that matter (a write-only host with no read channel, a harness
+  that is configured but not installed).
 - exit non-zero → list each `✗` line with its `fix:` hint, most consequential first. Do not run
   the fixes; several need a human on the receiver, and one (`authorized_keys`) must never be done
   by an agent. Offer to run the ones that are purely local.

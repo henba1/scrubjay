@@ -23,10 +23,11 @@ tpath="$(sjh_find_live_transcript "$cwd")"
 f="$(basename "$tpath")"; sid="${f%.*}"
 
 # Feed log-session.sh the same shape Claude would, and run it synchronously (--detached skips its
-# self-relaunch), so the status line below reflects a completed publish.
+# self-relaunch), so the step report below reflects a completed publish.
+sj_progress_begin publish "${sid:0:8}"
 printf '{"session_id":"%s","cwd":"%s","transcript_path":"%s"}' "$sid" "$cwd" "$tpath" \
   | bash "$APP/hooks/log-session.sh" --detached
 
-echo "published session ${sid:0:8} (cwd $cwd)"
-M="$(sj_memory)"; [ -d "$M/.git" ] && echo "memory @ $(git -C "$M" log --oneline -1 2>/dev/null || echo '(no commits)')"
+sj_progress_end
+sj_progress_render
 exit 0

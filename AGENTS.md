@@ -54,6 +54,9 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
   `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.
 - `commands/` — the generic `/dc*` slash commands shipped with the app.
+- `mods/scrubjay-ui/` — the optional Claude Code mod (TypeScript hooks module) that draws scrubjay
+  in the native interface; listed by `.claude-plugin/marketplace.json`. Tests:
+  `claude plugin test mods/scrubjay-ui` (local only — CI has no `claude`).
 - `skeleton/host/` — template copied when registering a new machine.
 - `docs/` — the documentation site (also the source for the published site + `llms.txt`).
 

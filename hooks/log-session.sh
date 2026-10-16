@@ -57,10 +57,16 @@ DATA="$(sj_data 2>/dev/null || true)"
 # ---- 1d) publish cross-machine memory to its own NAS-hosted git repo (not GitHub) ----
 # Memory holds sensitive paths, so it rides its own self-hosted repo over WireGuard, separate
 # from the data repo below. No-op if memory sync isn't configured on this machine.
+sj_step memory run
 "$APP/bin/memory-sync.sh" push >/dev/null 2>&1 &
 
 # ---- 2) relay the full transcript + the session's other records (pluggable backend) ----
-if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -s "${tpath:-}" ]; then
+if [ "${SCRUBJAY_NOSHIP:-0}" = "1" ]; then
+  sj_step relay skip "disabled (SCRUBJAY_NOSHIP)"
+elif [ ! -s "${tpath:-}" ]; then
+  sj_step relay skip "no transcript"
+else
+  sj_step relay run
   slug="$(sjh_session_slug "$tpath" "$cwd")"
   SCRUBJAY_HARNESS="$harness" \
     "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 &
@@ -77,6 +83,7 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   #     passes in; empty on the automatic path, where the row falls back to the session's first
   #     real user prompt — or, when it typed none, to the slash command it ran.
   sj_log_row "$LOG" "$sid" "$cwd" "$tpath" "$harness" "$host" "$ts" "${SCRUBJAY_TOPIC:-}"
+  sj_step catalogue ok "row for ${sid:0:8}"
 
   # 1b) refresh this host's chats index (cheap, idempotent — a chat just ended). It indexes
   #     ~/.claude/projects/, so it only means anything for the claude harness.
@@ -84,7 +91,18 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
 
   # 1c) commit + push EVERYTHING in the data repo so nothing needs a manual sync: the row, the
   #     chat index, plus any memory/ templates/ hosts/ settings/ edits.
+  sj_step data run
   sj_data_push "auto-sync (session end): $host $ts"
+  # sj_data_push is silent by contract; whether it landed is whether anything is left unpushed.
+  if [ "${SCRUBJAY_LOG_NOGIT:-0}" = "1" ]; then sj_step data skip "git disabled"
+  else
+    ahead="$(git -C "$DATA" rev-list --count '@{u}..HEAD' 2>/dev/null)"
+    case "$ahead" in
+      0)  sj_step data ok "in sync with origin" ;;
+      '') sj_step data skip "no upstream" ;;
+      *)  sj_step data fail "$ahead commit(s) not pushed" ;;
+    esac
+  fi
 
   # 1c-2) re-render the human-browsable chat table. AFTER the git block, not before: the push
   #       fallback above rebases onto origin, which is what brings OTHER hosts' log lines into
@@ -92,6 +110,8 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   #       that push/fetch just did it. Derived + .gitignore'd, so `git add -A` never stages it.
   #       See bin/sj-catalogue.sh.
   "$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1 || true
+else
+  sj_step data skip "no data repo"
 fi
 
 wait   # join 1d + 2: the detached SessionEnd copy must not exit before they finish either
