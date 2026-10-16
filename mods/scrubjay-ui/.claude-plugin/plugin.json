@@ -1,0 +1,6 @@
+{
+  "name": "scrubjay-ui",
+  "version": "0.1.0",
+  "description": "scrubjay in Claude Code's own interface: named rows for sjmcp calls and scrubjay scripts, live publish/sync steps above the prompt, toasts on failure",
+  "types": "./types/index.d.ts"
+}
