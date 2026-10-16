@@ -76,6 +76,16 @@ git_reachable() {  # git_reachable <remote>
   GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=8' \
     sj_timeout 20 git ls-remote "$1" HEAD >/dev/null 2>&1
 }
+relay_ssh() { sj_timeout 20 ssh -o BatchMode=yes -o ConnectTimeout=8 "$1" true >/dev/null 2>&1; }
+
+# Each network probe is a full round-trip and none depends on another, so they all start together
+# in the background (see "start the network probes" below) and each section collects its own
+# result with `probed`. A probe that was never started runs inline, so every section stands alone.
+probe()  { local n="$1"; shift; "$@" >/dev/null 2>&1 & eval "_probe_$n=\$!"; }
+probed() {  # probed <name> <cmd…> — exit status of probe <name>, or of <cmd…> if none was started
+  local n="$1" p; shift; eval "p=\${_probe_$n:-}"
+  if [ -n "$p" ]; then wait "$p"; else "$@"; fi
+}
 
 # Resolved once, up here rather than inside doctor_config: every section must stand alone, or
 # `sj-doctor.sh relay` would abort on an unbound $backend under `set -u`.
@@ -109,7 +119,7 @@ doctor_data() {
     if sj_timeout 30 git -C "$data" rev-parse HEAD >/dev/null 2>&1; then ok "object store readable"
     else bad "data repo is corrupt (HEAD unreadable)" "re-clone it: the working tree is intact, so clone fresh and move .git across"; fi
     if r="$(git -C "$data" remote get-url origin 2>/dev/null)" && [ -n "$r" ]; then
-      if git_reachable "$r"; then ok "origin reachable"
+      if probed data git_reachable "$r"; then ok "origin reachable"
       else bad "origin unreachable: $r" "check network/SSH key, then: git -C '$data' fetch"; fi
       b="$(git -C "$data" branch --show-current 2>/dev/null)"; b="${b:-main}"
       if n="$(git -C "$data" rev-list --count "origin/$b..$b" 2>/dev/null)" && [ "${n:-0}" -gt 0 ]; then
@@ -140,7 +150,7 @@ doctor_memory() {
     # nothing, forever, without erroring in a way anyone sees.
     if [ "$b" = main ]; then ok "on branch main"
     else bad "on branch '$b', but the archive uses main" "git -C '$mem' branch -m '$b' main"; fi
-    if git_reachable "$mrem"; then
+    if probed memory git_reachable "$mrem"; then
       ok "memory remote reachable"
       if n="$(git -C "$mem" rev-list --count "origin/$b..$b" 2>/dev/null)" && [ "${n:-0}" -gt 0 ]; then
         bad "$n memory commit(s) never published" "bin/memory-sync.sh push"
@@ -170,7 +180,7 @@ doctor_relay() {
         # a non-zero exit is expected and proves nothing. What distinguishes reachable from not is
         # ssh's own 255: connection or authentication failure. Anything else means we got in and the
         # forced command did its job.
-        sj_timeout 20 ssh -o BatchMode=yes -o ConnectTimeout=8 "$tgt" true >/dev/null 2>&1
+        probed relay relay_ssh "$tgt"
         if [ "$?" = 255 ]; then bad "cannot authenticate to $tgt" "add this host's relay key to the receiver's authorized_keys (a human with root on the receiver must do this)"
         else ok "receiver reachable and key accepted: $tgt"; fi
       fi
@@ -180,7 +190,7 @@ doctor_relay() {
     git)
       chats="$(sj_chats 2>/dev/null || true)"
       if [ -z "$chats" ] || [ ! -d "$chats/.git" ]; then bad "no chats repo at ${chats:-<unset>}" "bin/sj-bootstrap.sh"
-      elif r="$(git -C "$chats" remote get-url origin 2>/dev/null)" && git_reachable "$r"; then ok "chats remote reachable"
+      elif r="$(git -C "$chats" remote get-url origin 2>/dev/null)" && probed relay git_reachable "$r"; then ok "chats remote reachable"
       else bad "chats remote unreachable" "check the SSH key for GitHub"; fi
       ;;
     off) note "relay disabled — transcripts stay on this machine" ;;
@@ -247,6 +257,27 @@ doctor_outcomes() {
     else ok "$what: last attempt ok"; fi
   done
 }
+
+# ── start the network probes ───────────────────────────────────────────────────────────────────
+# Same preconditions as the sections that read them, so nothing is probed that goes unreported.
+for s in $WANT; do
+  case "$s" in
+    data)
+      d="$(sj_data 2>/dev/null || true)"
+      [ -n "$d" ] && [ -d "$d/.git" ] && r="$(git -C "$d" remote get-url origin 2>/dev/null)" \
+        && [ -n "$r" ] && probe data git_reachable "$r" ;;
+    memory)
+      r="$(sj_memory_remote)"
+      [ -n "$r" ] && [ -d "$(sj_memory)/.git" ] && probe memory git_reachable "$r" ;;
+    relay)
+      case "$backend" in
+        rsync-wg) [ -n "${SCRUBJAY_WG_TARGET:-}" ] && probe relay relay_ssh "$SCRUBJAY_WG_TARGET" ;;
+        git) d="$(sj_chats 2>/dev/null || true)"
+             [ -n "$d" ] && [ -d "$d/.git" ] && r="$(git -C "$d" remote get-url origin 2>/dev/null)" \
+               && probe relay git_reachable "$r" ;;
+      esac ;;
+  esac
+done
 
 # ── run what was asked for ─────────────────────────────────────────────────────────────────────
 for s in $WANT; do "doctor_$s"; done
