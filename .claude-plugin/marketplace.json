@@ -1,0 +1,11 @@
+{
+  "name": "scrubjay",
+  "owner": { "name": "Hendrik Baacke" },
+  "plugins": [
+    {
+      "name": "scrubjay-ui",
+      "source": "./mods/scrubjay-ui",
+      "description": "scrubjay in Claude Code's own interface: named rows for archive calls, live publish/sync steps above the prompt, toasts on failure"
+    }
+  ]
+}
