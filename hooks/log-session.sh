@@ -49,6 +49,23 @@ tpath="$(printf '%s' "$input"| jq -r '.transcript_path // empty')"
 host="$(sj_host)"
 DATA="$(sj_data 2>/dev/null || true)"
 
+# Steps 1d (memory push) and 2 (relay) touch neither the data repo nor each other, and each is a
+# network round trip on a client (ssh over WG), as is the data-repo push to GitHub in step 1. So they
+# run in the background alongside step 1, and the `wait` at the end joins them: /sjlog runs this
+# synchronously, and its wall time becomes the slowest of the three rather than their sum.
+
+# ---- 1d) publish cross-machine memory to its own NAS-hosted git repo (not GitHub) ----
+# Memory holds sensitive paths, so it rides its own self-hosted repo over WireGuard, separate
+# from the data repo below. No-op if memory sync isn't configured on this machine.
+"$APP/bin/memory-sync.sh" push >/dev/null 2>&1 &
+
+# ---- 2) relay the full transcript + the session's other records (pluggable backend) ----
+if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -s "${tpath:-}" ]; then
+  slug="$(sjh_session_slug "$tpath" "$cwd")"
+  SCRUBJAY_HARNESS="$harness" \
+    "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 &
+fi
+
 # ---- 1) session line + chat index + auto-sync the whole data repo ----
 if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   LOG="$DATA/logs/$host.log"; mkdir -p "$DATA/logs"; touch "$LOG"
@@ -77,16 +94,5 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   "$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1 || true
 fi
 
-# ---- 1d) publish cross-machine memory to its own NAS-hosted git repo (not GitHub) ----
-# Memory holds sensitive paths, so it rides its own self-hosted repo over WireGuard, separate
-# from the data repo above. No-op if memory sync isn't configured on this machine.
-"$APP/bin/memory-sync.sh" push >/dev/null 2>&1 || true
-
-# ---- 2) relay the full transcript + the session's other records (pluggable backend) ----
-if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ] && [ -s "${tpath:-}" ]; then
-  slug="$(sjh_session_slug "$tpath" "$cwd")"
-  SCRUBJAY_HARNESS="$harness" \
-    "$APP/bin/ship-transcript.sh" "$tpath" "$slug" "$sid" "$host" "$cwd" >/dev/null 2>&1 || true
-fi
-
+wait   # join 1d + 2: the detached SessionEnd copy must not exit before they finish either
 exit 0
