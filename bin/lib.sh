@@ -416,6 +416,8 @@ sj_record_ship() {  # sj_record_ship <ok|fail> <session_id> <backend> [rc]
   f="$(sj_ship_status_file)"; mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
   printf 'result=%s ts=%s host=%s backend=%s sid=%s rc=%s\n' \
     "$result" "$(date +%FT%T)" "$(sj_host)" "$backend" "${sid:0:8}" "$rc" > "$f" 2>/dev/null || true
+  if [ "$result" = ok ]; then sj_step relay ok "shipped via $backend"
+  else sj_step relay fail "$backend failed (rc=$rc)"; fi
 }
 
 # Same idea for cross-machine memory. memory-sync.sh warns on a failed push, but both its callers
@@ -444,7 +446,62 @@ sj_record_memory_sync() {  # sj_record_memory_sync <ok|fail|skip> <pull|push> <r
     printf 'mode=%s result=%s ts=%s host=%s remote=%s%s\n' \
       "$mode" "$result" "$(date +%FT%T)" "$(sj_host)" "$remote" "${detail:+ detail=$detail}"
   } > "$tmp" 2>/dev/null && mv "$tmp" "$f" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+  case "$result" in
+    ok)   sj_step memory ok "${mode}ed" ;;
+    skip) sj_step memory skip "$(printf '%s' "${detail:-nothing to $mode}" | tr '-' ' ')" ;;
+    *)    sj_step memory fail "$mode failed${detail:+ ($detail)}" ;;
+  esac
   return 0
+}
+
+# --- run progress ------------------------------------------------------------------------------
+# A hook is silent by contract (its stdout lands in the session's context), so /sjlog and /sjsync
+# used to answer a bare ✓ with nothing behind it. A run now records one line per step to
+# $SCRUBJAY_PROGRESS — TSV <epoch> <step> <state> <detail>, state run|ok|fail|skip — which
+# sj_progress_render prints for the command and the Claude Code mod (mods/scrubjay-ui) follows
+# live. One file per kind of run, newest wins: a view of what is happening, not a log. Children
+# inherit the variable, so a step finished in a backgrounded child lands as it finishes; lines
+# are short single writes in append mode, so concurrent children do not interleave.
+# SCRUBJAY_PROGRESS unset → every call here is a no-op.
+sj_progress_dir() { printf '%s' "${SCRUBJAY_RUN_DIR:-$HOME/.scrubjay/run}"; }
+sj_progress_begin() {  # sj_progress_begin <op> [label]   (exports SCRUBJAY_PROGRESS)
+  local d; d="$(sj_progress_dir)"
+  mkdir -p "$d" 2>/dev/null || return 0
+  SCRUBJAY_PROGRESS="$d/$1.tsv"; export SCRUBJAY_PROGRESS
+  printf '%s\t#begin\t%s\t%s\n' "$(date +%s)" "$1" "${2:-}" > "$SCRUBJAY_PROGRESS" 2>/dev/null \
+    || unset SCRUBJAY_PROGRESS
+  return 0
+}
+sj_step() {  # sj_step <step> <run|ok|fail|skip> [detail]
+  [ -n "${SCRUBJAY_PROGRESS:-}" ] || return 0
+  printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$1" "$2" "$(printf '%s' "${3:-}" | tr '\t\n' '  ')" \
+    >> "$SCRUBJAY_PROGRESS" 2>/dev/null
+  return 0
+}
+sj_progress_end() { sj_step '#end' 'done'; }
+# The run as a short aligned block: a header, then one line per step in the order it started, at
+# its last state. A step still `run` after #end never reported back (not configured, or bailed
+# early) — shown as skipped, never as a success.
+sj_progress_render() {  # sj_progress_render [file]
+  local f="${1:-${SCRUBJAY_PROGRESS:-}}"
+  [ -n "$f" ] && [ -s "$f" ] || return 0
+  awk -F'\t' '
+    $2 == "#begin" { t0 = $1; op = $3; label = $4; next }
+    $2 == "#end"   { t1 = $1; ended = 1; next }
+    { if (!($2 in st)) order[++n] = $2
+      st[$2] = $3; det[$2] = $4; if (length($2) > w) w = length($2) }
+    END {
+      hdr = "scrubjay " op; if (label != "") hdr = hdr " · " label
+      if (ended) hdr = hdr " · " (t1 - t0) "s"
+      print hdr
+      fmt = "  %s %-" w "s  %s\n"
+      for (i = 1; i <= n; i++) {
+        s = st[order[i]]; d = det[order[i]]
+        if (s == "run" && ended) { s = "skip"; if (d == "") d = "did not report" }
+        icon = (s == "ok") ? "✓" : (s == "fail") ? "✗" : (s == "skip") ? "–" : "…"
+        printf fmt, icon, order[i], d
+      }
+    }' "$f"
 }
 
 # --- pending receiver authorization -----------------------------------------------------------

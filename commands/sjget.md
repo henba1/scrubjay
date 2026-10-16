@@ -19,7 +19,8 @@ Ref + optional slice: **$ARGUMENTS**
 3. **A slice was named** (`turns=A-B` / `lines=A-B`) → pass it straight through and leave the
    format `readable`: a targeted read wants the text verbatim, and a `lines=` number from
    `sj_recall` or `sj_search_within` indexes the readable file, not the condensed view.
-4. Do not call any other tool. Do not summarize or re-print the content — the `sj_get` result
+4. Say one line before the call (`→ fetching 1a2b3c4d, condensed`) and nothing after it unless it
+   failed. Do not call any other tool. Do not summarize or re-print the content — the `sj_get` result
    is already injected. If it errors (e.g. permission denied or unknown ref), report just that
    one line.
 5. Still `truncated`? The `hint` names the next slice. The user asked for the whole item, so

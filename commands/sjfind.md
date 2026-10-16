@@ -19,4 +19,9 @@ Request: **$ARGUMENTS**  (typically "<topic> in <which session>")
    summarize where the discussion is densest.
 4. Offer to `sj_get` a `turns=` / `lines=` slice around the best hit to pull it into context.
 
+**Narrate as you go.** Before each tool call write one short line naming what you are about to do
+and with what, e.g. `→ recalling "retry backoff" across all hosts since 2026-09-01`; after it, one
+line with the outcome (`✓ 6 candidates from 3 hosts`, `✗ archive unreachable`). The user should
+see scrubjay working, not a silent pause.
+
 Be concise. Do not dump raw tool JSON.

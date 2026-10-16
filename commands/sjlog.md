@@ -19,5 +19,8 @@ and one catalogue line for `/sjbrowse`), without ending the session.
    the catalogue topic. (Skip step 1 and it falls back to the first user prompt — still valid, just
    less memorable.)
 
-Then reply with a single line: ✓ published if the exit was 0, else the failing line. Do not analyze
-the output.
+It prints a step report — a `scrubjay publish · <sid> · <n>s` header and one line per step
+(`✓` done, `✗` failed, `–` skipped, with why). Reply with that block verbatim in a ```` ```text ````
+fence; it is short and it is the answer. Add one sentence only for a `✗` line, saying what it means
+for this session. A `–` is not a failure (memory not configured, relay disabled). Do not analyze
+otherwise.
