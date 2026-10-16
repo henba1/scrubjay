@@ -557,6 +557,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#what-the-commands-show-while-they-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the commands show while they run
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -893,6 +904,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#what-the-commands-show-while-they-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the commands show while they run
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1014,6 +1036,17 @@ injects it directly with no tool call at all.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="what-the-commands-show-while-they-run">What the commands show while they run<a class="headerlink" href="#what-the-commands-show-while-they-run" title="Permanent link">&para;</a></h2>
+<p><code>/sjlog</code> and <code>/sjsync</code> print a step report: one line per step, <code>✓</code> done, <code>✗</code> failed, <code>–</code> skipped
+with the reason. Steps are recorded in <code>~/.scrubjay/run/&lt;op&gt;.tsv</code> as they finish (<code>sj_step</code> in
+<code>bin/lib.sh</code>). The archive commands say one line before and after each <code>sjmcp</code> call. Both work in
+every harness.</p>
+<p>In Claude Code, the optional <strong>scrubjay-ui</strong> mod draws the same in the native interface: a named
+row per archive call (<code>⏺ Recall("retry backoff") · scrubjay</code>) with a one-line result instead of raw
+JSON, the live steps of a publish or sync above the prompt, and a toast when a step fails —
+including the SessionStart sync, which otherwise fails unseen.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/plugin install scrubjay-ui --marketplace henba1/scrubjay
+</code></pre></div>
 
 
 
