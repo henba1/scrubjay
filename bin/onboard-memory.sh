@@ -142,15 +142,25 @@ if [ "$backend" = local ] && [ -n "$remote" ]; then
       && ok "created bare repo $remote (group-shared)" || warn "could not create bare repo at $remote"
   else ok "bare repo present: $remote"; fi
   hook="$remote/hooks/post-receive"
-  if [ -d "$remote" ] && [ ! -f "$hook" ]; then
+  # (Re)install when absent or still ours (marker line), so a re-run upgrades an older copy.
+  if [ -d "$remote" ] && { [ ! -f "$hook" ] || grep -q 'browsable working copy of memory' "$hook"; }; then
     cat > "$hook" <<'HOOK'
 #!/bin/sh
 # Keep a browsable working copy of memory on the NAS, refreshed whenever any machine pushes.
+# Pushers run as different users (owner locally, relay account over SSH), so everything written
+# here must stay group-writable — otherwise one user's files block the other's checkout.
 unset GIT_DIR GIT_WORK_TREE
+umask 002
 BARE="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET="$(dirname "$BARE")/memory"
+LOG="$BARE/post-receive.log"
 mkdir -p "$TARGET"
-git --git-dir="$BARE" --work-tree="$TARGET" checkout -f main 2>/dev/null || true
+if ! out="$(git --git-dir="$BARE" --work-tree="$TARGET" checkout -f main 2>&1)"; then
+  # Don't fail the push (the bare repo is already updated) — but say so, and keep a record.
+  printf '%s %s browsable copy NOT refreshed: %s\n' "$(date '+%F %T')" "$(id -un)" "$out" >> "$LOG" 2>/dev/null
+  echo "post-receive: browsable copy at $TARGET NOT refreshed (see $LOG): $out" >&2
+fi
+exit 0
 HOOK
     chmod +x "$hook" && ok "installed post-receive hook → browsable copy at $(dirname "$remote")/memory"
   fi
