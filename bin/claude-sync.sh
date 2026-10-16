@@ -144,10 +144,23 @@ link_memory() {  # link_memory <repo-target-dir> <scrubjay-memory-path>
 # surprise we want to avoid. Each reason says what to do about it. Returns 0 (never fails sync).
 skip_mcp() { echo "  ┌─ MCP archive server NOT registered (/sjrecall, /sjfind, /sjbrowse stay inert)"; echo "  └─ reason: $1"; return 0; }
 
+# What sjmcp is registered as (command + args, one line), or nothing. Reads the stored entry
+# rather than `claude mcp get`, which health-checks the server — spawning uv, or an SSH round-trip
+# to the archive host — and cost several seconds of every SessionStart. Falls back to it without jq.
+_mcp_current() {
+  local cfg="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+  if command -v jq >/dev/null 2>&1 && [ -f "$cfg" ]; then
+    jq -r '.mcpServers.sjmcp // empty | [.command] + (.args // []) | join(" ")' "$cfg" 2>/dev/null
+  else
+    claude mcp get sjmcp 2>/dev/null
+  fi
+}
+
 _mcp_add_local() {  # _mcp_add_local <chats> <server.py>
   local chats="$1" server="$2"
-  if claude mcp get sjmcp >/dev/null 2>&1; then
-    case "$(claude mcp get sjmcp 2>/dev/null)" in
+  local cur; cur="$(_mcp_current)"
+  if [ -n "$cur" ]; then
+    case "$cur" in
       *"$server"*) echo "  ok    mcp sjmcp (local)"; return 0 ;;   # already points at our server
     esac
     claude mcp remove sjmcp -s user >/dev/null 2>&1 || claude mcp remove sjmcp >/dev/null 2>&1 || true
@@ -165,8 +178,9 @@ _mcp_add_local() {  # _mcp_add_local <chats> <server.py>
 
 _mcp_add_remote() {  # _mcp_add_remote <ssh-target>   (forced command on the far end runs the server)
   local target="$1"
-  if claude mcp get sjmcp >/dev/null 2>&1; then
-    case "$(claude mcp get sjmcp 2>/dev/null)" in
+  local cur; cur="$(_mcp_current)"
+  if [ -n "$cur" ]; then
+    case "$cur" in
       *"ssh"*"$target"*) echo "  ok    mcp sjmcp (remote → $target)"; return 0 ;;
     esac
     claude mcp remove sjmcp -s user >/dev/null 2>&1 || claude mcp remove sjmcp >/dev/null 2>&1 || true

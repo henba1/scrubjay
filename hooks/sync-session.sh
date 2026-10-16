@@ -27,6 +27,7 @@ input="$(cat 2>/dev/null)" || input=""
 APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 DATA="$(sj_data 2>/dev/null || true)"
+sj_load_config   # in THIS shell: sj_data loads it only in its own subshell, so the backend check below saw the default
 
 # 1) pull latest from other machines (best-effort, fast). DATA = your config/content;
 #    APP = the scripts & hooks themselves, so hook/script fixes also propagate on their
@@ -36,9 +37,10 @@ if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
   # install from a source tarball/zip would skip it forever, silently, and rot. Say it out loud
   # (stdout lands in the session's context, so the assistant surfaces it).
   sj_is_clone || printf 'scrubjay: the app at %s is not a git clone, so it can never self-update. Source tarballs are not a supported install — reinstall with `git clone`.\n' "$APP"
+  # Independent repos, each a network round-trip — pull them concurrently (chats below too).
   for repo in "$DATA" "$APP"; do
     [ -n "$repo" ] && [ -d "$repo/.git" ] && \
-      ( cd "$repo" && sj_timeout 15 git pull --ff-only -q 2>/dev/null ) || true
+      { ( cd "$repo" && sj_timeout 15 git pull --ff-only -q 2>/dev/null ) || true; } &
   done
   # git backend only: refresh the scrubjay-chats clone so the local sjmcp archive spans every
   # machine's sessions (not just this one's) before claude-sync registers/serves it. Best-effort;
@@ -46,13 +48,15 @@ if [ "${SCRUBJAY_SYNC_NOPULL:-0}" != "1" ]; then
   if [ "${SCRUBJAY_TRANSCRIPT_BACKEND:-git}" = "git" ]; then
     chats="$(sj_chats 2>/dev/null || true)"
     [ -n "$chats" ] && [ -d "$chats/.git" ] && \
-      ( cd "$chats" && sj_timeout 20 git pull --ff-only -q 2>/dev/null ) || true
+      { ( cd "$chats" && sj_timeout 20 git pull --ff-only -q 2>/dev/null ) || true; } &
   fi
 fi
 
 # 1b) pull cross-machine memory from its own NAS-hosted git repo (no-op if not configured),
 #     BEFORE claude-sync links the per-project memory dirs at it, so others' memory is present.
-"$APP/bin/memory-sync.sh" pull >/dev/null 2>&1 || true
+#     Concurrent with the pulls above; `wait` joins them all before anything reads the results.
+{ "$APP/bin/memory-sync.sh" pull >/dev/null 2>&1 || true; } &
+wait
 
 # 2) apply into each harness's config root (idempotent; mostly a no-op thanks to symlinks)
 "$APP/bin/sync-config.sh" >/dev/null 2>&1 || true
