@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["mcp[cli]>=1.2"]
+# dependencies = ["mcp[cli]>=1.2,<2"]
 # ///
 # SPDX-License-Identifier: FSL-1.1-ALv2
 # Copyright (c) 2026 Hendrik Baacke. See LICENSE.
