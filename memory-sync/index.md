@@ -65,7 +65,7 @@ git init --bare /mnt/nas1/scrubjay-storage/memory.git          # the bare repo
 bin/memory-sync.sh pull && bin/claude-sync.sh && bin/memory-sync.sh push
 ```
 
-`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`scrubjay-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push).
+`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`scrubjay-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push). Pushers run as different users, so the hook writes with `umask 002`; if the checkout still fails it tells the pusher and appends to `memory.git/post-receive.log` instead of failing silently. Re-running `onboard-memory.sh` upgrades a hook it installed earlier.
 
 WG client — git needs **full git-over-SSH**, and the transcript relay key can't be reused (its forced `rrsync -wo` command blocks git). `onboard-memory.sh` makes the key + alias; you add its public key on the receiver, restricted to git:
 

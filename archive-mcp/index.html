@@ -1071,7 +1071,7 @@
 
 <h1 id="query-the-archive-mcp">Query the archive (MCP)<a class="headerlink" href="#query-the-archive-mcp" title="Permanent link">&para;</a></h1>
 <p><code>grep</code>-ing the logs finds a chat by a word you remember typing. The harder case — <em>"I discussed
-X </em><em>somewhere</em><em> a while ago, which machine was it even on?"</em> — is what the <strong><code>sjmcp</code></strong> MCP server
+X <strong>somewhere</strong> a while ago, which machine was it even on?"</em> — is what the <strong><code>sjmcp</code></strong> MCP server
 solves: a <strong>read</strong> path back into a live session over everything the relay already wrote
 (transcripts, plans, cross-machine memory, notes), so you can recall a past session by <em>topic</em> and pull
 it — or just the relevant slice — straight into context without leaving Claude.</p>
@@ -1276,7 +1276,8 @@ pinned to the read-only server and nothing else:</p>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>restrict,port-forwarding,permitopen="&lt;archive-host&gt;:&lt;port&gt;",command="/bin/false" &lt;the printed public key&gt;
 </code></pre></div>
-<p>Then verify from the client — `ssh <mcp-alias> </p>
+<p>Then verify from the client — <code>ssh &lt;mcp-alias&gt; &lt;/dev/null &amp;&amp; echo OK</code> (first run is slow once while
+<code>uv</code> resolves deps on the archive host, then caches). sjmcp activates on the next Claude session.</p>
 
 
 

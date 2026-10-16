@@ -667,7 +667,7 @@ EOF
 
 # Query the archive (MCP)
 
-`grep`-ing the logs finds a chat by a word you remember typing. The harder case — *"I discussed X* *somewhere* *a while ago, which machine was it even on?"* — is what the **`sjmcp`** MCP server solves: a **read** path back into a live session over everything the relay already wrote (transcripts, plans, cross-machine memory, notes), so you can recall a past session by *topic* and pull it — or just the relevant slice — straight into context without leaving Claude.
+`grep`-ing the logs finds a chat by a word you remember typing. The harder case — *"I discussed X **somewhere** a while ago, which machine was it even on?"* — is what the **`sjmcp`** MCP server solves: a **read** path back into a live session over everything the relay already wrote (transcripts, plans, cross-machine memory, notes), so you can recall a past session by *topic* and pull it — or just the relevant slice — straight into context without leaving Claude.
 
 It's a single-file, **read-only** server (`mcp/sjmcp_server.py`, run via `uv run --script`) that reads the same storage pointers as the rest of scrubjay (`SCRUBJAY_LOCAL_CHATS`, `SCRUBJAY_MEMORY`, `SCRUBJAY_DATA`). Recall is deliberately **embedding-free** — a fast ripgrep prefilter (grep fallback) surfaces candidate snippets and the in-session model does the semantic ranking — so there's no index to build and nothing sensitive ever leaves the NAS. Each `sj_recall` enumerates the archive **once** and resolves every candidate's metadata from that single pass, so cost scales with the size of the archive rather than the number of matches — it stays snappy as the corpus grows (a NAS-mounted archive of ~100+ sessions recalls in tens of milliseconds). It also folds the `logs/<host>.log` **session catalogue** into recall: a topic match there links to the transcript when present, or stands alone as a "you had this on `<host>`" pointer — so recall spans even sessions whose full transcript isn't on the machine you're asking from. It exposes:
 
@@ -763,7 +763,7 @@ command="<abs-path-to-clone>/bin/sjmcp-serve.sh",restrict <the printed public ke
 restrict,port-forwarding,permitopen="<archive-host>:<port>",command="/bin/false" <the printed public key>
 ```
 
-Then verify from the client — \`ssh
+Then verify from the client — `ssh <mcp-alias> </dev/null && echo OK` (first run is slow once while `uv` resolves deps on the archive host, then caches). sjmcp activates on the next Claude session.
 
 # Slash commands
 
@@ -1158,7 +1158,7 @@ git init --bare /mnt/nas1/scrubjay-storage/memory.git          # the bare repo
 bin/memory-sync.sh pull && bin/claude-sync.sh && bin/memory-sync.sh push
 ```
 
-`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`scrubjay-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push).
+`onboard-memory.sh` also installs a `post-receive` hook on the bare repo that checks the latest `main` out into a sibling **`scrubjay-storage/memory/`** — a human-browsable copy on the NAS, refreshed on every push (from this box or any client). The bare repo stays the sync hub; `memory/` is just a convenience view (don't edit it — it's overwritten on the next push). Pushers run as different users, so the hook writes with `umask 002`; if the checkout still fails it tells the pusher and appends to `memory.git/post-receive.log` instead of failing silently. Re-running `onboard-memory.sh` upgrades a hook it installed earlier.
 
 WG client — git needs **full git-over-SSH**, and the transcript relay key can't be reused (its forced `rrsync -wo` command blocks git). `onboard-memory.sh` makes the key + alias; you add its public key on the receiver, restricted to git:
 
