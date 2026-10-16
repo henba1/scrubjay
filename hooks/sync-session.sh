@@ -27,6 +27,7 @@ input="$(cat 2>/dev/null)" || input=""
 APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
 DATA="$(sj_data 2>/dev/null || true)"
+sj_load_config   # in THIS shell: sj_data loads it only in its own subshell, so the backend check below saw the default
 
 # 1) pull latest from other machines (best-effort, fast). DATA = your config/content;
 #    APP = the scripts & hooks themselves, so hook/script fixes also propagate on their
