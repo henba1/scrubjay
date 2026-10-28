@@ -94,13 +94,11 @@ emit() {  # emit <jq-filter> [--arg k v …]  — the JSON answer, once, to fd 3
 # logs/<host>.log in the data repo already records every session that ever ended, on every machine,
 # and rides git to this one — so "what can I resume?" needs no network at all.
 if [ "$list" -eq 1 ] && [ "$json" -eq 1 ]; then
-  me="$(sj_host)"
-  sj_log_catalogue | while IFS=$'\t' read -r ts host s cwd topic harness; do
-    jq -nc --arg ts "$ts" --arg host "$host" --arg sid "$s" --arg cwd "$cwd" --arg topic "$topic" \
-      --arg harness "$harness" --arg me "$me" \
-      '{ts:$ts, host:$host, sid:$sid, sid8:$sid[0:8], cwd:$cwd, topic:$topic,
-        harness:(if $harness == "-" then null else $harness end), here:($host == $me)}'
-  done >&3
+  # one jq over the whole TSV — a jq per row took 20 s for ~800 sessions on a Raspberry Pi
+  sj_log_catalogue | jq -R -c --arg me "$(sj_host)" '
+    split("\t") | select(length >= 3 and .[2] != "")
+    | {ts:.[0], host:.[1], sid:.[2], sid8:.[2][0:8], cwd:.[3], topic:(.[4] // ""),
+       harness:(if (.[5] // "-") == "-" or .[5] == "" then null else .[5] end), here:(.[1] == $me)}' >&3
   exit 0
 fi
 if [ "$list" -eq 1 ]; then
