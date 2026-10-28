@@ -73,7 +73,7 @@ section "the row follows the topic: a new row only when it moved"
 . "$APP/bin/lib.sh"
 rlog="$SANDBOX/row.log"; t="$SANDBOX/grow.jsonl"; rsid="77777777-2222-4333-8444-555555555555"
 urec() { jq -cn --arg t "$1" '{type:"user", message:{role:"user", content:[{type:"text", text:$t}]}}'; }
-row() { sj_log_row "$rlog" "$rsid" /w "$t" claude testhost "2026-01-01 00:00" "${1:-}"; }
+row() { sj_log_row "$rlog" "$rsid" /w "$t" claude testhost "2026-01-01 00:00" "${1:-}" refresh; }
 urec "<command-name>/sjtable</command-name>
 <command-args>head=10</command-args>" > "$t"
 row; assert_eq "first row titled by the lookup" 1 "$(grep -c '"/sjtable head=10"' "$rlog")"
@@ -84,8 +84,8 @@ row; assert_eq "topic moved: a row is written" 0 "$?"
 assert_contains "the new row carries the work" "$(tail -1 "$rlog")" '"fix the nftables syntax error in the firewall config"'
 row "Fixed the nftables config"; assert_contains "an essence is marked" "$(tail -1 "$rlog")" "| essence=1"
 urec "write a backup script for the postgres database dumps" >> "$t"
-row; assert_eq "the fallback never replaces an essence" 1 "$?"
-assert_eq "three rows in all" 3 "$(grep -c "session=$rsid" "$rlog")"
+row; assert_contains "the fallback never replaces an essence" "$(tail -1 "$rlog")" '"Fixed the nftables config"'
+assert_contains "and the essence mark stays" "$(tail -1 "$rlog")" "| essence=1"
 
 section "with a model: billed only for new prose, never downgraded"
 rsid="88888888-2222-4333-8444-555555555555"
@@ -99,7 +99,8 @@ assert_contains "and the prompt count it titled" "$(tail -1 "$rlog")" "| prompts
 row; assert_eq "no new prose: nothing written" 1 "$?"
 assert_eq "no new prose: no second call" 1 "$(ncalls)"
 urec "write a backup script for the postgres dumps" >> "$t"
-STUB_CLAUDE=fail row; assert_eq "a failed call never downgrades a model title" 1 "$?"
+STUB_CLAUDE=fail row
+assert_contains "a failed call never downgrades a model title" "$(tail -1 "$rlog")" '"Retry backoff fix" | session='
 STUB_CLAUDE="Firewall fix + postgres backups" row
 assert_contains "new prose, new title: a row is appended" "$(tail -1 "$rlog")" \
   '"Firewall fix + postgres backups" | session='
@@ -110,6 +111,9 @@ assert_contains "a failed first call falls back to the first prompt" "$last" \
   '"fix the nftables syntax error in the firewall config" | session='
 case "$last" in *prompts=*) _no "a fallback row has no prompt count, so it is retried" "$last" ;;
   *) _ok "a fallback row has no prompt count, so it is retried" ;; esac
+c0="$(ncalls)"; rsid="aaaaaaaa-2222-4333-8444-555555555555"
+sj_log_row "$rlog" "$rsid" /w "$t" claude testhost "" ""
+assert_eq "a per-turn (non-refresh) row never calls the model" "$c0" "$(ncalls)"
 export SCRUBJAY_AI_TOPIC=0
 
 section "the model's own child session fires no scrubjay hook"
@@ -149,5 +153,48 @@ assert_eq "compacted session has no forked_from" "0" "$(grep "session=$sid8" "$L
 
 "$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1
 assert_contains "catalogue marks the fork" "$(grep "${sid7:0:8}" "$SCRUBJAY_DATA/logs/CATALOGUE.md")" "⑂${sid:0:8} "
+
+section "per turn (Stop): the first turn writes the row, later turns leave it be"
+# Stop fires at the end of every turn; the session must be catalogued (and relayed) from the first.
+export SCRUBJAY_TURN_SETTLE=0
+sidt="a1a1a1a1-2222-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sidt.jsonl"
+stop() { printf '{"session_id":"%s","cwd":"/home/user/widget-api","transcript_path":"%s","hook_event_name":"%s"}' \
+  "$1" "$proj/$1.jsonl" "$2"; }
+run_hook() { SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' "$APP" "$1"; }
+run_hook "$(stop "$sidt" Stop)"
+assert_eq "the first turn writes one row" "1" "$(grep -c "session=$sidt" "$LOG")"
+first="$(grep "session=$sidt" "$LOG")"
+tail -n 1 "$proj/$sidt.jsonl" >> "$proj/$sidt.jsonl"          # the session goes on
+run_hook "$(stop "$sidt" Stop)"
+assert_eq "a later turn adds none" "1" "$(grep -c "session=$sidt" "$LOG")"
+
+section "session end refreshes the row a turn wrote: appended, last row wins"
+run_hook "$(stop "$sidt" SessionEnd)"
+assert_eq "one superseding row" "2" "$(grep -c "session=$sidt" "$LOG")"
+last="$(grep "session=$sidt" "$LOG" | tail -n 1)"
+assert_contains "it carries the grown size" "$last" "| size=$(wc -c < "$proj/$sidt.jsonl" | tr -d ' ')"
+assert_eq "it keeps the first row's time" "${first%% | *}" "${last%% | *}"
+assert_contains "and its topic" "$last" '"the retry backoff fires twice per failure — find out why"'
+assert_eq "the catalogue lists the session once" "1" \
+  "$(bash -c '. "$0/bin/lib.sh"; sj_log_catalogue' "$APP" | grep -c "$sidt")"
+run_hook "$(stop "$sidt" SessionEnd)"
+assert_eq "ending again with nothing new adds nothing" "2" "$(grep -c "session=$sidt" "$LOG")"
+SCRUBJAY_TOPIC="Retry fired twice: one wrapper too many" run_hook "$(stop "$sidt" SessionEnd)"
+assert_contains "/sjlog's essence still lands after a turn wrote the row" \
+  "$(grep "session=$sidt" "$LOG" | tail -n 1)" '"Retry fired twice: one wrapper too many"'
+
+section "per turn: a turn that finds the session busy leaves a mark instead of racing it"
+sidl="b2b2b2b2-2222-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sidl.jsonl"
+lock="${TMPDIR:-/tmp}/scrubjay-publish-$sidl"
+sleep 30 & holder=$!
+mkdir -p "$lock"; echo "$holder" > "$lock/pid"
+run_hook "$(stop "$sidl" Stop)"
+check "the mark is left for the holder" test -e "$lock.pending"
+assert_eq "and the busy turn wrote nothing" "0" "$(grep -c "session=$sidl" "$LOG")"
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+run_hook "$(stop "$sidl" Stop)"
+assert_eq "a dead holder's lock is taken over" "1" "$(grep -c "session=$sidl" "$LOG")"
+check "the mark is consumed"  bash -c '! test -e "$1"' _ "$lock.pending"
+check "and the lock released" bash -c '! test -e "$1"' _ "$lock"
 
 finish

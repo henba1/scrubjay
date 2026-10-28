@@ -7,7 +7,8 @@ Both housekeeping scripts run automatically via hooks, so you never update anyth
 | When | Hook | Does |
 |---|---|---|
 | session **start** | `sync-session.sh` | `git pull --ff-only` **both** repos (data *and* app, so hook/script fixes propagate too), then `claude-sync.sh` — config edited on another machine arrives and applies itself. |
-| session **end** | `log-session.sh` | append the log line, refresh `chats.index.json`, then `git add -A` + commit + push the **whole** data repo — `memory/`, `templates/`, host config and all. Nothing needs a manual sync. |
+| every **turn** | `log-session.sh` | relay the transcript so far and push memory; the first turn also writes the log line and pushes the data repo. A crashed or killed session is archived up to its last finished turn. |
+| session **end** | `log-session.sh` | append (or refresh) the log line, refresh `chats.index.json`, then `git add -A` + commit + push the **whole** data repo — `memory/`, `templates/`, host config and all. Nothing needs a manual sync. |
 
 `git add -A` is safe because the data repo's `.gitignore` blocks secrets and transcripts
 (`*.credentials*`, `*.jsonl`, `.claude.json`), so those can never be staged.
