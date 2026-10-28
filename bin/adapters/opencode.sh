@@ -385,8 +385,11 @@ sjh_resume_cmd() {  # sjh_resume_cmd <sid> <staged-file> [installed]
 # Cross-harness carry-over: the session came from a DIFFERENT agent, so there is no native session
 # to resume — we hand the conversation over as context instead. See bin/adapters/ROADMAP.md for the
 # open issue on translating a session into this harness's own format.
+#
+# `--prompt` opens the TUI with that first prompt — a conversation to go on with. `opencode run` (what this
+# printed before) answers the one message and exits, so the hand-off ended after a single reply.
 sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
-  printf 'opencode run "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
+  printf 'opencode --prompt "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
     "$3" "$2" "$1"
 }
 
