@@ -115,6 +115,7 @@ editing needed:
 | `SCRUBJAY_NOSYNC=1` | skip the start-of-session pull + sync entirely |
 | `SCRUBJAY_SYNC_NOPULL=1` | sync at start but don't `git pull` first |
 | `SCRUBJAY_NOSHIP=1` | end the session without shipping its transcript |
+| `SCRUBJAY_TURN_PUBLISH=0` | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
 

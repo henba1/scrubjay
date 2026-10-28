@@ -136,6 +136,20 @@ bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "a removed skill's link is retracted"  bash -c '! test -e "$1"' _ "$CLAUDE_CONFIG_DIR/skills/deploy"
 check "the machine-local skill is still there" test -f "$CLAUDE_CONFIG_DIR/skills/machine-local/SKILL.md"
 
+section "claude: the per-turn publish (Stop -> log-session) is registered once"
+# The app registers it, not the data repo: a data repo seeded before it existed must get it too.
+settings="$CLAUDE_CONFIG_DIR/settings.json"
+git -C "$SCRUBJAY_DATA" init -q   # sync configures the data repo's git before it merges settings
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+stops='[.hooks.Stop[]?.hooks[]?.command] | map(select(test("log-session"))) | length'
+check "Stop -> log-session registered"  bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$stops" "$settings"
+check "SessionEnd still registered"     bash -c 'jq -e "[.hooks.SessionEnd[].hooks[].command] | map(test(\"log-session\")) | any" "$1" >/dev/null' _ "$settings"
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+check "a second sync adds no second one" bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$stops" "$settings"
+SCRUBJAY_TURN_PUBLISH=0 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+check "SCRUBJAY_TURN_PUBLISH=0 leaves it out" bash -c 'jq -e "$0 == 0" "$1" >/dev/null' "$stops" "$settings"
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+
 section "opencode: skills are linked into opencode's own dir too"
 mkdir -p "$SCRUBJAY_DATA/claude-md/skills/deploy"
 printf -- '---\nname: deploy\ndescription: Ship it.\n---\nSteps.\n' > "$SCRUBJAY_DATA/claude-md/skills/deploy/SKILL.md"
