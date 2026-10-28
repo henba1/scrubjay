@@ -22,7 +22,7 @@ sessions whose full transcript isn't on the machine you're asking from. It expos
 |---|---|
 | **tools** | `sj_list` (browse w/ filters, sort + paging, incl. `type=log` for the catalogue), `sj_recall` (topic → ranked candidates + anchors), `sj_search_within` (a topic *inside* one session → turn/line anchors), `sj_get` (fetch an artifact or a `turns=`/`lines=` slice), `sj_status` |
 | **resources** | every transcript/plan/memory/note as an `@`-pickable resource (`sj://transcript/…`, `sj://plan/…`, `sj://memory/…`, `sj://note/…`) with a human, date-sorted title |
-| **commands** | `/sjrecall <topic>`, `/sjfind <topic> in <session>`, `/sjbrowse [type]`, `/sjget <ref>` — thin wrappers that drive the tools (full list under [Slash commands](slash-commands.md)) |
+| **commands** | `/sjrecall <topic>`, `/sjfind <topic> in <session>`, `/sjbrowse [type]`, `/sjget <ref>` — thin wrappers that drive the tools; `/sjgrep` falls back to them where the archive is not on disk (full list under [Slash commands](slash-commands.md)) |
 
 ## Every result is bounded, and says so
 
