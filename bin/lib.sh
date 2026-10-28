@@ -568,9 +568,15 @@ sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when
 # <ts> and <topic> may be empty: ts defaults to now, topic to the first real user prompt. Both are
 # parameters rather than reads of the ambient environment so the function stays testable — the
 # `/sjlog` essence (SCRUBJAY_TOPIC) is passed in by the hook, not picked up here.
-sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic>
+#
+# Write-once by default. <mode> `refresh` (the session-end and /sjlog path) instead appends a
+# superseding copy when the session has grown since its row — the row a session's first turn wrote
+# says turns=1 — or when a topic is given. Appending rather than editing keeps logs/*.log
+# append-only for `merge=union`, and every reader already takes the LAST row per session (see
+# bin/sj-catalogue.sh). The copy keeps the first row's time and, unless given one, its topic.
+sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic> [refresh]
   local log="$1" sid="$2" cwd="$3" tpath="$4" harness="$5" host="$6" ts="$7" topic="${8:-}"
-  local model="" turns="" size=0
+  local mode="${9:-}" model="" turns="" size=0 prev="" line=""
 
   # A session with no transcript produced no records at all: nothing is shipped for it and nothing
   # is rendered, so a row would advertise an archive entry that does not exist. This is not
@@ -579,7 +585,12 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # covers both the missing file and the empty one.
   [ -s "${tpath:-}" ] || return 1
   [ -n "$sid" ] || return 1
-  grep -q "session=$sid" "$log" 2>/dev/null && return 1   # write-once per session
+  prev="$(grep "session=$sid" "$log" 2>/dev/null | tail -n 1)"
+  if [ -n "$prev" ]; then
+    [ "$mode" = refresh ] || return 1                       # write-once per session
+    ts="${prev%% | *}"
+    [ -n "$topic" ] || topic="$(printf '%s' "$prev" | awk -F' [|] ' '{ t = $4; gsub(/^"|"$/, "", t); print t }')"
+  fi
 
   [ -n "$ts" ] || ts="$(date '+%Y-%m-%d %H:%M')"
   # Topic: prefer the caller's (a model-authored essence from /sjlog); else the first real user
@@ -604,8 +615,10 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
-  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s\n' \
-    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" >> "$log"
+  line="$(printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s' \
+    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size")"
+  [ "$line" = "$prev" ] && return 1        # a refresh with nothing new: nothing to push either
+  printf '%s\n' "$line" >> "$log"
 }
 
 # Commit + push EVERYTHING in the data repo. Shared by the session-end hook and sj-reconcile.sh:

@@ -69,4 +69,47 @@ SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.s
   "$APP" "$(payload "$sid")"
 assert_eq "still one line for the session" "$n_before" "$(grep -c "session=$sid" "$LOG")"
 
+section "per turn (Stop): the first turn writes the row, later turns leave it be"
+# Stop fires at the end of every turn; the session must be catalogued (and relayed) from the first.
+export SCRUBJAY_TURN_SETTLE=0
+sid6="66666666-2222-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sid6.jsonl"
+stop() { printf '{"session_id":"%s","cwd":"/home/user/widget-api","transcript_path":"%s","hook_event_name":"%s"}' \
+  "$1" "$proj/$1.jsonl" "$2"; }
+run_hook() { SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' "$APP" "$1"; }
+run_hook "$(stop "$sid6" Stop)"
+assert_eq "the first turn writes one row" "1" "$(grep -c "session=$sid6" "$LOG")"
+first="$(grep "session=$sid6" "$LOG")"
+tail -n 1 "$proj/$sid6.jsonl" >> "$proj/$sid6.jsonl"          # the session goes on
+run_hook "$(stop "$sid6" Stop)"
+assert_eq "a later turn adds none" "1" "$(grep -c "session=$sid6" "$LOG")"
+
+section "session end refreshes the row a turn wrote: appended, last row wins"
+run_hook "$(stop "$sid6" SessionEnd)"
+assert_eq "one superseding row" "2" "$(grep -c "session=$sid6" "$LOG")"
+last="$(grep "session=$sid6" "$LOG" | tail -n 1)"
+assert_contains "it carries the grown size" "$last" "| size=$(stat -c%s "$proj/$sid6.jsonl")"
+assert_eq "it keeps the first row's time" "${first%% | *}" "${last%% | *}"
+assert_contains "and its topic" "$last" '"the retry backoff fires twice per failure — find out why"'
+assert_eq "the catalogue lists the session once" "1" \
+  "$(bash -c '. "$0/bin/lib.sh"; sj_log_catalogue' "$APP" | grep -c "$sid6")"
+run_hook "$(stop "$sid6" SessionEnd)"
+assert_eq "ending again with nothing new adds nothing" "2" "$(grep -c "session=$sid6" "$LOG")"
+SCRUBJAY_TOPIC="Retry fired twice: one wrapper too many" run_hook "$(stop "$sid6" SessionEnd)"
+assert_contains "/sjlog's essence still lands after a turn wrote the row" \
+  "$(grep "session=$sid6" "$LOG" | tail -n 1)" '"Retry fired twice: one wrapper too many"'
+
+section "per turn: a turn that finds the session busy leaves a mark instead of racing it"
+sid7="77777777-2222-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sid7.jsonl"
+lock="${TMPDIR:-/tmp}/scrubjay-publish-$sid7"
+sleep 30 & holder=$!
+mkdir -p "$lock"; echo "$holder" > "$lock/pid"
+run_hook "$(stop "$sid7" Stop)"
+check "the mark is left for the holder" test -e "$lock.pending"
+assert_eq "and the busy turn wrote nothing" "0" "$(grep -c "session=$sid7" "$LOG")"
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+run_hook "$(stop "$sid7" Stop)"
+assert_eq "a dead holder's lock is taken over" "1" "$(grep -c "session=$sid7" "$LOG")"
+check "the mark is consumed"  bash -c '! test -e "$1"' _ "$lock.pending"
+check "and the lock released" bash -c '! test -e "$1"' _ "$lock"
+
 finish

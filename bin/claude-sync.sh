@@ -275,10 +275,16 @@ OVER="$HOSTDIR/claude/settings.json"
 OUT="$CLAUDE_DIR/settings.json"
 [ -f "$OVER" ] && OVERJSON="$(cat "$OVER")" || OVERJSON='{}'
 tmp="$(mktemp)"
-jq -n --argjson base "$(cat "$BASE")" --argjson host "$OVERJSON" '
+jq -n --argjson base "$(cat "$BASE")" --argjson host "$OVERJSON" --arg turn "$(sj_load_config; printf %s "${SCRUBJAY_TURN_PUBLISH:-1}")" '
   ($base * $host)
   | .permissions.allow = (($base.permissions.allow // []) + ($host.permissions.allow // []) | unique)
   | .permissions.deny  = (($base.permissions.deny  // []) + ($host.permissions.deny  // []) | unique)
+  # Publish after every turn, not only at session end (hooks/log-session.sh): the app registers it
+  # rather than the data repo, so a data repo seeded before it existed gets it too. Once; a data repo
+  # that registers log-session.sh on Stop itself keeps its own. SCRUBJAY_TURN_PUBLISH=0 opts out.
+  | if $turn != "1" or ([.hooks.Stop[]?.hooks[]?.command] | map(test("log-session")) | any) then .
+    else .hooks.Stop = ((.hooks.Stop // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/log-session.sh\""}]}])
+    end
 ' > "$tmp"
 if [ -f "$OUT" ] && [ ! -L "$OUT" ] && ! cmp -s "$tmp" "$OUT"; then
   cp "$OUT" "$OUT.bak.$(date +%s)"; echo "  bak   $(sj_pretty_path "$OUT")"
