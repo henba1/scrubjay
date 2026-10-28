@@ -33,6 +33,7 @@ const SCRIPTS: ReadonlyArray<{ re: RegExp; verb: string; op?: string }> = [
   { re: /sj-note\.sh\b/, verb: 'Note' },
   { re: /sj-resume\.sh\b/, verb: 'Resume' },
   { re: /sj-table\.sh\b/, verb: 'Table' },
+  { re: /sj-grep\.sh\b/, verb: 'Grep' },
   { re: /sj-paste\.sh\b/, verb: 'Paste' },
   { re: /onboard-memory\.sh\b/, verb: 'Memory setup' },
   { re: /memory-sync\.sh\b/, verb: 'Memory sync' },
