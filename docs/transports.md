@@ -36,7 +36,7 @@ The NAS holds **two parallel trees per host**. The `.jsonl` tree above is canoni
 machine-readable, the thing you'd resume or feed to a tool. Alongside it, a `readable/` tree
 holds the same sessions rendered as Markdown session logs (user + assistant text plus the full
 tool stream — each call shows its input, Bash commands verbatim, and the tool's output inline;
-only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by **project** (the session's working dir),
+only thinking and system/meta lines dropped) — for browsing and manually repeating tasks. It's organised for humans: foldered by **project** (the working dir the session **started** in),
 each file named `<date>_<topic>__<sid8>.md` where `topic` is the first real prompt slugified and
 `date` is when the session **started**, read from the transcript's own records.
 
@@ -49,10 +49,17 @@ midnight changed dates mid-life, and an archived copy carries the time it was *s
 the time it ran (`cp` does not preserve mtime). Reading the session's first record instead makes the
 name a pure function of the session, so re-publishing overwrites by construction.
 
+The project folder follows the same rule. A session-end hook is handed the *live* working dir, so a
+session that `cd`s into a subdirectory — or is exited and resumed there — used to be filed under a
+second project on its next publish. The folder is now the session's **origin**, read from its own
+records (`sj_session_origin` in `bin/lib.sh`): the same directory the `.jsonl`'s `<slug>` and the
+catalogue row go by, however far the session wandered.
+
 Rendering happens automatically on every ship (`bin/render-transcript.sh`, additive — it never
 touches the `.jsonl`); `bin/backfill-readable.sh` re-renders transcripts already on the NAS, and
-prunes duplicates left by the old mtime-based naming (same topic and handle, different date —
-`--no-prune` to skip that).
+prunes duplicates the older naming left behind — same topic and handle under a different date, or
+under a different project of the same host (`--no-prune` to skip that). Run it on the box that has
+the NAS mounted to clean up an archive written before the fix.
 
 Plans get the same human-friendly treatment: Claude Code saves each plan under three random words
 (`rippling-sprouting-whisper.md`), so on every ship `sj_normalize_plans` (in `bin/lib.sh`) renames

@@ -69,4 +69,15 @@ SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.s
   "$APP" "$(payload "$sid")"
 assert_eq "still one line for the session" "$n_before" "$(grep -c "session=$sid" "$LOG")"
 
+section "a session that ends in a subdirectory is catalogued under where it started"
+# The payload's cwd is the LIVE one. The row (and everything else the hook files) must use the
+# session's origin, or the first SessionEnd after a `cd` would catalogue it under the wrong project.
+sid6="66666666-2222-4333-8444-555555555555"
+cp "$FIXTURES/claude-session.jsonl" "$proj/$sid6.jsonl"
+SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(printf '{"session_id":"%s","cwd":"/home/user/widget-api/frontend","transcript_path":"%s"}' \
+            "$sid6" "$proj/$sid6.jsonl")"
+line="$(grep "session=$sid6" "$LOG")"
+assert_contains "the row carries the origin cwd" "$line" "| /home/user/widget-api |"
+
 finish

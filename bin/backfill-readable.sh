@@ -13,9 +13,16 @@
 # the time the session ran. The older file is a truncated copy of the same conversation under the
 # same `__<sid8>` handle, which is the thing every reader treats as a session identifier. Now that
 # the date comes from the transcript's own records (sj_transcript_date), the name is stable, and a
-# stale sibling can be recognised and dropped: same topic, same handle, different date. Nothing else
-# is ever removed — a name that does not match on BOTH topic and handle is left alone. --no-prune
-# renders without deleting anything.
+# stale sibling can be recognised and dropped: same topic, same handle, different date.
+#
+# The same goes for the PROJECT part of the name. The session-end hook used to file the readable copy
+# under the payload's live cwd, so a session that changed directory between two publishes (a `cd`
+# into a subdirectory, or an exit and resume there) left a copy under a second project. Now the
+# project is the session's origin (sj_session_origin), and a same-topic, same-handle copy under any
+# other project of the same host is a stale duplicate too.
+#
+# Nothing else is ever removed — a name that does not match on BOTH topic and handle is left alone.
+# --no-prune renders without deleting anything.
 set -uo pipefail
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; . "$APP/bin/lib.sh"; sj_load_config
 
@@ -34,12 +41,13 @@ while IFS= read -r f; do
   mkdir -p "$dir" || continue
   bash "$APP/bin/render-transcript.sh" "$f" > "$out" 2>/dev/null && n=$((n+1)) || continue
 
-  # Drop any earlier name for THIS session: same `<topic>__<handle>`, different date. Matching on
-  # the handle alone would be enough in practice but not safe in principle — two sessions can share
-  # an 8-char prefix — so the topic has to match too, and a file whose topic differs survives.
+  # Drop any earlier name for THIS session: same `<topic>__<handle>`, under a different date or a
+  # different project of this host. Matching on the handle alone would be enough in practice but not
+  # safe in principle — two sessions can share an 8-char prefix — so the topic has to match too, and
+  # a file whose topic differs survives.
   [ "$PRUNE" = 1 ] || continue
   stem="$(basename "$relout")"; stem="${stem#*_}"   # strip the leading <date>_
-  for old in "$dir"/*_"$stem".md; do
+  for old in "$root/$host/readable"/*/*_"$stem".md; do
     [ -e "$old" ] || continue
     [ "$old" = "$out" ] && continue
     rm -f -- "$old" && pruned=$((pruned+1))
@@ -47,5 +55,5 @@ while IFS= read -r f; do
 done < <(find "$root" -type f -name '*.jsonl' \
               ! -path '*/readable/*' ! -path '*/subagents/*' ! -name 'agent-*')
 printf 'rendered %d transcript(s) into */readable/ under %s' "$n" "$root"
-[ "$pruned" -gt 0 ] && printf ' (pruned %d stale duplicate(s) from the old mtime-based naming)' "$pruned"
+[ "$pruned" -gt 0 ] && printf ' (pruned %d stale duplicate(s) left by an earlier date or project in the name)' "$pruned"
 printf '\n'

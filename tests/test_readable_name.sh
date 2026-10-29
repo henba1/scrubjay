@@ -90,4 +90,51 @@ printf 'stale again\n' > "$stale"
 bash "$APP/bin/backfill-readable.sh" --no-prune "$ARCHIVE" >/dev/null 2>&1
 check "the stale file survives --no-prune" test -e "$stale"
 
+section "the session's origin, not the caller's cwd, names it"
+# The session-end hook hands over the LIVE cwd. A session that has since moved into a subdirectory
+# must still resolve to where it started; the caller's cwd only matters when the records carry none.
+assert_eq "no adapter loaded: the caller's cwd is all there is" "/live/dir" \
+  "$(sj_session_origin "$FIXTURES/claude-session.jsonl" /live/dir)"
+(
+  sj_load_adapter claude
+  assert_eq "adapter loaded: the transcript's first cwd wins" "/home/user/widget-api" \
+    "$(sj_session_origin "$FIXTURES/claude-session.jsonl" /home/user/widget-api/frontend)"
+  printf '{"type":"user","message":{"content":"hi"}}\n' > "$SANDBOX/nocwd.jsonl"
+  assert_eq "a transcript with no cwd falls back to the caller's" "/live/dir" \
+    "$(sj_session_origin "$SANDBOX/nocwd.jsonl" /live/dir)"
+  assert_eq "a missing transcript falls back too" "/live/dir" \
+    "$(sj_session_origin "$SANDBOX/absent.jsonl" /live/dir)"
+)
+
+section "a session that changed directory between publishes keeps ONE readable file"
+# The bug as it happened: published from the project root, then again from a subdirectory it had
+# cd'd into. Before, the second publish minted readable/frontend/… beside readable/widget-api/….
+SCRUBJAY_HARNESS=claude bash "$APP/bin/ship-transcript.sh" \
+  "$FIXTURES/claude-session.jsonl" "-home-user-widget-api" "$sid" movehost /home/user/widget-api \
+  >/dev/null 2>&1
+SCRUBJAY_HARNESS=claude bash "$APP/bin/ship-transcript.sh" \
+  "$FIXTURES/claude-session.jsonl" "-home-user-widget-api" "$sid" movehost /home/user/widget-api/frontend \
+  >/dev/null 2>&1
+assert_eq "one readable for one session" "1" \
+  "$(find "$ARCHIVE/movehost/readable" -name '*11111111*.md' | wc -l | tr -d ' ')"
+check "filed under the project it started in" test -s "$ARCHIVE/movehost/readable/widget-api/$good.md"
+check_fails "nothing filed under the subdirectory" test -e "$ARCHIVE/movehost/readable/frontend"
+
+section "backfill prunes a copy the old scheme filed under another project"
+# What already-drifted archives hold: the same session, same topic, under a second project dir.
+moved="$ARCHIVE/testhost/readable/frontend/$good.md"
+mkdir -p "$(dirname "$moved")"; printf 'stale copy from a moved cwd\n' > "$moved"
+# Same handle, different topic, other project: a different session — must survive.
+other_session="$ARCHIVE/testhost/readable/frontend/2026-03-09_another-topic__11111111.md"
+printf 'different session\n' > "$other_session"
+# The prune is per host: the same name on ANOTHER host is that host's own archive, not a duplicate.
+foreign="$ARCHIVE/otherhost/readable/frontend/$good.md"
+mkdir -p "$(dirname "$foreign")"; printf 'another host\n' > "$foreign"
+
+bash "$APP/bin/backfill-readable.sh" "$ARCHIVE" >/dev/null 2>&1
+check_fails "the copy under the other project is gone" test -e "$moved"
+check "the canonical copy is there" test -s "$ARCHIVE/testhost/readable/widget-api/$good.md"
+check "a different topic under that project is NOT touched" test -e "$other_session"
+check "another host's archive is NOT touched" test -e "$foreign"
+
 finish
