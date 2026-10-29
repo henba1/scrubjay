@@ -46,6 +46,10 @@ tpath="$(printf '%s' "$input"| jq -r '.transcript_path // empty')"
 # Codex declares transcript_path NULLABLE, and a harness may not keep a transcript file at all
 # (opencode). When the payload doesn't name one, ask the adapter to find (or produce) it.
 [ -n "$tpath" ] || tpath="$(sjh_find_live_transcript "$cwd" "$sid" 2>/dev/null)"
+# From here on the session's cwd is where it STARTED, not where it is now (the payload's). Every use
+# below — the catalogue row, the slug, the readable name, CLAUDE.local.md — files the session, and a
+# session is filed in one place however often it is published. See sj_session_origin.
+cwd="$(sj_session_origin "$tpath" "$cwd")"
 host="$(sj_host)"
 DATA="$(sj_data 2>/dev/null || true)"
 

@@ -354,9 +354,24 @@ sj_project_key() {  # sj_project_key [cwd]
   printf '%s' "$real" | sed 's/[^A-Za-z0-9-]/-/g'
 }
 
+# The directory a session is FILED under: where it started, as its own records say — not where it
+# happens to be when a hook fires. A harness's hook payload carries the *live* cwd, and a session
+# that `cd`s into a subdirectory (or is exited and resumed there) would otherwise be filed under a
+# second project the next time it is published: a second readable copy under the same `__<sid8>`
+# handle, plus a catalogue row and a CLAUDE.local.md from the wrong project. The origin is also what
+# the raw transcript's slug, sj-reconcile.sh and backfill-readable.sh already go by, so every path
+# agrees. The given cwd is only the fallback, for a transcript that records none.
+sj_session_origin() {  # sj_session_origin <transcript> [fallback_cwd]
+  local origin=""
+  if [ -s "${1:-}" ] && declare -F sjh_session_cwd >/dev/null 2>&1; then
+    origin="$(sjh_session_cwd "$1" 2>/dev/null)"
+  fi
+  printf '%s' "${origin:-${2:-}}"
+}
+
 # Human-readable relpath for a transcript, under the per-host `readable/` tree:
-#   <project>/<date>_<topic>__<sid8>   (project = basename of the session cwd; topic = first
-#   real user prompt, slugified).
+#   <project>/<date>_<topic>__<sid8>   (project = basename of the session's ORIGIN cwd — see
+#   sj_session_origin; topic = first real user prompt, slugified).
 #
 # <cwd> and <topic> are optional: a caller that has a harness adapter loaded passes what the
 # adapter extracted (transcripts are not all JSONL). Omitted, they are read from the file itself in

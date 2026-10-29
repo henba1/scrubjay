@@ -45,8 +45,10 @@ transport_ship "$src" "$host/$slug/$sid.$(sjh_transcript_ext)"; ship_rc=$?
 if [ "$ship_rc" -eq 0 ]; then sj_record_ship ok "$sid" "$backend"
 else sj_record_ship fail "$sid" "$backend" "$ship_rc"; fi
 
-# The session cwd: given by the hook payload, else recovered from the transcript.
-[ -n "$cwd" ] || cwd="$(sjh_session_cwd "$src")"
+# The cwd the session is filed under: where it started, from its own records. A caller's cwd (a hook
+# payload's is the LIVE one) is only the fallback — otherwise a session that changed directory
+# between two publishes gets a second readable copy under another project. See sj_session_origin.
+cwd="$(sj_session_origin "$src" "$cwd")"
 
 # 2) the session's other records. The adapter names them; we just relay them. It may normalize
 #    files in place first (Claude's plans get <date>_<topic>.md names), and may ask for `mirror`
