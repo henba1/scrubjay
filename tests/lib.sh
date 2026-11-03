@@ -45,11 +45,33 @@ sj_sandbox() {
   export SCRUBJAY_HOST=testhost
   export CLAUDE_HOST=testhost
   export SCRUBJAY_LOG_NOGIT=1          # never git-commit from a test
+  export SCRUBJAY_AI_TOPIC=0           # never call a real model from a test
   export SCRUBJAY_MEMORY="$SANDBOX/memory"
   export SCRUBJAY_MEMORY_REMOTE=""     # never clone/push a memory repo from a test
   export CLAUDE_CONFIG_DIR="$SANDBOX/home/.claude"
   export OPENCODE_CONFIG_DIR="$SANDBOX/home/.config/opencode"
   export CODEX_HOME="$SANDBOX/home/.codex"
+}
+
+# A fake `claude` first on PATH, for sj_ai_topic. Each call appends its args + SCRUBJAY_NO_HOOKS to
+# $SANDBOX/claude.calls and its stdin to $SANDBOX/claude.in. STUB_CLAUDE picks the behaviour:
+# a title to print (default), `fail`, `empty`, or `slow`.
+stub_claude() {
+  mkdir -p "$SANDBOX/stubbin"
+  cat > "$SANDBOX/stubbin/claude" <<'EOF'
+#!/usr/bin/env bash
+printf '%s nohooks=%s\n' "$*" "${SCRUBJAY_NO_HOOKS:-}" >> "$SANDBOX/claude.calls"
+cat > "$SANDBOX/claude.in"
+case "${STUB_CLAUDE:-}" in
+  fail)  exit 1 ;;
+  empty) exit 0 ;;
+  slow)  sleep 5; echo "too late" ;;
+  '')    echo '**Retry backoff fix**' ;;
+  *)     echo "$STUB_CLAUDE" ;;
+esac
+EOF
+  chmod +x "$SANDBOX/stubbin/claude"
+  export PATH="$SANDBOX/stubbin:$PATH" SCRUBJAY_AI_TOPIC=1
 }
 
 # ── assertions ─────────────────────────────────────────────────────────────────────────────────

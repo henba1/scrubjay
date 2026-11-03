@@ -73,7 +73,7 @@ within_after=$(( now - WITHIN_DAYS * 86400 ))
 # live session in another terminal is still writing, so "untouched for --quiet-mins" separates
 # crashed from running. It does not have to be right, and that is by design: if this reconciles a
 # session that is actually alive — resumed with `claude --resume`, so its transcript is old and
-# quiet — then when that session ends properly, sj_log_row's write-once guard keeps the row single
+# quiet — then when that session ends properly, sj_log_row adds a row only if the topic moved,
 # and the ship simply overwrites the archive with the fuller transcript. The residue is a row whose
 # turns=/size= are stale, which is precisely what a repeated /sjlog already leaves. A false positive
 # costs nothing the system does not already do.
@@ -163,7 +163,8 @@ while IFS=$'\t' read -r sid tpath mt; do
   # The row is dated when the session DIED (the transcript's mtime), not when it was recovered.
   # A week-old crash surfacing in the catalogue as today's work would be worse than missing: the
   # catalogue is sorted by that timestamp, and /sjbrowse's "what was I doing" answer depends on it.
-  if sj_log_row "$LOG" "$sid" "$cwd" "$tpath" "$harness" "$host" "$(sj_epoch_stamp "$mt")" ""; then
+  # No model call here: this runs inside SessionStart, which is awaited.
+  if SCRUBJAY_AI_TOPIC=0 sj_log_row "$LOG" "$sid" "$cwd" "$tpath" "$harness" "$host" "$(sj_epoch_stamp "$mt")" ""; then
     rows=$((rows+1))
   fi
   if [ "${SCRUBJAY_NOSHIP:-0}" != "1" ]; then

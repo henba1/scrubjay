@@ -237,8 +237,10 @@ sj_detect_harness() {  # sj_detect_harness <transcript>
 # to be, and naming the command is honest: it says the session happened and what it was.
 # Prose wins over the command, so a session that runs `/clear` and then does real work is still
 # titled by the work.
-sj_session_topic() {  # sj_session_topic <transcript.jsonl>
-  jq -rs '
+#
+# Mode `prompts` emits every prose prompt as a JSON array instead — the input to sj_ai_topic.
+sj_session_topic() {  # sj_session_topic <transcript.jsonl> [prompts]
+  jq -rs --arg mode "${2:-}" '
     def clean:
         gsub("(?s)<local-command-caveat>.*?</local-command-caveat>"; "")
       | gsub("(?s)<system-reminder>.*?</system-reminder>"; "")
@@ -261,9 +263,9 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl>
     | ( [ .[] | select(test("<command-name>") | not) | clean
           | select(. != ""
                    and ((startswith("<") or startswith("Caveat")
-                         or startswith("[Request interrupted")) | not)) ] | first ) as $prose
+                         or startswith("[Request interrupted")) | not)) ] ) as $prose
     | ( [ .[] | cmd | select(. != "") ] | first ) as $cmd
-    | $prose // $cmd // ""' \
+    | if $mode == "prompts" then $prose | tojson else $prose[0] // $cmd // "" end' \
     "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
 }
 
@@ -577,10 +579,10 @@ sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when
 # because the line IS the interface: sjmcp's _LOG regex and sj_log_catalogue's pipe-split both
 # parse it, and tests/test_log.sh pins its shape. A second place that formatted it would drift.
 #
-# Returns 0 when a row was written, 1 when there was nothing to write (already catalogued, or the
-# session recorded nothing) — callers count on that to decide whether a push is even needed.
+# Returns 0 when a row was written, 1 when there was nothing to write (catalogued with this topic
+# already, or the session recorded nothing) — callers count on that to decide whether to push.
 #
-# <ts> and <topic> may be empty: ts defaults to now, topic to the first real user prompt. Both are
+# <ts> and <topic> may be empty: ts defaults to now, topic to sj_session_topic's. Both are
 # parameters rather than reads of the ambient environment so the function stays testable — the
 # `/sjlog` essence (SCRUBJAY_TOPIC) is passed in by the hook, not picked up here.
 sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic>
@@ -594,12 +596,28 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # covers both the missing file and the empty one.
   [ -s "${tpath:-}" ] || return 1
   [ -n "$sid" ] || return 1
-  grep -q "session=$sid" "$log" 2>/dev/null && return 1   # write-once per session
+  # A session gets a new row only when its topic moved (readers take the last row per session).
+  # An /sjlog essence (marked essence=1) is only ever replaced by another essence.
+  local last essence=""
+  last="$(grep "session=$sid" "$log" 2>/dev/null | tail -1)"
+  if [ -n "$topic" ]; then essence=" | essence=1"
+  else case "$last" in *' | essence=1'*) return 1 ;; esac; fi
 
   [ -n "$ts" ] || ts="$(date '+%Y-%m-%d %H:%M')"
-  # Topic: prefer the caller's (a model-authored essence from /sjlog); else the first real user
-  # prompt. The adapter knows how to read its own transcript format; sj_session_topic is the
-  # Claude/JSONL shape and the fallback for a caller with no adapter loaded (backfill).
+  # Topic: prefer the caller's (a model-authored essence from /sjlog); else a small model's title
+  # of the session's prompts (sj_ai_topic), billed only when there are prompts it has not titled
+  # (prompts=<n>); else the first real user prompt. The adapter knows how to read its own
+  # transcript format; sj_session_topic is the Claude/JSONL shape and the fallback for a caller
+  # with no adapter loaded (backfill).
+  local prompts n aimark=""
+  if [ -z "$topic" ] && [ "$harness" = claude ] && [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ]; then
+    prompts="$(sj_session_topic "$tpath" prompts)"
+    n="$(printf '%s' "$prompts" | jq 'length' 2>/dev/null)" || n=0
+    case "$last" in *" | prompts=$n"|*" | prompts=$n | "*) return 1 ;; esac
+    [ "${n:-0}" -gt 0 ] && topic="$(sj_ai_topic "$prompts")" && aimark=" | prompts=$n"
+    # A failed call never downgrades a model title to the first prompt.
+    if [ -z "$topic" ]; then case "$last" in *" | prompts="*) return 1 ;; esac; fi
+  fi
   if [ -z "$topic" ]; then
     if declare -F sjh_session_topic >/dev/null 2>&1; then topic="$(sjh_session_topic "$tpath")"
     else topic="$(sj_session_topic "$tpath")"; fi
@@ -614,6 +632,7 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   [ -n "$topic" ] || topic="(no text)"
   # One writer of the "safe in a row" rule, so the backfill path cannot drift from this one.
   topic="$(sj_topic_sanitize "$topic")"
+  case "$last" in *" | \"$topic\" | session="*) return 1 ;; esac   # topic unchanged
   size="$(sj_size "$tpath")" || size=0
   # Lineage: only a forked session carries `forked_from=`, and only an id-shaped one.
   local fork=""
@@ -624,8 +643,28 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
   printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s\n' \
-    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" \
+    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size$aimark$essence" \
     "${fork:+ | forked_from=$fork}" >> "$log"
+}
+
+# A short title for a session, from a small model reading its prose prompts (JSON array, as
+# `sj_session_topic <f> prompts` emits it). Best-effort and bounded: any failure returns 1 and the
+# caller keeps the deterministic topic. The child loads no settings — so none of scrubjay's hooks
+# — and keeps no transcript; SCRUBJAY_NO_HOOKS=1 is the second lock. SCRUBJAY_AI_TOPIC=0 opts out.
+sj_ai_topic() {  # sj_ai_topic <prompts-json>
+  [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ] && sj_has claude || return 1
+  local digest out
+  digest="$(printf '%s' "$1" | jq -r 'if length > 12 then .[:4] + ["..."] + .[-8:] else . end
+            | map("- " + .[:300]) | join("\n")' 2>/dev/null | head -c 4000)"
+  [ -n "$digest" ] || return 1
+  out="$(cd "${TMPDIR:-/tmp}" && printf '%s\n\n%s\n' \
+    'Title this coding session for a catalogue, from the user prompts below (in order). Reply with the title only: plain text, at most 10 words. If the session genuinely changed subject, name its two or three topics as "X + Y". Never title it by a lookup or slash command.' \
+    "$digest" | SCRUBJAY_NO_HOOKS=1 sj_timeout "${SCRUBJAY_AI_TOPIC_TIMEOUT:-30}" claude -p \
+      --model haiku --no-session-persistence --setting-sources "" --tools "" \
+      --strict-mcp-config --disable-slash-commands 2>/dev/null)" || return 1
+  out="$(printf '%s\n' "$out" | tr -d '*#`' | awk 'NF { print; exit }')"
+  out="$(sj_topic_sanitize "$out")"
+  [ -n "$out" ] && printf '%s' "$out"
 }
 
 # Commit + push EVERYTHING in the data repo. Shared by the session-end hook and sj-reconcile.sh:

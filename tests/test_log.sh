@@ -69,6 +69,55 @@ SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.s
   "$APP" "$(payload "$sid")"
 assert_eq "still one line for the session" "$n_before" "$(grep -c "session=$sid" "$LOG")"
 
+section "the row follows the topic: a new row only when it moved"
+. "$APP/bin/lib.sh"
+rlog="$SANDBOX/row.log"; t="$SANDBOX/grow.jsonl"; rsid="77777777-2222-4333-8444-555555555555"
+urec() { jq -cn --arg t "$1" '{type:"user", message:{role:"user", content:[{type:"text", text:$t}]}}'; }
+row() { sj_log_row "$rlog" "$rsid" /w "$t" claude testhost "2026-01-01 00:00" "${1:-}"; }
+urec "<command-name>/sjtable</command-name>
+<command-args>head=10</command-args>" > "$t"
+row; assert_eq "first row titled by the lookup" 1 "$(grep -c '"/sjtable head=10"' "$rlog")"
+row; assert_eq "same topic: nothing written" 1 "$?"
+assert_eq "same topic: still one row" 1 "$(grep -c "session=$rsid" "$rlog")"
+urec "fix the nftables syntax error in the firewall config" >> "$t"
+row; assert_eq "topic moved: a row is written" 0 "$?"
+assert_contains "the new row carries the work" "$(tail -1 "$rlog")" '"fix the nftables syntax error in the firewall config"'
+row "Fixed the nftables config"; assert_contains "an essence is marked" "$(tail -1 "$rlog")" "| essence=1"
+urec "write a backup script for the postgres database dumps" >> "$t"
+row; assert_eq "the fallback never replaces an essence" 1 "$?"
+assert_eq "three rows in all" 3 "$(grep -c "session=$rsid" "$rlog")"
+
+section "with a model: billed only for new prose, never downgraded"
+rsid="88888888-2222-4333-8444-555555555555"
+ncalls() { if [ -f "$SANDBOX/claude.calls" ]; then wc -l < "$SANDBOX/claude.calls" | tr -d ' '; else echo 0; fi; }
+stub_claude
+urec "<command-name>/sjtable</command-name>" > "$t"
+row; assert_eq "no prose: no model call" 0 "$(ncalls)"
+urec "fix the nftables syntax error in the firewall config" >> "$t"
+row; assert_contains "new prose: the model's title" "$(tail -1 "$rlog")" '"Retry backoff fix" | session='
+assert_contains "and the prompt count it titled" "$(tail -1 "$rlog")" "| prompts=1"
+row; assert_eq "no new prose: nothing written" 1 "$?"
+assert_eq "no new prose: no second call" 1 "$(ncalls)"
+urec "write a backup script for the postgres dumps" >> "$t"
+STUB_CLAUDE=fail row; assert_eq "a failed call never downgrades a model title" 1 "$?"
+STUB_CLAUDE="Firewall fix + postgres backups" row
+assert_contains "new prose, new title: a row is appended" "$(tail -1 "$rlog")" \
+  '"Firewall fix + postgres backups" | session='
+rsid="99999999-2222-4333-8444-555555555555"
+STUB_CLAUDE=fail row
+last="$(tail -1 "$rlog")"
+assert_contains "a failed first call falls back to the first prompt" "$last" \
+  '"fix the nftables syntax error in the firewall config" | session='
+case "$last" in *prompts=*) _no "a fallback row has no prompt count, so it is retried" "$last" ;;
+  *) _ok "a fallback row has no prompt count, so it is retried" ;; esac
+export SCRUBJAY_AI_TOPIC=0
+
+section "the model's own child session fires no scrubjay hook"
+sid7="77777777-3333-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sid7.jsonl"
+SCRUBJAY_NO_HOOKS=1 SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(payload "$sid7")"
+assert_eq "SessionEnd under SCRUBJAY_NO_HOOKS writes no row" 0 "$(grep -c "session=$sid7" "$LOG")"
+
 section "a session that ends in a subdirectory is catalogued under where it started"
 # The payload's cwd is the LIVE one. The row (and everything else the hook files) must use the
 # session's origin, or the first SessionEnd after a `cd` would catalogue it under the wrong project.

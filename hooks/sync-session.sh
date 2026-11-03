@@ -16,6 +16,7 @@
 # --report (the /sjsync command): print the step report at the end. Never on the hook path —
 # stdout there is the session's context, and a clean sync has nothing to tell it.
 [ "${SCRUBJAY_NOSYNC:-0}" = "1" ] && exit 0
+[ "${SCRUBJAY_NO_HOOKS:-0}" = "1" ] && exit 0   # set by sj_ai_topic for its own child session
 report=0; [ "${1:-}" = "--report" ] && report=1
 # Read the payload rather than discarding it: step 2c needs this session's own id, so that the
 # reconcile pass cannot mistake the session it is running inside for one that died. Everything

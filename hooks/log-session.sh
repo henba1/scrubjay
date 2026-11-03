@@ -9,6 +9,9 @@
 #
 # Env knobs:  SCRUBJAY_LOG_NOGIT=1  (append log, skip its git)   CLAUDE_HOST=<name>
 #             SCRUBJAY_NOSHIP=1     (skip transcript relay)
+#             SCRUBJAY_AI_TOPIC=0   (no model-written topic)
+
+[ "${SCRUBJAY_NO_HOOKS:-0}" = "1" ] && exit 0   # set by sj_ai_topic for its own child session
 
 input="$(cat)"
 command -v jq >/dev/null 2>&1 || exit 0
@@ -81,11 +84,11 @@ if [ -n "$DATA" ] && [ -d "$DATA" ]; then
   LOG="$DATA/logs/$host.log"; mkdir -p "$DATA/logs"; touch "$LOG"
   ts="$(date '+%Y-%m-%d %H:%M')"
 
-  # 1a) append the session's catalogue row (write-once; sj_log_row in bin/lib.sh is the single
-  #     writer of that format — bin/sj-reconcile.sh writes the same row for a session that ended
-  #     without ever reaching this hook). SCRUBJAY_TOPIC is the model-authored essence /sjlog
-  #     passes in; empty on the automatic path, where the row falls back to the session's first
-  #     real user prompt — or, when it typed none, to the slash command it ran.
+  # 1a) append the session's catalogue row (again only when its topic moved; sj_log_row in
+  #     bin/lib.sh is the single writer of that format — bin/sj-reconcile.sh writes the same row
+  #     for a session that ended without ever reaching this hook). SCRUBJAY_TOPIC is the
+  #     model-authored essence /sjlog passes in; empty on the automatic path, where the topic comes
+  #     from the session's prompts — or, when it typed none, the slash command it ran.
   sj_log_row "$LOG" "$sid" "$cwd" "$tpath" "$harness" "$host" "$ts" "${SCRUBJAY_TOPIC:-}"
   sj_step catalogue ok "row for ${sid:0:8}"
 

@@ -80,6 +80,48 @@ f="$SANDBOX/side.jsonl"
 assert_eq "sidechain records are skipped" \
   "why is the archive missing yesterday's sessions?" "$(sj_session_topic "$f")"
 
+section "lookups never title a session that has prose"
+cmdrec() { rec "<command-name>$1</command-name>
+<command-args>$2</command-args>"; }
+f="$SANDBOX/lookup-then-work.jsonl"
+{ cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66
+  rec "list the steps left before commissioning the widget"
+  cmdrec /sjget "065f6e66 last turns"
+  rec "write a backup script for the postgres dumps"
+} > "$f"
+assert_eq "the first prose prompt, not the lookup" \
+  "list the steps left before commissioning the widget" "$(sj_session_topic "$f")"
+assert_eq "mode prompts: every prose prompt, commands skipped" \
+  '["list the steps left before commissioning the widget","write a backup script for the postgres dumps"]' \
+  "$(sj_session_topic "$f" prompts)"
+f2="$SANDBOX/lookups-only.jsonl"
+{ cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66; } > "$f2"
+assert_eq "a commands-only session keeps its first command" "/sjtable head=10" "$(sj_session_topic "$f2")"
+assert_eq "mode prompts: none" "[]" "$(sj_session_topic "$f2" prompts)"
+
+section "sj_ai_topic: a small model titles the session, best-effort"
+stub_claude
+p="$(sj_session_topic "$f" prompts)"
+assert_eq "the model's title, markup stripped" "Retry backoff fix" "$(sj_ai_topic "$p")"
+calls="$(cat "$SANDBOX/claude.calls")"
+assert_contains "asks haiku" "$calls" "--model haiku"
+assert_contains "the child keeps no transcript" "$calls" "--no-session-persistence"
+assert_contains "the child loads no settings, so no hooks" "$calls" "--setting-sources"
+assert_contains "the child carries the hook guard" "$calls" "nohooks=1"
+assert_contains "the digest carries the prose" "$(cat "$SANDBOX/claude.in")" "- write a backup script"
+assert_eq "output is sanitized for the row" "Widget commissioning / plan" \
+  "$(STUB_CLAUDE='Widget commissioning | "plan"' sj_ai_topic "$p")"
+check_fails "a failing call is a failure" env STUB_CLAUDE=fail bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+check_fails "empty output is a failure" env STUB_CLAUDE=empty bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+check_fails "no prompts, no call" sj_ai_topic "[]"
+check_fails "SCRUBJAY_AI_TOPIC=0 opts out" env SCRUBJAY_AI_TOPIC=0 bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+if command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1; then
+  check_fails "a slow call is cut off" env STUB_CLAUDE=slow SCRUBJAY_AI_TOPIC_TIMEOUT=1 \
+    bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+else skip "a slow call is cut off" "no timeout(1)"; fi
+check_fails "no claude on PATH is a failure" env PATH=/usr/bin:/bin bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+export SCRUBJAY_AI_TOPIC=0
+
 section "a transcript with nothing to quote still yields nothing"
 f="$SANDBOX/empty.jsonl"
 printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}' > "$f"
