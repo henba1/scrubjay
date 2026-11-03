@@ -73,7 +73,7 @@ sjh_project_dir() {  # sjh_project_dir [cwd]
   printf '%s/%s' "$proj" "$(sjh_slug "$real")"
 }
 
-sjh_session_topic() { sj_session_topic "$1"; }
+sjh_session_topic() { sj_session_topic "$@"; }
 sjh_session_cwd()   { jq -rs '[ .[] | select(.cwd != null) | .cwd ][0] // ""' "$1" 2>/dev/null; }
 sjh_render()        { bash "$(sj_app)/bin/render-transcript.sh" "$1"; }
 

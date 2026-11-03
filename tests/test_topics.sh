@@ -80,6 +80,40 @@ f="$SANDBOX/side.jsonl"
 assert_eq "sidechain records are skipped" \
   "why is the archive missing yesterday's sessions?" "$(sj_session_topic "$f")"
 
+section "the whole session titles it, not just the first prompt"
+cmdrec() { rec "<command-name>$1</command-name>
+<command-args>$2</command-args>"; }
+f="$SANDBOX/lookup-then-work.jsonl"
+{ cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66
+  rec "re-iterate the steps I need to do before commissioning of the widget is possible"
+  cmdrec /sjget "065f6e66 last couple of turns"
+  rec "merge PR 17 and PR 1"
+  rec "works. what are the 4 different dirs for? run me through step 5"
+} > "$f"
+assert_eq "lookups never title a session with prose; follow-ups add no part" \
+  "re-iterate the steps I need to do before commissioning of the widget is possible" \
+  "$(sj_session_topic "$f")"
+
+f="$SANDBOX/two-topics.jsonl"
+{ rec "fix the nftables syntax error in the firewall config"
+  rec "yes thanks"
+  rec "now the nftables firewall config reloads cleanly, fix the syntax"
+  rec "write a backup script for the postgres database dumps"
+} > "$f"
+assert_eq "a distinct later prompt becomes a second part" \
+  "fix the nftables syntax error in + write a backup script for the" "$(sj_session_topic "$f")"
+assert_eq "mode first keeps the first prompt (readable filename)" \
+  "fix the nftables syntax error in the firewall config" "$(sj_session_topic "$f" first)"
+
+f="$SANDBOX/smalltalk.jsonl"
+{ rec "fix the nftables syntax error in the firewall config"; rec "works."; rec "yes, merge it"; } > "$f"
+assert_eq "short acknowledgements add no part" \
+  "fix the nftables syntax error in the firewall config" "$(sj_session_topic "$f")"
+
+f="$SANDBOX/lookups-only.jsonl"
+{ cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66; } > "$f"
+assert_eq "a commands-only session keeps its first command" "/sjtable head=10" "$(sj_session_topic "$f")"
+
 section "a transcript with nothing to quote still yields nothing"
 f="$SANDBOX/empty.jsonl"
 printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}' > "$f"

@@ -237,8 +237,13 @@ sj_detect_harness() {  # sj_detect_harness <transcript>
 # to be, and naming the command is honest: it says the session happened and what it was.
 # Prose wins over the command, so a session that runs `/clear` and then does real work is still
 # titled by the work.
-sj_session_topic() {  # sj_session_topic <transcript.jsonl>
-  jq -rs '
+#
+# The topic covers the whole session: it starts as the first prose prompt, and a later prompt adds
+# a part (" + ", at most 3, each cut to 6 words) when it has >= 4 content words (lowercase, >= 4
+# chars, no stopword, trailing "s" dropped) and under a quarter of them were said before in the
+# session. Mode `first` returns just the first prompt — the readable filename's, so names stay put.
+sj_session_topic() {  # sj_session_topic <transcript.jsonl> [first]
+  jq -rs --arg mode "${2:-}" '
     def clean:
         gsub("(?s)<local-command-caveat>.*?</local-command-caveat>"; "")
       | gsub("(?s)<system-reminder>.*?</system-reminder>"; "")
@@ -253,6 +258,14 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl>
             then (capture("(?s)<command-args>(?<v>.*?)</command-args>").v | trim) else "" end) as $a
          | if $n == "" then "" elif $a == "" then $n else $n + " " + $a end)
       else "" end;
+    def stop: "this that with from have what when where which there their them then than they will
+      would could should about into also just like make need want please some your okay sure thanks
+      thank does done here more much only over very been were being lets dont through again still
+      after before other these those each actually really think know works";
+    def words: (stop | [splits("\\s+")]) as $s
+      | [ ascii_downcase | scan("[a-z0-9]+") | select(length >= 4)
+          | . as $w | select($s | index($w) == null) | sub("s$"; "") ] | unique;
+    def short: [splits("\\s+")] | .[:6] | join(" ");
     [ .[]
       | select(.type == "user" and .isSidechain != true and .isMeta != true)
       | .message.content
@@ -261,9 +274,18 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl>
     | ( [ .[] | select(test("<command-name>") | not) | clean
           | select(. != ""
                    and ((startswith("<") or startswith("Caveat")
-                         or startswith("[Request interrupted")) | not)) ] | first ) as $prose
+                         or startswith("[Request interrupted")) | not)) ] ) as $prose
     | ( [ .[] | cmd | select(. != "") ] | first ) as $cmd
-    | $prose // $cmd // ""' \
+    | if ($prose | length) == 0 then $cmd // ""
+      elif $mode == "first" then $prose[0]
+      else reduce $prose[1:][] as $p ({parts: [$prose[0]], seen: ($prose[0] | words)};
+             . as $st | ($p | words) as $w
+             | ([ $w[] | . as $x | select($st.seen | index($x) != null) ] | length) as $old
+             | (if (.parts | length) < 3 and ($w | length) >= 4 and $old * 4 < ($w | length)
+                then .parts += [$p] else . end)
+             | .seen = (.seen + $w | unique))
+        | if (.parts | length) == 1 then .parts[0] else [ .parts[] | short ] | join(" + ") end
+      end' \
     "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
 }
 
@@ -381,7 +403,7 @@ sj_readable_relpath() {  # sj_readable_relpath <transcript> <session_id> [cwd] [
   if ! command -v jq >/dev/null 2>&1; then printf 'misc/%s' "${sid:0:8}"; return; fi
   [ -n "$cwd" ] || cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
   project="$(basename "${cwd:-misc}")"; [ -n "$project" ] && [ "$project" != "/" ] || project="misc"
-  [ -n "$topic" ] || topic="$(sj_session_topic "$src")"
+  [ -n "$topic" ] || topic="$(sj_session_topic "$src" first)"
   topic="$(sj_slugify "$topic" 40)"
   [ -n "$topic" ] || topic="session"
   d="$(sj_transcript_date "$src")"
@@ -577,10 +599,10 @@ sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when
 # because the line IS the interface: sjmcp's _LOG regex and sj_log_catalogue's pipe-split both
 # parse it, and tests/test_log.sh pins its shape. A second place that formatted it would drift.
 #
-# Returns 0 when a row was written, 1 when there was nothing to write (already catalogued, or the
-# session recorded nothing) — callers count on that to decide whether a push is even needed.
+# Returns 0 when a row was written, 1 when there was nothing to write (catalogued with this topic
+# already, or the session recorded nothing) — callers count on that to decide whether to push.
 #
-# <ts> and <topic> may be empty: ts defaults to now, topic to the first real user prompt. Both are
+# <ts> and <topic> may be empty: ts defaults to now, topic to sj_session_topic's. Both are
 # parameters rather than reads of the ambient environment so the function stays testable — the
 # `/sjlog` essence (SCRUBJAY_TOPIC) is passed in by the hook, not picked up here.
 sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic>
@@ -594,11 +616,16 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # covers both the missing file and the empty one.
   [ -s "${tpath:-}" ] || return 1
   [ -n "$sid" ] || return 1
-  grep -q "session=$sid" "$log" 2>/dev/null && return 1   # write-once per session
+  # A session gets a new row only when its topic moved (readers take the last row per session).
+  # An /sjlog essence (marked essence=1) is only ever replaced by another essence.
+  local last essence=""
+  last="$(grep "session=$sid" "$log" 2>/dev/null | tail -1)"
+  if [ -n "$topic" ]; then essence=" | essence=1"
+  else case "$last" in *' | essence=1'*) return 1 ;; esac; fi
 
   [ -n "$ts" ] || ts="$(date '+%Y-%m-%d %H:%M')"
-  # Topic: prefer the caller's (a model-authored essence from /sjlog); else the first real user
-  # prompt. The adapter knows how to read its own transcript format; sj_session_topic is the
+  # Topic: prefer the caller's (a model-authored essence from /sjlog); else the session's prompts.
+  # The adapter knows how to read its own transcript format; sj_session_topic is the
   # Claude/JSONL shape and the fallback for a caller with no adapter loaded (backfill).
   if [ -z "$topic" ]; then
     if declare -F sjh_session_topic >/dev/null 2>&1; then topic="$(sjh_session_topic "$tpath")"
@@ -614,6 +641,7 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   [ -n "$topic" ] || topic="(no text)"
   # One writer of the "safe in a row" rule, so the backfill path cannot drift from this one.
   topic="$(sj_topic_sanitize "$topic")"
+  case "$last" in *" | \"$topic\" | session="*) return 1 ;; esac   # topic unchanged
   size="$(sj_size "$tpath")" || size=0
   # Lineage: only a forked session carries `forked_from=`, and only an id-shaped one.
   local fork=""
@@ -623,8 +651,9 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
-  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s\n' \
-    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" \
+  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s
+' \
+    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size$essence" \
     "${fork:+ | forked_from=$fork}" >> "$log"
 }
 

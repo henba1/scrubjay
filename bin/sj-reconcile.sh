@@ -73,7 +73,7 @@ within_after=$(( now - WITHIN_DAYS * 86400 ))
 # live session in another terminal is still writing, so "untouched for --quiet-mins" separates
 # crashed from running. It does not have to be right, and that is by design: if this reconciles a
 # session that is actually alive — resumed with `claude --resume`, so its transcript is old and
-# quiet — then when that session ends properly, sj_log_row's write-once guard keeps the row single
+# quiet — then when that session ends properly, sj_log_row adds a row only if the topic moved,
 # and the ship simply overwrites the archive with the fuller transcript. The residue is a row whose
 # turns=/size= are stale, which is precisely what a repeated /sjlog already leaves. A false positive
 # costs nothing the system does not already do.

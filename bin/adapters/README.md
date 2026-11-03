@@ -36,7 +36,7 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_transcript_ext` | extension an archived transcript carries (`jsonl`, `json`) |
 | `sjh_session_handle <sid>` | the 8-char handle the session is known by (readable name, `/sjrecall`, `/sjresume`) |
 | `sjh_session_slug <transcript> <cwd>` | the `<slug>` this session archives under |
-| `sjh_session_topic <transcript>` | first real user prompt, one line of plain text |
+| `sjh_session_topic <transcript> [first]` | the session's topic, one line of plain text (`first`: first real user prompt only, for the readable filename) |
 | `sjh_session_cwd <transcript>` | the working dir recorded inside the transcript |
 | `sjh_session_meta <transcript>` | catalogue metadata as TSV `<model>\t<turns>`, in one pass (fields empty when the transcript doesn't carry them) |
 | `sjh_session_parent <transcript>` | **optional.** The session id this one was forked/branched from, else empty; becomes the row's `forked_from=` field. Only Claude implements it. |

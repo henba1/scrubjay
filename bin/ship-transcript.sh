@@ -61,7 +61,7 @@ done < <(sjh_extra_artifacts "$src" "$sid" "$slug" "$cwd")
 # 3) human-readable rendering (clean conversation). Additive: the machine-format tree above is
 #    untouched; this is the browsable layer — and the one thing every harness has in common, which
 #    is why /sjrecall and /sjbrowse can search across all of them.
-rel="$(sj_readable_relpath "$src" "$sid" "$cwd" "$(sjh_session_topic "$src")")"
+rel="$(sj_readable_relpath "$src" "$sid" "$cwd" "$(sjh_session_topic "$src" first)")"
 tmpmd="$(mktemp 2>/dev/null)" || tmpmd=""
 if [ -n "$tmpmd" ]; then
   sjh_render "$src" > "$tmpmd" 2>/dev/null

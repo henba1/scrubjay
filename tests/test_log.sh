@@ -69,6 +69,24 @@ SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.s
   "$APP" "$(payload "$sid")"
 assert_eq "still one line for the session" "$n_before" "$(grep -c "session=$sid" "$LOG")"
 
+section "the row follows the topic: a new row only when it moved"
+. "$APP/bin/lib.sh"
+rlog="$SANDBOX/row.log"; t="$SANDBOX/grow.jsonl"; rsid="77777777-2222-4333-8444-555555555555"
+urec() { jq -cn --arg t "$1" '{type:"user", message:{role:"user", content:[{type:"text", text:$t}]}}'; }
+row() { sj_log_row "$rlog" "$rsid" /w "$t" claude testhost "2026-01-01 00:00" "${1:-}"; }
+urec "<command-name>/sjtable</command-name>
+<command-args>head=10</command-args>" > "$t"
+row; assert_eq "first row titled by the lookup" 1 "$(grep -c '"/sjtable head=10"' "$rlog")"
+row; assert_eq "same topic: nothing written" 1 "$?"
+assert_eq "same topic: still one row" 1 "$(grep -c "session=$rsid" "$rlog")"
+urec "fix the nftables syntax error in the firewall config" >> "$t"
+row; assert_eq "topic moved: a row is written" 0 "$?"
+assert_contains "the new row carries the work" "$(tail -1 "$rlog")" '"fix the nftables syntax error in the firewall config"'
+row "Fixed the nftables config"; assert_contains "an essence is marked" "$(tail -1 "$rlog")" "| essence=1"
+urec "write a backup script for the postgres database dumps" >> "$t"
+row; assert_eq "the heuristic never replaces an essence" 1 "$?"
+assert_eq "three rows in all" 3 "$(grep -c "session=$rsid" "$rlog")"
+
 section "a session that ends in a subdirectory is catalogued under where it started"
 # The payload's cwd is the LIVE one. The row (and everything else the hook files) must use the
 # session's origin, or the first SessionEnd after a `cd` would catalogue it under the wrong project.
