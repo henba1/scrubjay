@@ -73,6 +73,28 @@ git -C ~/.scrubjay/scrubjay-data pull
 grep -i <keyword> ~/.scrubjay/scrubjay-data/logs/*.log
 ```
 
+That searches the catalogue's topics. To search what was actually *said* — every session's
+readable transcript, on a machine that can read the archive as files (`local` or `git` backend) —
+use `bin/sj-grep.sh` (`/sjgrep` drives it from a session):
+
+```sh
+~/.scrubjay/scrubjay/bin/sj-grep.sh borg prune                    # sessions mentioning either, best first
+~/.scrubjay/scrubjay/bin/sj-grep.sh --all borg "retention policy" # only those mentioning both
+~/.scrubjay/scrubjay/bin/sj-grep.sh borg host=nas since=2026-09-01 head=50 --limit=5
+~/.scrubjay/scrubjay/bin/sj-grep.sh 1a2b3c4d -- prune             # inside one session
+~/.scrubjay/scrubjay/bin/sj-grep.sh --json borg                   # one JSON object per line, for tools
+```
+
+Scope takes the `sj-table.sh` filters (`host= project= harness= model= topic= since= until=`,
+`head=N tail=N [a:b]`) plus `session=<sid8>[,…]`. Matching is literal and case-insensitive. Each
+hit prints with its turn and line number — the same numbers `sj_get(turns=…, lines=…)` slices by.
+Exit `0` hits, `1` none, `2` usage, `3` no filesystem view of the archive (`rsync-wg`, or the NAS
+is not mounted). With `--json` each session is one line,
+`{"type":"session", "rank", "sid", "sid8", "harness", "host", "project", "date", "ts", "topic",
+"path", "hits", "terms_hit", "term_hits": {term: n}, "turns", "snippets": [{"turn", "line",
+"start", "end", "text"}]}`, and a final `{"type":"summary", "terms", "mode", "in_scope",
+"matched", "shown", "capped", "archive"}` closes the stream.
+
 ## Keep a written artefact (a note)
 
 `/sjnote` from inside a session is the usual way; the script is also usable directly, and reads
