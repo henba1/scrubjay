@@ -1139,24 +1139,42 @@ start, so it makes no model call. Resume the session and end it normally to get 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>pull
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>grep<span class="w"> </span>-i<span class="w"> </span>&lt;keyword&gt;<span class="w"> </span>~/.scrubjay/scrubjay-data/logs/*.log
 </code></pre></div>
+<p>That searches the catalogue's topics. To search what was actually <em>said</em> — every session's
+readable transcript, on a machine that can read the archive as files (<code>local</code> or <code>git</code> backend) —
+use <code>bin/sj-grep.sh</code> (<code>/sjgrep</code> drives it from a session):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>~/.scrubjay/scrubjay/bin/sj-grep.sh<span class="w"> </span>borg<span class="w"> </span>prune<span class="w">                    </span><span class="c1"># sessions mentioning either, best first</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>~/.scrubjay/scrubjay/bin/sj-grep.sh<span class="w"> </span>--all<span class="w"> </span>borg<span class="w"> </span><span class="s2">"retention policy"</span><span class="w"> </span><span class="c1"># only those mentioning both</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>~/.scrubjay/scrubjay/bin/sj-grep.sh<span class="w"> </span>borg<span class="w"> </span><span class="nv">host</span><span class="o">=</span>nas<span class="w"> </span><span class="nv">since</span><span class="o">=</span><span class="m">2026</span>-09-01<span class="w"> </span><span class="nv">head</span><span class="o">=</span><span class="m">50</span><span class="w"> </span>--limit<span class="o">=</span><span class="m">5</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>~/.scrubjay/scrubjay/bin/sj-grep.sh<span class="w"> </span>1a2b3c4d<span class="w"> </span>--<span class="w"> </span>prune<span class="w">             </span><span class="c1"># inside one session</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>~/.scrubjay/scrubjay/bin/sj-grep.sh<span class="w"> </span>--json<span class="w"> </span>borg<span class="w">                   </span><span class="c1"># one JSON object per line, for tools</span>
+</code></pre></div>
+<p>Scope takes the <code>sj-table.sh</code> filters (<code>host= project= harness= model= topic= since= until=</code>,
+<code>head=N tail=N [a:b]</code>) plus <code>session=&lt;sid8&gt;[,…]</code>. Matching is literal and case-insensitive. Each
+hit prints with its turn and line number — the same numbers <code>sj_get(turns=…, lines=…)</code> slices by.
+Exit <code>0</code> hits, <code>1</code> none, <code>2</code> usage, <code>3</code> no filesystem view of the archive (<code>rsync-wg</code>, or the NAS
+is not mounted). With <code>--json</code> each session is one line,
+<code>{"type":"session", "rank", "sid", "sid8", "harness", "host", "project", "date", "ts", "topic",
+"path", "hits", "terms_hit", "term_hits": {term: n}, "turns", "snippets": [{"turn", "line",
+"start", "end", "text"}]}</code>, and a final <code>{"type":"summary", "terms", "mode", "in_scope",
+"matched", "shown", "capped", "archive"}</code> closes the stream.</p>
 <h2 id="keep-a-written-artefact-a-note">Keep a written artefact (a note)<a class="headerlink" href="#keep-a-written-artefact-a-note" title="Permanent link">&para;</a></h2>
 <p><code>/sjnote</code> from inside a session is the usual way; the script is also usable directly, and reads
 the body from stdin.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>~/.scrubjay/scrubjay/bin/sj-note.sh<span class="w"> </span>--topic<span class="w"> </span><span class="s2">"fsl impact on document b"</span><span class="w"> </span>&lt;<span class="w"> </span>analysis.md
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>~/.scrubjay/scrubjay/bin/sj-note.sh<span class="w"> </span>--from<span class="w"> </span>/tmp/…/scratchpad/briefing.md<span class="w">   </span><span class="c1"># promote an existing file</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>ls<span class="w"> </span>~/.scrubjay/scrubjay-memory/*/notes/<span class="w">                                    </span><span class="c1"># what's kept, this machine</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.scrubjay/scrubjay/bin/sj-note.sh<span class="w"> </span>--topic<span class="w"> </span><span class="s2">"fsl impact on document b"</span><span class="w"> </span>&lt;<span class="w"> </span>analysis.md
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>~/.scrubjay/scrubjay/bin/sj-note.sh<span class="w"> </span>--from<span class="w"> </span>/tmp/…/scratchpad/briefing.md<span class="w">   </span><span class="c1"># promote an existing file</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>ls<span class="w"> </span>~/.scrubjay/scrubjay-memory/*/notes/<span class="w">                                    </span><span class="c1"># what's kept, this machine</span>
 </code></pre></div>
 <p>Notes land in <code>&lt;memory&gt;/&lt;project&gt;/notes/</code> and publish immediately. They are <strong>not</strong> loaded into
 future sessions — read them back with <code>/sjrecall</code>, <code>/sjbrowse note</code>, or <code>sj_list(type="note")</code>.</p>
 <h2 id="continue-another-machines-chat-here">Continue another machine's chat here<a class="headerlink" href="#continue-another-machines-chat-here" title="Permanent link">&para;</a></h2>
 <p>Stage it, then resume with Claude Code's own picker — see <a href="../handoff/">handoff.md</a>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>--list<span class="w">       </span><span class="c1"># what's resumable, from other machines</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">cd</span><span class="w"> </span>&lt;the<span class="w"> </span>project<span class="w"> </span>dir<span class="w"> </span>on<span class="w"> </span>this<span class="w"> </span>machine&gt;
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>&lt;sid8&gt;<span class="w">       </span><span class="c1"># stage it (rewrites the other host's paths)</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>claude<span class="w"> </span>--resume<span class="w"> </span>&lt;sid&gt;<span class="w">                              </span><span class="c1"># …or /resume inside a session here</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>--list<span class="w">       </span><span class="c1"># what's resumable, from other machines</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">cd</span><span class="w"> </span>&lt;the<span class="w"> </span>project<span class="w"> </span>dir<span class="w"> </span>on<span class="w"> </span>this<span class="w"> </span>machine&gt;
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>&lt;sid8&gt;<span class="w">       </span><span class="c1"># stage it (rewrites the other host's paths)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>claude<span class="w"> </span>--resume<span class="w"> </span>&lt;sid&gt;<span class="w">                              </span><span class="c1"># …or /resume inside a session here</span>
 </code></pre></div>
 <h2 id="register-the-current-machine-first-time-onboarding">Register the current machine (first-time onboarding)<a class="headerlink" href="#register-the-current-machine-first-time-onboarding" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
 </code></pre></div>
 <h2 id="toggle-behaviour">Toggle behaviour<a class="headerlink" href="#toggle-behaviour" title="Permanent link">&para;</a></h2>
 <p>Set in <code>~/.config/scrubjay/config</code> (persistent) or inline before a command (one-off) — no file
@@ -1201,17 +1219,17 @@ editing needed:</p>
 </table>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Move the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="s">: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="s">: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="s">: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="s">EOF</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s">: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="s">: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="s">: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="s">EOF</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
 </code></pre></div>
 <p><code>claude-sync.sh</code> recomputes the app location from its own path and re-links every scope, so
 nothing else needs touching. Confirm with

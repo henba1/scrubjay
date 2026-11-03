@@ -977,6 +977,11 @@ read-only <a href="../archive-mcp/"><code>sjmcp</code> MCP tools</a>; <strong>li
 <td><code>bin/sj-table.sh</code> (no MCP)</td>
 <td><strong>Reading the catalogue as a table</strong>, not picking one item out of it. Filters apply <em>before</em> slices, so <code>harness=opencode head=20</code> is "the newest 20 opencode sessions". It costs no MCP round-trip — it queries the rendered <code>logs/CATALOGUE.md</code>. Bare <code>/sjtable</code> prints a summary, not ~600 rows.</td>
 </tr>
+<tr>
+<td><code>/sjgrep &lt;what to look for, in plain words&gt;</code></td>
+<td><code>bin/sj-grep.sh</code> (no MCP) → <code>sj_get</code> or <code>bin/sj-resume.sh</code></td>
+<td><em>"Where did we talk about borg retention or prune on <code>nas</code> last month?"</em> — <strong>keyword search across one, some or all sessions</strong>, with the hits shown in context. The model turns your sentence into a few literal keywords (plus obvious variants) and the <code>/sjtable</code> scope filters, the script ranks sessions by how many of the terms they hit, then how often, then recency, and prints each hit with its turn and line numbers. It then <strong>asks</strong> which session — or which turns/lines of it — to pull into context (<code>sj_get</code> with that slice) or to resume here (the <code>/sjresume</code> flow). Exact words rather than a gist: reach for <code>/sjrecall</code> when you remember the idea but not the vocabulary. On a machine with no filesystem view of the archive (<code>rsync-wg</code>) it falls back to <code>sj_recall</code> + <code>sj_search_within</code>.</td>
+</tr>
 </tbody>
 </table>
 <blockquote>
