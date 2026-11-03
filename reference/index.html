@@ -1133,8 +1133,8 @@ to sweep now:</p>
 terminal is still writing) and modified in the last 14 days, and it does at most 25 per run so a
 backlog cannot slow a session's startup. <code>--all</code> lifts every one of those limits.</p>
 <p>A recovered session is dated when it <em>died</em>, not when it was recovered, so it sorts into the
-catalogue where it belongs. The one thing that cannot be recovered is a <code>/sjlog</code> essence — the row
-falls back to the session's first prompt, exactly as the automatic path does.</p>
+catalogue where it belongs. Its topic is the session's first prompt: the sweep runs inside session
+start, so it makes no model call. Resume the session and end it normally to get a model-written one.</p>
 <h2 id="find-a-past-chat-across-every-machine">Find a past chat across every machine<a class="headerlink" href="#find-a-past-chat-across-every-machine" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>-C<span class="w"> </span>~/.scrubjay/scrubjay-data<span class="w"> </span>pull
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>grep<span class="w"> </span>-i<span class="w"> </span>&lt;keyword&gt;<span class="w"> </span>~/.scrubjay/scrubjay-data/logs/*.log
@@ -1192,6 +1192,10 @@ editing needed:</p>
 <tr>
 <td><code>SCRUBJAY_NORECONCILE=1</code></td>
 <td>don't sweep for sessions that ended without a clean exit</td>
+</tr>
+<tr>
+<td><code>SCRUBJAY_AI_TOPIC=0</code></td>
+<td>don't ask Haiku for the session's topic; use its first prompt</td>
 </tr>
 </tbody>
 </table>

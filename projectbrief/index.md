@@ -88,7 +88,7 @@ scrubjay ships with an onboarding script that sets up the networking and MCP. Ho
 
 **No per-person access control.** scrubjay knows hosts, not users. Everyone pointed at the same storage sees everything in it — including the shared config and memory that ride along with the sessions. For a small, trusting team that is the point; where separation matters, the answer today is one archive per team or per engagement, not permissions inside one archive.
 
-**Some commands take getting used to.** Ending a session with `/sjlog` (or `/clear`) gives it a written one-sentence topic. Quit any other way and the session still lands in the archive — it just gets the first prompt as its topic line, which makes it harder to recognise later when you are scanning the catalogue. This will be improved in a future update.
+**Some commands take getting used to.** Ending a session with `/sjlog` (or `/clear`) gives it a written one-sentence topic. Quit any other way and the session still lands in the archive with a short title Haiku writes from its prompts — or, when that call cannot be made, its first prompt.
 
 **The scrubjay storage on the central node is a single point of failure.** In future, the central storage should be moved to an off-premise VPS and managed via a distributed database such as Apache Cassandra, which opens up the path to further optimisation. For production environments relying on 100% uptime, this is non-negotiable. See [Archive durability](https://henba1.github.io/scrubjay/durability/index.md) for what protects the archive today.
 

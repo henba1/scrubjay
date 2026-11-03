@@ -123,7 +123,7 @@ scrubjay ships with an onboarding script that sets up the networking and MCP. Ho
 
 **No per-person access control.** scrubjay knows hosts, not users. Everyone pointed at the same storage sees everything in it — including the shared config and memory that ride along with the sessions. For a small, trusting team that is the point; where separation matters, the answer today is one archive per team or per engagement, not permissions inside one archive.
 
-**Some commands take getting used to.** Ending a session with `/sjlog` (or `/clear`) gives it a written one-sentence topic. Quit any other way and the session still lands in the archive — it just gets the first prompt as its topic line, which makes it harder to recognise later when you are scanning the catalogue. This will be improved in a future update.
+**Some commands take getting used to.** Ending a session with `/sjlog` (or `/clear`) gives it a written one-sentence topic. Quit any other way and the session still lands in the archive with a short title Haiku writes from its prompts — or, when that call cannot be made, its first prompt.
 
 **The scrubjay storage on the central node is a single point of failure.** In future, the central storage should be moved to an off-premise VPS and managed via a distributed database such as Apache Cassandra, which opens up the path to further optimisation. For production environments relying on 100% uptime, this is non-negotiable. See [Archive durability](https://henba1.github.io/scrubjay/durability/index.md) for what protects the archive today.
 
@@ -522,7 +522,7 @@ Escape hatches (env, in `~/.config/scrubjay/config` or inline): `SCRUBJAY_NOSYNC
 
 ## Find a past chat
 
-Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log` (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`) and pushed, so all machines' histories are searchable from any clone of the data repo. The `topic` is the first real prompt — or the slash command the session ran, if you typed nothing — or, if you publish with `/sjlog`, a one-sentence essence the model writes; the trailing `key=value` fields are additive, so older lines simply have fewer:
+Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log` (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`) and pushed, so all machines' histories are searchable from any clone of the data repo. The `topic` is a short title Haiku writes from the session's prompts (`claude -p`, bounded, only when there are prompts it has not titled yet — `prompts=<n>` records how many). Without it (offline, no `claude`, `SCRUBJAY_AI_TOPIC=0`) the topic is the first real prompt, or the slash command the session ran if you typed nothing. A `/sjlog` essence wins over both. When a resumed session's topic changes, a new line is appended and the last one per session counts. The trailing `key=value` fields are additive, so older lines simply have fewer:
 
 ```
 git -C ~/.scrubjay/scrubjay-data pull
@@ -593,7 +593,7 @@ The start of your next session sweeps these up automatically, and says so when i
 
 The automatic pass only considers sessions untouched for 30 minutes (a live session in another terminal is still writing) and modified in the last 14 days, and it does at most 25 per run so a backlog cannot slow a session's startup. `--all` lifts every one of those limits.
 
-A recovered session is dated when it *died*, not when it was recovered, so it sorts into the catalogue where it belongs. The one thing that cannot be recovered is a `/sjlog` essence — the row falls back to the session's first prompt, exactly as the automatic path does.
+A recovered session is dated when it *died*, not when it was recovered, so it sorts into the catalogue where it belongs. Its topic is the session's first prompt: the sweep runs inside session start, so it makes no model call. Resume the session and end it normally to get a model-written one.
 
 ## Find a past chat across every machine
 
@@ -643,6 +643,7 @@ Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-
 | `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                   |
 | `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                      |
 | `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit          |
+| `SCRUBJAY_AI_TOPIC=0`             | don't ask Haiku for the session's topic; use its first prompt     |
 
 ## Re-home the scrubjay clones
 

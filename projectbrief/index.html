@@ -1277,9 +1277,8 @@ storage sees everything in it — including the shared config and memory that ri
 sessions. For a small, trusting team that is the point; where separation matters, the answer today is
 one archive per team or per engagement, not permissions inside one archive.</p>
 <p><strong>Some commands take getting used to.</strong> Ending a session with <code>/sjlog</code> (or <code>/clear</code>) gives it a
-written one-sentence topic. Quit any other way and the session still lands in the archive — it just
-gets the first prompt as its topic line, which makes it harder to recognise later when you are
-scanning the catalogue. This will be improved in a future update.</p>
+written one-sentence topic. Quit any other way and the session still lands in the archive with a
+short title Haiku writes from its prompts — or, when that call cannot be made, its first prompt.</p>
 <p><strong>The scrubjay storage on the central node is a single point of failure.</strong> In future, the central
 storage should be moved to an off-premise VPS and managed via a distributed database such as Apache
 Cassandra, which opens up the path to further optimisation. For production environments relying on
