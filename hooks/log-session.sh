@@ -9,6 +9,9 @@
 #
 # Env knobs:  SCRUBJAY_LOG_NOGIT=1  (append log, skip its git)   CLAUDE_HOST=<name>
 #             SCRUBJAY_NOSHIP=1     (skip transcript relay)
+#             SCRUBJAY_AI_TOPIC=0   (no model-written topic)
+
+[ "${SCRUBJAY_NO_HOOKS:-0}" = "1" ] && exit 0   # set by sj_ai_topic for its own child session
 
 input="$(cat)"
 command -v jq >/dev/null 2>&1 || exit 0

@@ -80,39 +80,47 @@ f="$SANDBOX/side.jsonl"
 assert_eq "sidechain records are skipped" \
   "why is the archive missing yesterday's sessions?" "$(sj_session_topic "$f")"
 
-section "the whole session titles it, not just the first prompt"
+section "lookups never title a session that has prose"
 cmdrec() { rec "<command-name>$1</command-name>
 <command-args>$2</command-args>"; }
 f="$SANDBOX/lookup-then-work.jsonl"
 { cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66
-  rec "re-iterate the steps I need to do before commissioning of the widget is possible"
-  cmdrec /sjget "065f6e66 last couple of turns"
-  rec "merge PR 17 and PR 1"
-  rec "works. what are the 4 different dirs for? run me through step 5"
+  rec "list the steps left before commissioning the widget"
+  cmdrec /sjget "065f6e66 last turns"
+  rec "write a backup script for the postgres dumps"
 } > "$f"
-assert_eq "lookups never title a session with prose; follow-ups add no part" \
-  "re-iterate the steps I need to do before commissioning of the widget is possible" \
-  "$(sj_session_topic "$f")"
+assert_eq "the first prose prompt, not the lookup" \
+  "list the steps left before commissioning the widget" "$(sj_session_topic "$f")"
+assert_eq "mode prompts: every prose prompt, commands skipped" \
+  '["list the steps left before commissioning the widget","write a backup script for the postgres dumps"]' \
+  "$(sj_session_topic "$f" prompts)"
+f2="$SANDBOX/lookups-only.jsonl"
+{ cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66; } > "$f2"
+assert_eq "a commands-only session keeps its first command" "/sjtable head=10" "$(sj_session_topic "$f2")"
+assert_eq "mode prompts: none" "[]" "$(sj_session_topic "$f2" prompts)"
 
-f="$SANDBOX/two-topics.jsonl"
-{ rec "fix the nftables syntax error in the firewall config"
-  rec "yes thanks"
-  rec "now the nftables firewall config reloads cleanly, fix the syntax"
-  rec "write a backup script for the postgres database dumps"
-} > "$f"
-assert_eq "a distinct later prompt becomes a second part" \
-  "fix the nftables syntax error in + write a backup script for the" "$(sj_session_topic "$f")"
-assert_eq "mode first keeps the first prompt (readable filename)" \
-  "fix the nftables syntax error in the firewall config" "$(sj_session_topic "$f" first)"
-
-f="$SANDBOX/smalltalk.jsonl"
-{ rec "fix the nftables syntax error in the firewall config"; rec "works."; rec "yes, merge it"; } > "$f"
-assert_eq "short acknowledgements add no part" \
-  "fix the nftables syntax error in the firewall config" "$(sj_session_topic "$f")"
-
-f="$SANDBOX/lookups-only.jsonl"
-{ cmdrec /sjtable head=10; cmdrec /sjresume 065f6e66; } > "$f"
-assert_eq "a commands-only session keeps its first command" "/sjtable head=10" "$(sj_session_topic "$f")"
+section "sj_ai_topic: a small model titles the session, best-effort"
+stub_claude
+p="$(sj_session_topic "$f" prompts)"
+assert_eq "the model's title, markup stripped" "Retry backoff fix" "$(sj_ai_topic "$p")"
+calls="$(cat "$SANDBOX/claude.calls")"
+assert_contains "asks haiku" "$calls" "--model haiku"
+assert_contains "the child keeps no transcript" "$calls" "--no-session-persistence"
+assert_contains "the child loads no settings, so no hooks" "$calls" "--setting-sources"
+assert_contains "the child carries the hook guard" "$calls" "nohooks=1"
+assert_contains "the digest carries the prose" "$(cat "$SANDBOX/claude.in")" "- write a backup script"
+assert_eq "output is sanitized for the row" "Widget commissioning / plan" \
+  "$(STUB_CLAUDE='Widget commissioning | "plan"' sj_ai_topic "$p")"
+check_fails "a failing call is a failure" env STUB_CLAUDE=fail bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+check_fails "empty output is a failure" env STUB_CLAUDE=empty bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+check_fails "no prompts, no call" sj_ai_topic "[]"
+check_fails "SCRUBJAY_AI_TOPIC=0 opts out" env SCRUBJAY_AI_TOPIC=0 bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+if command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1; then
+  check_fails "a slow call is cut off" env STUB_CLAUDE=slow SCRUBJAY_AI_TOPIC_TIMEOUT=1 \
+    bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+else skip "a slow call is cut off" "no timeout(1)"; fi
+check_fails "no claude on PATH is a failure" env PATH=/usr/bin:/bin bash -c '. "$APP/bin/lib.sh"; sj_ai_topic "[\"x\"]"'
+export SCRUBJAY_AI_TOPIC=0
 
 section "a transcript with nothing to quote still yields nothing"
 f="$SANDBOX/empty.jsonl"

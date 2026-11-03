@@ -31,9 +31,12 @@ The full toggle list is in the [Reference cheatsheet](reference.md#toggle-behavi
 Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log`
 (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`)
 and pushed, so all machines' histories are searchable from any clone of the data repo. The
-`topic` is the first real prompt — or the slash command the session ran, if you typed nothing —
-or, if you publish with `/sjlog`, a one-sentence essence the model writes; the trailing
-`key=value` fields are additive, so older lines simply have fewer:
+`topic` is a short title Haiku writes from the session's prompts (`claude -p`, bounded, only when
+there are prompts it has not titled yet — `prompts=<n>` records how many). Without it (offline, no
+`claude`, `SCRUBJAY_AI_TOPIC=0`) the topic is the first real prompt, or the slash command the
+session ran if you typed nothing. A `/sjlog` essence wins over both. When a resumed session's topic
+changes, a new line is appended and the last one per session counts. The trailing `key=value`
+fields are additive, so older lines simply have fewer:
 
 ```sh
 git -C ~/.scrubjay/scrubjay-data pull

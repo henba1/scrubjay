@@ -238,11 +238,8 @@ sj_detect_harness() {  # sj_detect_harness <transcript>
 # Prose wins over the command, so a session that runs `/clear` and then does real work is still
 # titled by the work.
 #
-# The topic covers the whole session: it starts as the first prose prompt, and a later prompt adds
-# a part (" + ", at most 3, each cut to 6 words) when it has >= 4 content words (lowercase, >= 4
-# chars, no stopword, trailing "s" dropped) and under a quarter of them were said before in the
-# session. Mode `first` returns just the first prompt — the readable filename's, so names stay put.
-sj_session_topic() {  # sj_session_topic <transcript.jsonl> [first]
+# Mode `prompts` emits every prose prompt as a JSON array instead — the input to sj_ai_topic.
+sj_session_topic() {  # sj_session_topic <transcript.jsonl> [prompts]
   jq -rs --arg mode "${2:-}" '
     def clean:
         gsub("(?s)<local-command-caveat>.*?</local-command-caveat>"; "")
@@ -258,14 +255,6 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl> [first]
             then (capture("(?s)<command-args>(?<v>.*?)</command-args>").v | trim) else "" end) as $a
          | if $n == "" then "" elif $a == "" then $n else $n + " " + $a end)
       else "" end;
-    def stop: "this that with from have what when where which there their them then than they will
-      would could should about into also just like make need want please some your okay sure thanks
-      thank does done here more much only over very been were being lets dont through again still
-      after before other these those each actually really think know works";
-    def words: (stop | [splits("\\s+")]) as $s
-      | [ ascii_downcase | scan("[a-z0-9]+") | select(length >= 4)
-          | . as $w | select($s | index($w) == null) | sub("s$"; "") ] | unique;
-    def short: [splits("\\s+")] | .[:6] | join(" ");
     [ .[]
       | select(.type == "user" and .isSidechain != true and .isMeta != true)
       | .message.content
@@ -276,16 +265,7 @@ sj_session_topic() {  # sj_session_topic <transcript.jsonl> [first]
                    and ((startswith("<") or startswith("Caveat")
                          or startswith("[Request interrupted")) | not)) ] ) as $prose
     | ( [ .[] | cmd | select(. != "") ] | first ) as $cmd
-    | if ($prose | length) == 0 then $cmd // ""
-      elif $mode == "first" then $prose[0]
-      else reduce $prose[1:][] as $p ({parts: [$prose[0]], seen: ($prose[0] | words)};
-             . as $st | ($p | words) as $w
-             | ([ $w[] | . as $x | select($st.seen | index($x) != null) ] | length) as $old
-             | (if (.parts | length) < 3 and ($w | length) >= 4 and $old * 4 < ($w | length)
-                then .parts += [$p] else . end)
-             | .seen = (.seen + $w | unique))
-        | if (.parts | length) == 1 then .parts[0] else [ .parts[] | short ] | join(" + ") end
-      end' \
+    | if $mode == "prompts" then $prose | tojson else $prose[0] // $cmd // "" end' \
     "$1" 2>/dev/null | tr '\n\t' '  ' | sed 's/  */ /g; s/^ *//; s/ *$//'
 }
 
@@ -403,7 +383,7 @@ sj_readable_relpath() {  # sj_readable_relpath <transcript> <session_id> [cwd] [
   if ! command -v jq >/dev/null 2>&1; then printf 'misc/%s' "${sid:0:8}"; return; fi
   [ -n "$cwd" ] || cwd="$(jq -rs '[ .[] | select(.cwd!=null) | .cwd ][0] // ""' "$src" 2>/dev/null)"
   project="$(basename "${cwd:-misc}")"; [ -n "$project" ] && [ "$project" != "/" ] || project="misc"
-  [ -n "$topic" ] || topic="$(sj_session_topic "$src" first)"
+  [ -n "$topic" ] || topic="$(sj_session_topic "$src")"
   topic="$(sj_slugify "$topic" 40)"
   [ -n "$topic" ] || topic="session"
   d="$(sj_transcript_date "$src")"
@@ -624,9 +604,20 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   else case "$last" in *' | essence=1'*) return 1 ;; esac; fi
 
   [ -n "$ts" ] || ts="$(date '+%Y-%m-%d %H:%M')"
-  # Topic: prefer the caller's (a model-authored essence from /sjlog); else the session's prompts.
-  # The adapter knows how to read its own transcript format; sj_session_topic is the
-  # Claude/JSONL shape and the fallback for a caller with no adapter loaded (backfill).
+  # Topic: prefer the caller's (a model-authored essence from /sjlog); else a small model's title
+  # of the session's prompts (sj_ai_topic), billed only when there are prompts it has not titled
+  # (prompts=<n>); else the first real user prompt. The adapter knows how to read its own
+  # transcript format; sj_session_topic is the Claude/JSONL shape and the fallback for a caller
+  # with no adapter loaded (backfill).
+  local prompts n aimark=""
+  if [ -z "$topic" ] && [ "$harness" = claude ] && [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ]; then
+    prompts="$(sj_session_topic "$tpath" prompts)"
+    n="$(printf '%s' "$prompts" | jq 'length' 2>/dev/null)" || n=0
+    case "$last" in *" | prompts=$n"|*" | prompts=$n | "*) return 1 ;; esac
+    [ "${n:-0}" -gt 0 ] && topic="$(sj_ai_topic "$prompts")" && aimark=" | prompts=$n"
+    # A failed call never downgrades a model title to the first prompt.
+    if [ -z "$topic" ]; then case "$last" in *" | prompts="*) return 1 ;; esac; fi
+  fi
   if [ -z "$topic" ]; then
     if declare -F sjh_session_topic >/dev/null 2>&1; then topic="$(sjh_session_topic "$tpath")"
     else topic="$(sj_session_topic "$tpath")"; fi
@@ -651,10 +642,29 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
-  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s
-' \
-    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size$essence" \
+  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s\n' \
+    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size$aimark$essence" \
     "${fork:+ | forked_from=$fork}" >> "$log"
+}
+
+# A short title for a session, from a small model reading its prose prompts (JSON array, as
+# `sj_session_topic <f> prompts` emits it). Best-effort and bounded: any failure returns 1 and the
+# caller keeps the deterministic topic. The child loads no settings — so none of scrubjay's hooks
+# — and keeps no transcript; SCRUBJAY_NO_HOOKS=1 is the second lock. SCRUBJAY_AI_TOPIC=0 opts out.
+sj_ai_topic() {  # sj_ai_topic <prompts-json>
+  [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ] && sj_has claude || return 1
+  local digest out
+  digest="$(printf '%s' "$1" | jq -r 'if length > 12 then .[:4] + ["..."] + .[-8:] else . end
+            | map("- " + .[:300]) | join("\n")' 2>/dev/null | head -c 4000)"
+  [ -n "$digest" ] || return 1
+  out="$(cd "${TMPDIR:-/tmp}" && printf '%s\n\n%s\n' \
+    'Title this coding session for a catalogue, from the user prompts below (in order). Reply with the title only: plain text, at most 10 words. If the session genuinely changed subject, name its two or three topics as "X + Y". Never title it by a lookup or slash command.' \
+    "$digest" | SCRUBJAY_NO_HOOKS=1 sj_timeout "${SCRUBJAY_AI_TOPIC_TIMEOUT:-30}" claude -p \
+      --model haiku --no-session-persistence --setting-sources "" --tools "" \
+      --strict-mcp-config --disable-slash-commands 2>/dev/null)" || return 1
+  out="$(printf '%s\n' "$out" | tr -d '*#`' | awk 'NF { print; exit }')"
+  out="$(sj_topic_sanitize "$out")"
+  [ -n "$out" ] && printf '%s' "$out"
 }
 
 # Commit + push EVERYTHING in the data repo. Shared by the session-end hook and sj-reconcile.sh:

@@ -16,7 +16,7 @@ and one catalogue line for `/sjbrowse`), without ending the session.
    ```
 
    `publish-now.sh` runs SessionEnd synchronously and inherits the env, so `SCRUBJAY_TOPIC` becomes
-   the catalogue topic. (Skip step 1 and it falls back to the first user prompt — still valid, just
+   the catalogue topic. (Skip step 1 and it falls back to a short model-written title — still valid, just
    less memorable.)
 
 It prints a step report — a `scrubjay publish · <sid> · <n>s` header and one line per step

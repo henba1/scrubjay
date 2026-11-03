@@ -63,8 +63,8 @@ terminal is still writing) and modified in the last 14 days, and it does at most
 backlog cannot slow a session's startup. `--all` lifts every one of those limits.
 
 A recovered session is dated when it *died*, not when it was recovered, so it sorts into the
-catalogue where it belongs. The one thing that cannot be recovered is a `/sjlog` essence — the row
-falls back to the session's first prompt, exactly as the automatic path does.
+catalogue where it belongs. Its topic is the session's first prompt: the sweep runs inside session
+start, so it makes no model call. Resume the session and end it normally to get a model-written one.
 
 ## Find a past chat across every machine
 
@@ -117,6 +117,7 @@ editing needed:
 | `SCRUBJAY_NOSHIP=1` | end the session without shipping its transcript |
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
+| `SCRUBJAY_AI_TOPIC=0` | don't ask Haiku for the session's topic; use its first prompt |
 
 ## Re-home the scrubjay clones
 
