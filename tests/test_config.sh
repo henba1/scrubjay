@@ -33,6 +33,17 @@ first="$(cat "$cfg")"
 sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
 assert_eq "a second apply changes nothing" "$first" "$(cat "$cfg")"
 
+section "opencode: the TUI plugin lands in tui.json, beside the user's own"
+tcfg="$OPENCODE_CONFIG_DIR/tui.json"
+check "tui plugin was added"         bash -c 'jq -e ".plugin | map(test(\"scrubjay-tui.tsx\")) | any" "$1" >/dev/null' _ "$tcfg"
+printf '{"theme":"x","plugin":["their-tui"]}\n' > "$tcfg"
+sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
+check "user's own tui plugin survives" bash -c 'jq -e ".plugin | index(\"their-tui\")" "$1" >/dev/null' _ "$tcfg"
+check "user's tui keys survive"      bash -c 'jq -e ".theme == \"x\"" "$1" >/dev/null' _ "$tcfg"
+tfirst="$(cat "$tcfg")"
+sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
+assert_eq "a second apply leaves tui.json alone" "$tfirst" "$(cat "$tcfg")"
+
 section "opencode: an unparseable config is refused, not clobbered"
 printf '{ this is not json ' > "$cfg"
 sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
