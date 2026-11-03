@@ -90,6 +90,7 @@ sjh_extra_artifacts() { :; }
 #   * shared + per-host settings   (opencode.json, deep-merged under your own keys)
 #   * the shared instructions      (opencode.json `instructions` -> <data>/shared/AGENTS.md)
 #   * the lifecycle bridge plugin  (opencode.json `plugin`)
+#   * the TUI plugin               (tui.json `plugin`: /sj* commands drawn in scrubjay blue)
 #   * the sjmcp archive server     (opencode.json `mcp`)   -> /sjrecall & co. work INSIDE opencode
 #   * the /sj* + personal commands (commands/*.md)
 #   * agents                       (agent/*.md, translated from claude-md/agents + native ones)
@@ -302,6 +303,20 @@ _sjh_oc_instructions_json() {  # _sjh_oc_instructions_json <data>
   if [ -n "$data" ] && [ -f "$f" ]; then jq -n --arg p "$f" '[$p]'; else printf '[]'; fi
 }
 
+# The TUI plugin lives in tui.json's own `plugin` array (opencode keeps TUI config apart from
+# opencode.json). Same rule as the bridge: point at the file in the app repo, union with yours.
+_sjh_oc_tui() {  # _sjh_oc_tui <tui.json>
+  local f="$1" p tmp
+  p="$(sj_app)/hooks/opencode/scrubjay-tui.tsx"
+  [ -f "$p" ] || return 0
+  [ -f "$f" ] || echo '{"$schema":"https://opencode.ai/tui.json"}' > "$f"
+  if ! jq empty "$f" 2>/dev/null; then echo "  SKIP  $f is not valid JSON (refusing to overwrite)"; return 0; fi
+  tmp="$(mktemp)" || return 1
+  jq --arg p "$p" '.plugin = ((.plugin // []) + [$p] | unique)' "$f" > "$tmp" || { rm -f "$tmp"; return 1; }
+  if cmp -s "$tmp" "$f"; then echo "  ok    tui plugin"; rm -f "$tmp"
+  else mv "$tmp" "$f"; echo "  wrote $f  (tui plugin)"; fi
+}
+
 sjh_apply_config() {
   local cfgdir cfg tmp mcp data basejson hostjson instr
   cfgdir="$(sjh_config_dir)"
@@ -353,6 +368,7 @@ sjh_apply_config() {
   if cmp -s "$tmp" "$cfg"; then echo "  ok    settings + plugin + mcp"; rm -f "$tmp"
   else mv "$tmp" "$cfg"; echo "  wrote $cfg  (settings + plugin$([ -n "$mcp" ] && echo ' + mcp sjmcp'))"; fi
 
+  _sjh_oc_tui "$cfgdir/tui.json"
   _sjh_oc_commands "$cfgdir/commands" "$data/claude-md/commands"
   _sjh_oc_agents   "$cfgdir/agent"
   _sjh_oc_skills   "$cfgdir/skills"

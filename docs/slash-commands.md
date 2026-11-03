@@ -50,3 +50,9 @@ including the SessionStart sync, which otherwise fails unseen.
 ```
 /plugin install scrubjay-ui --marketplace henba1/scrubjay
 ```
+
+Both draw scrubjay in one blue, so an `/sj*` command stands apart from an ordinary turn. The mod
+paints `/sj…` blue as you type it and draws the sent prompt in blue under a `◆ scrubjay` tag.
+opencode's TUI plugin API cannot restyle the transcript, so there `hooks/opencode/scrubjay-tui.tsx`
+(registered in `tui.json` by `/sjsync`) shows a blue `◆ scrubjay /sj…` badge beside the prompt while
+the command runs, and lists the session's `/sj*` commands in the sidebar.

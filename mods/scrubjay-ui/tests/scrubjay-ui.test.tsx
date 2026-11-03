@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from 'claude-code/testing'
 
-import { argsLine, parseRun, reportOf, scriptOf, summarize } from '../hooks/parse'
+import { argsLine, parseRun, reportOf, scriptOf, sjCommandOf, sjSpanOf, summarize } from '../hooks/parse'
 
 const RECALL = 'mcp__sjmcp__sj_recall'
 
@@ -187,4 +187,41 @@ describe('only a command that runs a script is drawn as one', () => {
       expect(scriptOf(cmd)).toBe(null)
     }
   })
+})
+
+describe('scrubjay commands', () => {
+  test('a typed /sj command and its arguments', async () => {
+    expect(sjCommandOf('/sjtable head=10')).toEqual({ name: 'sjtable', args: 'head=10' })
+    expect(sjCommandOf('/sjsync')).toEqual({ name: 'sjsync', args: '' })
+  })
+
+  test('the stored shape of an expanded command', async () => {
+    const stored = '<command-message>sjtable</command-message>\n<command-name>/sjtable</command-name>\n<command-args>head=10</command-args>'
+    expect(sjCommandOf(stored)).toEqual({ name: 'sjtable', args: 'head=10' })
+  })
+
+  test('ordinary prompts and other commands are not scrubjay', async () => {
+    expect(sjCommandOf('fix the sjtable column widths')).toBe(null)
+    expect(sjCommandOf('/simplify')).toBe(null)
+    expect(sjCommandOf('/sjtablex2')).toBe(null)
+  })
+
+  test('the draft span covers the command word only', async () => {
+    expect(sjSpanOf('/sjtable head=10')).toEqual({ start: 0, end: 8 })
+    expect(sjSpanOf('/sj')).toEqual({ start: 0, end: 3 })
+    expect(sjSpanOf('/simplify')).toBe(null)
+    expect(sjSpanOf('see /sjtable')).toBe(null)
+  })
+})
+
+test('a scrubjay prompt row is drawn in blue under a scrubjay tag', async $ => {
+  const ui = await $.ui.mount({
+    plugin: 'scrubjay-ui',
+    surface: 'terminal',
+    component: 'UserMessage',
+    props: { text: '/sjtable head=10', origin: { kind: 'composer' }, isExpanded: false },
+  })
+  expect(await ui.find({ type: 'Text', text: '/sjtable' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /scrubjay/ })).toBeDefined()
+  await ui.unmount()
 })

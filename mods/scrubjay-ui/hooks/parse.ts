@@ -243,3 +243,29 @@ export function reportOf(stdout: string): Report | null {
 
   return { header: lines[at] ?? '', steps, rest }
 }
+
+// scrubjay's own colour: one blue for every row, band and prompt it draws, so a scrubjay command
+// stands apart from an ordinary turn. A fixed value, not a theme key — no theme key is reliably blue.
+export const SJ_BLUE = '#4f8ff7'
+
+// `/sj<name> [args]` as typed, or as the engine stores an expanded command
+// (`<command-name>/sjtable</command-name><command-args>head=10</command-args>`).
+export type SjCommand = { name: string; args: string }
+export function sjCommandOf(text: string): SjCommand | null {
+  const typed = /^\s*\/(sj[a-z]+)(?=\s|$)\s*([\s\S]*)$/.exec(text)
+  if (typed) return { name: typed[1] ?? '', args: (typed[2] ?? '').trim() }
+  const stored = /<command-name>\/?(sj[a-z]+)<\/command-name>/.exec(text)
+  if (!stored) return null
+  const args = /<command-args>([\s\S]*?)<\/command-args>/.exec(text)?.[1] ?? ''
+
+  return { name: stored[1] ?? '', args: args.trim() }
+}
+
+// The span of a leading `/sj<name>` in a prompt draft, to paint while it is typed.
+export function sjSpanOf(draft: string): { start: number; end: number } | null {
+  const m = /^(\s*)(\/sj[a-z]*)(?=\s|$)/.exec(draft)
+  if (!m) return null
+  const start = (m[1] ?? '').length
+
+  return { start, end: start + (m[2] ?? '').length }
+}

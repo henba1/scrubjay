@@ -12,7 +12,20 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import type { SjActivity, SjRun } from '../types'
-import { ICON, argsLine, isSjmcp, parseRun, reportOf, scriptOf, spinner, summarize, verbOf } from './parse'
+import {
+  ICON,
+  SJ_BLUE,
+  argsLine,
+  isSjmcp,
+  parseRun,
+  reportOf,
+  scriptOf,
+  sjCommandOf,
+  sjSpanOf,
+  spinner,
+  summarize,
+  verbOf,
+} from './parse'
 import type { Tone } from './parse'
 
 const runAtom = atom({ plugin: 'scrubjay-ui', key: 'run' } as const, null)
@@ -20,6 +33,7 @@ const activityAtom = atom({ plugin: 'scrubjay-ui', key: 'activity' } as const, n
 
 const OPS = ['publish', 'sync'] as const
 const COMMAND: Record<string, string> = { sjlog: 'publish', sjsync: 'sync' }
+const PERSON = new Set(['composer', 'bridge', 'unclassified'])
 const POLL_MS = 250
 const LINGER_MS = 5000 // the finished run stays on the band this long
 const GIVE_UP_MS = 90_000 // a watch that never sees its run begin stops
@@ -179,8 +193,10 @@ export const register: Register = on => {
 
       return (
         <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
-          <Text color="claude">◆</Text>
-          <Text bold>scrubjay {run.op}</Text>
+          <Text color={SJ_BLUE}>◆</Text>
+          <Text bold color={SJ_BLUE}>
+            scrubjay {run.op}
+          </Text>
           {run.steps.map(s => (
             <Text key={s.name}>
               <Text color={STEP_COLOR[s.state]}>{s.state === 'run' ? spinner(run.now) : ICON[s.state]}</Text>
@@ -196,8 +212,10 @@ export const register: Register = on => {
 
       return (
         <Box flexDirection="row" columnGap={1}>
-          <Text color="claude">◆</Text>
-          <Text bold>scrubjay {activity.command}</Text>
+          <Text color={SJ_BLUE}>◆</Text>
+          <Text bold color={SJ_BLUE}>
+            scrubjay {activity.command}
+          </Text>
           <Text color={TONE_COLOR[activity.tone]}>{isLive ? '→' : activity.tone === 'error' ? '✗' : '✓'}</Text>
           <Text dimColor wrap="truncate-end">
             {activity.line}
@@ -207,6 +225,43 @@ export const register: Register = on => {
     }
 
     return next(e)
+  })
+
+  // ── scrubjay commands, told apart from ordinary turns ───────────────────────────────────────
+  // While typed: a leading `/sj<name>` is painted blue in the draft.
+  on('prompt.edit', async ($, e, next) => {
+    const r = await next(e)
+    const span = sjSpanOf(r.text)
+    if (!span) return r
+
+    return { ...r, decorations: [...(r.decorations ?? []), { ...span, color: SJ_BLUE, bold: true }] }
+  }).catch(($, e, next) => next(e))
+
+  // Once sent: the prompt row is drawn in blue under a scrubjay tag.
+  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
+    const p = e.props
+    // The person's own prompts: typed here, sent over Remote Control, or stored before stamps.
+    if (!PERSON.has(p.origin.kind)) return next(e)
+    const cmd = sjCommandOf(p.text)
+    if (!cmd) return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+
+    return (
+      <Box flexDirection="row" columnGap={1}>
+        <Text color={SJ_BLUE}>❯</Text>
+        <Text bold color={SJ_BLUE}>
+          /{cmd.name}
+        </Text>
+        {cmd.args !== '' && (
+          <Text color={SJ_BLUE} wrap="truncate-end">
+            {cmd.args}
+          </Text>
+        )}
+        <Text color={SJ_BLUE} dimColor>
+          ◆ scrubjay
+        </Text>
+      </Box>
+    )
   })
 
   // ── the transcript rows ─────────────────────────────────────────────────────────────────────
@@ -237,7 +292,7 @@ export const register: Register = on => {
         </Text>
         <Text bold>{verb}</Text>
         {args !== '' && <Text wrap="truncate-end">({args})</Text>}
-        <Text dimColor> · scrubjay</Text>
+        <Text color={SJ_BLUE}> · scrubjay</Text>
       </Box>
     )
   })
