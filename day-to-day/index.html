@@ -953,9 +953,14 @@
 <td><code>git pull --ff-only</code> <strong>both</strong> repos (data <em>and</em> app, so hook/script fixes propagate too), then <code>claude-sync.sh</code> — config edited on another machine arrives and applies itself.</td>
 </tr>
 <tr>
+<td>every <strong>turn</strong></td>
+<td><code>log-session.sh</code></td>
+<td>relay the transcript so far and push memory; the first turn also writes the log line and pushes the data repo. A crashed or killed session is archived up to its last finished turn.</td>
+</tr>
+<tr>
 <td>session <strong>end</strong></td>
 <td><code>log-session.sh</code></td>
-<td>append the log line, refresh <code>chats.index.json</code>, then <code>git add -A</code> + commit + push the <strong>whole</strong> data repo — <code>memory/</code>, <code>templates/</code>, host config and all. Nothing needs a manual sync.</td>
+<td>append (or refresh) the log line, refresh <code>chats.index.json</code>, then <code>git add -A</code> + commit + push the <strong>whole</strong> data repo — <code>memory/</code>, <code>templates/</code>, host config and all. Nothing needs a manual sync.</td>
 </tr>
 </tbody>
 </table>

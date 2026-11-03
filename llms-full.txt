@@ -504,10 +504,11 @@ Moving the machinery (e.g. out of `~/code` into `~/.scrubjay`) is machine-local 
 
 Both housekeeping scripts run automatically via hooks, so you never update anything manually:
 
-| When              | Hook              | Does                                                                                                                                                                                    |
-| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| session **start** | `sync-session.sh` | `git pull --ff-only` **both** repos (data *and* app, so hook/script fixes propagate too), then `claude-sync.sh` — config edited on another machine arrives and applies itself.          |
-| session **end**   | `log-session.sh`  | append the log line, refresh `chats.index.json`, then `git add -A` + commit + push the **whole** data repo — `memory/`, `templates/`, host config and all. Nothing needs a manual sync. |
+| When              | Hook              | Does                                                                                                                                                                                                 |
+| ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| session **start** | `sync-session.sh` | `git pull --ff-only` **both** repos (data *and* app, so hook/script fixes propagate too), then `claude-sync.sh` — config edited on another machine arrives and applies itself.                       |
+| every **turn**    | `log-session.sh`  | relay the transcript so far and push memory; the first turn also writes the log line and pushes the data repo. A crashed or killed session is archived up to its last finished turn.                 |
+| session **end**   | `log-session.sh`  | append (or refresh) the log line, refresh `chats.index.json`, then `git add -A` + commit + push the **whole** data repo — `memory/`, `templates/`, host config and all. Nothing needs a manual sync. |
 
 `git add -A` is safe because the data repo's `.gitignore` blocks secrets and transcripts (`*.credentials*`, `*.jsonl`, `.claude.json`), so those can never be staged.
 
@@ -647,15 +648,16 @@ claude --resume <sid>                              # …or /resume inside a sess
 
 Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-off) — no file editing needed:
 
-| Env var                           | Effect                                                            |
-| --------------------------------- | ----------------------------------------------------------------- |
-| `SCRUBJAY_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`) |
-| `SCRUBJAY_NOSYNC=1`               | skip the start-of-session pull + sync entirely                    |
-| `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                          |
-| `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                   |
-| `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                      |
-| `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit          |
-| `SCRUBJAY_AI_TOPIC=0`             | don't ask Haiku for the session's topic; use its first prompt     |
+| Env var                           | Effect                                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| `SCRUBJAY_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`)                             |
+| `SCRUBJAY_NOSYNC=1`               | skip the start-of-session pull + sync entirely                                                |
+| `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                                                      |
+| `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                                               |
+| `SCRUBJAY_TURN_PUBLISH=0`         | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
+| `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                                                  |
+| `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit                                      |
+| `SCRUBJAY_AI_TOPIC=0`             | don't ask Haiku for the session's topic; use its first prompt                                 |
 
 ## Re-home the scrubjay clones
 
