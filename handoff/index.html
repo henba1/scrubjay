@@ -1178,6 +1178,10 @@ what the other host's paths get rewritten <em>to</em>.</p>
 <td><code>--no-rewrite-paths</code></td>
 <td>Install the archive copy <strong>verbatim</strong>. For inspecting a transcript as it was recorded; a session staged this way still points at the other machine's paths.</td>
 </tr>
+<tr>
+<td><code>--json</code></td>
+<td>For a program driving the hand-off (an editor's session list): stdout is exactly one JSON object — <code>mode</code> (<code>native</code> or <code>context</code>), <code>sid</code>, <code>src_host</code>, <code>src_harness</code>, <code>tgt_harness</code>, <code>cwd</code>, <code>cmd</code>, plus <code>staged</code>/<code>installed</code> or <code>primer</code> — or <code>{"ok":false,"error":…}</code>; the narration goes to stderr. With <code>--list</code> it prints the <strong>whole</strong> catalogue as JSON lines, this host's sessions too (<code>"here": true</code>).</td>
+</tr>
 </tbody>
 </table>
 <p>An 8-hex prefix is enough, but only if it is unambiguous: if the prefix matches more than one
