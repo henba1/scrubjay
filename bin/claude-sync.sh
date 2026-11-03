@@ -256,6 +256,17 @@ if [ -e "$PLUG_DST" ] && [ ! -L "$PLUG_DST" ]; then
   mkdir -p "$(dirname "$PLUG_SRC")"; cp -f "$PLUG_DST" "$PLUG_SRC"; rm -f "$PLUG_DST"
 fi
 [ -d "$CLAUDE_DIR/plugins" ] && link "$PLUG_SRC" "$PLUG_DST"
+# The clean filter below keeps `lastUpdated` out of commits, so a checkout has none — and Claude Code
+# refuses a marketplace entry without one ("configuration file is corrupted"), failing every
+# /plugin command. Restore a placeholder in the working copy only: the filter strips it again, so
+# the repo is unchanged, and the old date just makes Claude Code refresh and write the real one.
+if [ -f "$PLUG_SRC" ] && command -v jq >/dev/null 2>&1 \
+   && jq -e 'type == "object" and ([.[] | objects | select(has("lastUpdated") | not)] | length > 0)' \
+        "$PLUG_SRC" >/dev/null 2>&1; then
+  plug_tmp="$(mktemp)" && jq 'map_values(if type == "object" then .lastUpdated //= "1970-01-01T00:00:00.000Z" else . end)' \
+    "$PLUG_SRC" > "$plug_tmp" && cat "$plug_tmp" > "$PLUG_SRC"
+  rm -f "${plug_tmp:-}"
+fi
 
 # Register the clean filter that <data>/.gitattributes references for known_marketplaces.json,
 # so the harness's per-machine `lastUpdated` timestamp never reaches a commit and the file stays
