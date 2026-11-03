@@ -80,4 +80,25 @@ SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.s
 line="$(grep "session=$sid6" "$LOG")"
 assert_contains "the row carries the origin cwd" "$line" "| /home/user/widget-api |"
 
+section "a branched session records its parent; nothing else does"
+# /branch stamps every copied record with forkedFrom.sessionId. A plain, resumed (same file) or
+# /compact-ed (logicalParentUuid, same session) transcript carries no such field.
+sid7="77777777-2222-4333-8444-555555555555"
+cp "$FIXTURES/claude-branched.jsonl" "$proj/$sid7.jsonl"
+SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(payload "$sid7")"
+line="$(grep "session=$sid7" "$LOG")"
+assert_contains "fork carries forked_from" "$line" "| forked_from=$sid"
+assert_eq "plain session has no forked_from" "0" "$(grep "session=$sid " "$LOG" | grep -c forked_from)"
+sid8="88888888-2222-4333-8444-555555555555"
+{ cat "$FIXTURES/claude-session.jsonl"
+  printf '{"parentUuid":null,"logicalParentUuid":"aaaaaaaa-0000-4000-8000-000000000002","uuid":"cccccccc-0000-4000-8000-000000000001","sessionId":"%s","type":"system","subtype":"compact_boundary","cwd":"/home/user/widget-api"}\n' "$sid8"
+} > "$proj/$sid8.jsonl"
+SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(payload "$sid8")"
+assert_eq "compacted session has no forked_from" "0" "$(grep "session=$sid8" "$LOG" | grep -c forked_from)"
+
+"$APP/bin/sj-catalogue.sh" --no-pull >/dev/null 2>&1
+assert_contains "catalogue marks the fork" "$(grep "${sid7:0:8}" "$SCRUBJAY_DATA/logs/CATALOGUE.md")" "⑂${sid:0:8} "
+
 finish

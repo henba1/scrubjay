@@ -89,18 +89,20 @@ awk -F' *\\| *' -v OFS='\t' '
     return b "B"
   }
   {
-    sid = ""; harness = ""; model = ""; turns = ""; size = ""
+    sid = ""; harness = ""; model = ""; turns = ""; size = ""; fork = ""
     for (i = 5; i <= NF; i++) {
       if      ($i ~ /^session=/) sid     = substr($i, 9)
       else if ($i ~ /^harness=/) harness = substr($i, 9)
       else if ($i ~ /^model=/)   model   = substr($i, 7)
       else if ($i ~ /^turns=/)   turns   = substr($i, 7)
       else if ($i ~ /^size=/)    size    = substr($i, 6)
+      else if ($i ~ /^forked_from=/) fork = substr($i, 13, 8)
     }
     if (sid == "") next                       # not a session line (README prose, blank, …)
 
     topic = $4; gsub(/^"|"$/, "", topic)
     if (topic == "(no text)") topic = ""      # never summarized — blank beats a fake topic
+    if (fork != "") topic = "⑂" fork " " topic  # branched from session <fork>
 
     cwd = $3; sub(/\/+$/, "", cwd)
     project = cwd; sub(/^.*\//, "", project)

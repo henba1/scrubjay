@@ -288,6 +288,7 @@ class LogEntry:
     model: str = ""
     turns: str = ""
     size: str = ""
+    forked_from: str = ""  # parent session id, when this one was branched off it
 
     @property
     def sid8(self) -> str:
@@ -309,7 +310,8 @@ def _parse_log_line(line: str) -> LogEntry | None:
     return LogEntry(m.group("date"), m.group("time"), m.group("host").strip(),
                     m.group("cwd").strip(), topic, m.group("sid").strip(),
                     harness=extra.get("harness", ""), model=extra.get("model", ""),
-                    turns=extra.get("turns", ""), size=extra.get("size", ""))
+                    turns=extra.get("turns", ""), size=extra.get("size", ""),
+                    forked_from=extra.get("forked_from", ""))
 
 
 def _logs_dir(r: Roots) -> Path | None:
@@ -591,7 +593,8 @@ def core_list(type=None, host=None, project=None, since=None, until=None, limit=
             rows.append({"type": "log", "host": e.host, "project": e.project, "date": e.date,
                          "time": e.time, "topic": e.topic, "sid": e.sid8, "cwd": e.cwd,
                          "harness": e.harness, "model": e.model, "turns": e.turns,
-                         "size": _fmt_bytes(_size_bytes(e.size)) if e.size else ""})
+                         "size": _fmt_bytes(_size_bytes(e.size)) if e.size else "",
+                         **({"forked_from": _handle(e.forked_from)} if e.forked_from else {})})
         skey, sord = _sort_rows(rows, sort, order)
         total = len(rows)
         rows = rows[off: off + lim] if lim else rows[off:]
