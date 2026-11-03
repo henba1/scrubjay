@@ -88,6 +88,12 @@ sjh_session_meta() {  # sjh_session_meta <transcript.jsonl>
     "$1" 2>/dev/null || printf '\t0'
 }
 
+# The session this one was branched from (`/branch`), else empty. Claude stamps every copied record
+# with `forkedFrom.sessionId`, so the first hit suffices. `--fork-session` writes no such pointer.
+sjh_session_parent() {  # sjh_session_parent <transcript.jsonl>
+  jq -rn 'first(inputs | .forkedFrom.sessionId? // empty | strings)' "$1" 2>/dev/null
+}
+
 # Is <file> a Claude Code transcript? JSONL whose records carry Claude's own `sessionId` (which
 # neither a codex rollout — it nests session_id under .payload — nor an opencode export has at the
 # top level). Only the head is read: a transcript can be tens of MB.

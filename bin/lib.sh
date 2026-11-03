@@ -615,12 +615,17 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # One writer of the "safe in a row" rule, so the backfill path cannot drift from this one.
   topic="$(sj_topic_sanitize "$topic")"
   size="$(sj_size "$tpath")" || size=0
+  # Lineage: only a forked session carries `forked_from=`, and only an id-shaped one.
+  local fork=""
+  declare -F sjh_session_parent >/dev/null 2>&1 && fork="$(sjh_session_parent "$tpath")"
+  case "$fork" in *[!0-9A-Za-z_-]*) fork="" ;; esac
 
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
-  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s\n' \
-    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" >> "$log"
+  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s\n' \
+    "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size" \
+    "${fork:+ | forked_from=$fork}" >> "$log"
 }
 
 # Commit + push EVERYTHING in the data repo. Shared by the session-end hook and sj-reconcile.sh:

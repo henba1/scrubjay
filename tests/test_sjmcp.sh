@@ -124,6 +124,8 @@ json.dump({
     "turns_asc": [r["turns"] for r in byturns["items"]],
     "bogus_sort": bogus["sort"],
     "mixed_type": mixed["items"][0].get("type", ""),
+    "forked_from": m._parse_log_line('2026-03-09 08:12 | h | /p | "t" | session=77777777-2222 | '
+                                     'harness=claude | size=1 | forked_from=11111111-2222').forked_from,
     "get_truncated": get.get("truncated", False), "get_chars": len(get["content"]),
     "get_total_lines": get["total_lines"], "get_total_turns": get.get("total_turns"),
     "get_hint": get["hint"], "get_ends_clean": get["content"].endswith("\n"),
@@ -178,6 +180,7 @@ assert_contains "fields=full brings harness back" "$(j '.full_keys | join(",")')
 # The type filter is an argument the caller just passed; echoing it back per row is pure cost.
 assert_eq "a type-filtered row does not echo the filter" "" "$(j '.default_keys | index("type") // ""')"
 assert_eq "an unfiltered list still names each row's type" "transcript" "$(j .mixed_type)"
+assert_eq "a catalogue row's forked_from is parsed" "11111111-2222" "$(j .forked_from)"
 # Same 20 rows, both shapes — the only variable is the row.
 check "a compact page is materially smaller than a full one" \
   bash -c '[ "$1" -lt "$(( $2 * 3 / 4 ))" ]' _ "$(j .compact_chars)" "$(j .full_chars)"

@@ -39,6 +39,7 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_session_topic <transcript>` | first real user prompt, one line of plain text |
 | `sjh_session_cwd <transcript>` | the working dir recorded inside the transcript |
 | `sjh_session_meta <transcript>` | catalogue metadata as TSV `<model>\t<turns>`, in one pass (fields empty when the transcript doesn't carry them) |
+| `sjh_session_parent <transcript>` | **optional.** The session id this one was forked/branched from, else empty; becomes the row's `forked_from=` field. Only Claude implements it. |
 | `sjh_render <transcript>` | the readable Markdown rendering, on stdout |
 | `sjh_extra_artifacts <transcript> <sid> <slug> <cwd>` | TSV of the session's *other* records to relay (below) |
 | `sjh_find_live_transcript <cwd>` | the in-progress session's transcript, for a publish-now with no hook payload (empty if the harness has none on disk) |
