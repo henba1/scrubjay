@@ -171,7 +171,7 @@ bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "a missing lastUpdated is restored"  bash -c 'jq -e ".m1.lastUpdated | type == \"string\"" "$1" >/dev/null' _ "$km"
 check "a present lastUpdated is kept"     bash -c 'jq -e ".m2.lastUpdated == \"2026-11-01T00:00:00.000Z\"" "$1" >/dev/null' _ "$km"
 check "the source survives"               bash -c 'jq -e ".m1.source.repo == \"o/r\"" "$1" >/dev/null' _ "$km"
-check "~/.claude still links to it"       test -L "$CLAUDE_CONFIG_DIR/plugins/known_marketplaces.json"
+check "the claude dir still links to it"     test -L "$CLAUDE_CONFIG_DIR/plugins/known_marketplaces.json"
 
 section "opencode: skills are linked into opencode's own dir too"
 mkdir -p "$SCRUBJAY_DATA/claude-md/skills/deploy"
