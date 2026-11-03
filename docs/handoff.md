@@ -127,6 +127,7 @@ sj-resume.sh <sid|sid8>        # stage it into the project dir you're standing i
 | `--into <dir>` | The project lives somewhere else here. Stage against `<dir>` instead of `$PWD`. |
 | `--force` | Import even when the local copy is **longer** than the archive's. The refusal exists to protect unpublished turns — prefer `/sjlog` on the other machine first. The overwritten file is still backed up to `<sid>.jsonl.bak`. |
 | `--no-rewrite-paths` | Install the archive copy **verbatim**. For inspecting a transcript as it was recorded; a session staged this way still points at the other machine's paths. |
+| `--json` | For a program driving the hand-off (an editor's session list): stdout is exactly one JSON object — `mode` (`native` or `context`), `sid`, `src_host`, `src_harness`, `tgt_harness`, `cwd`, `cmd`, plus `staged`/`installed` or `primer` — or `{"ok":false,"error":…}`; the narration goes to stderr. With `--list` it prints the **whole** catalogue as JSON lines, this host's sessions too (`"here": true`). |
 
 An 8-hex prefix is enough, but only if it is unambiguous: if the prefix matches more than one
 *distinct* session the script lists them and stops, rather than guess which conversation you meant.

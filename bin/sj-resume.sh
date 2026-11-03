@@ -5,8 +5,18 @@
 # Cross-host session hand-off: stage an archived session from ANOTHER machine into this one's
 # ~/.claude/projects/, so Claude Code's own `--resume` / `/resume` picker can continue it here.
 #
-#   usage: sj-resume.sh <sid|sid8> [--into <dir>] [--no-rewrite-paths] [--force]
-#          sj-resume.sh --list [n]
+#   usage: sj-resume.sh <sid|sid8> [--into <dir>] [--no-rewrite-paths] [--force] [--json]
+#          sj-resume.sh --list [n] [--json]
+#
+# --json is for programs that drive a hand-off for the user (an editor's session list): the narration
+# moves to stderr and stdout carries exactly one JSON object describing the outcome —
+#   {"ok":true,"mode":"native","sid":…,"src_host":…,"src_harness":…,"tgt_harness":…,"cwd":…,
+#    "staged":…,"installed":true|false,"cmd":…}
+#   {"ok":true,"mode":"context",…,"primer":<rendered transcript>,"cmd":…}
+#   {"ok":false,"error":…}
+# With --list it prints the WHOLE catalogue as JSON lines (this host's sessions too, marked "here"),
+# {"ts","host","sid","sid8","cwd","topic","harness","here"} — the human list filters to other hosts
+# because a hand-off is from elsewhere, but a front-end lists every session and decides itself.
 #
 # Why this is small: `claude --resume <sid>` reads exactly ONE file —
 # ~/.claude/projects/<slug>/<sid>.jsonl — and scrubjay already archives that file byte-for-byte at
@@ -39,7 +49,12 @@ APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tgt_harness="$(sj_harness)"
 sj_load_adapter "$tgt_harness" || exit 1
 
-die()  { echo "sj-resume: $*" >&2; exit 1; }
+json=0
+die()  {
+  echo "sj-resume: $*" >&2
+  [ "$json" -eq 1 ] && jq -nc --arg e "$*" '{ok:false, error:$e}' >&3
+  exit 1
+}
 warn() { echo "  !  $*" >&2; }
 ok()   { echo "  ✓  $*"; }
 info() { echo "     $*"; }
@@ -58,15 +73,34 @@ while [ $# -gt 0 ]; do
     --import)           do_import=1 ;;
     --no-import)        do_import=0 ;;
     --force)            force=1 ;;
+    --json)             json=1 ;;
     -*)                 die "unknown flag '$1'" ;;
     *)                  sid="$1" ;;
   esac
   shift
 done
 
+# --json: fd 3 is the one JSON answer; everything a human reads goes to stderr.
+if [ "$json" -eq 1 ]; then exec 3>&1 1>&2; fi
+emit() {  # emit <jq-filter> [--arg k v …]  — the JSON answer, once, to fd 3
+  [ "$json" -eq 1 ] || return 0
+  local filter="$1"; shift
+  jq -nc "$@" --arg sid "$full_sid" --arg src_host "$src_host" --arg src_harness "$src_harness" \
+    --arg tgt_harness "$tgt_harness" --arg cwd "$dest_cwd" \
+    "{ok:true, sid:\$sid, src_host:\$src_host, src_harness:\$src_harness, tgt_harness:\$tgt_harness, cwd:\$cwd} + ($filter)" >&3
+}
+
 # --- the catalogue ----------------------------------------------------------------------------
 # logs/<host>.log in the data repo already records every session that ever ended, on every machine,
 # and rides git to this one — so "what can I resume?" needs no network at all.
+if [ "$list" -eq 1 ] && [ "$json" -eq 1 ]; then
+  # one jq over the whole TSV — a jq per row took 20 s for ~800 sessions on a Raspberry Pi
+  sj_log_catalogue | jq -R -c --arg me "$(sj_host)" '
+    split("\t") | select(length >= 3 and .[2] != "")
+    | {ts:.[0], host:.[1], sid:.[2], sid8:.[2][0:8], cwd:.[3], topic:(.[4] // ""),
+       harness:(if (.[5] // "-") == "-" or .[5] == "" then null else .[5] end), here:(.[1] == $me)}' >&3
+  exit 0
+fi
 if [ "$list" -eq 1 ]; then
   me="$(sj_host)"
   printf '%-10s  %-9s  %-8s  %-20s  %s\n' HOST HARNESS SID PROJECT TOPIC
@@ -238,6 +272,8 @@ if [ "$src_harness" != "$tgt_harness" ]; then
   echo
   echo "      $(sjh_context_cmd "$primer" "$src_host" "$src_harness")"
   echo
+  emit '{mode:"context", primer:$primer, cmd:$cmd}' --arg primer "$primer" \
+    --arg cmd "$(sjh_context_cmd "$primer" "$src_host" "$src_harness")"
   info "this carries the conversation, not the session id — tool history and /rewind stay behind."
   info "to continue it natively instead, run this from a $src_harness session."
   exit 0
@@ -306,6 +342,8 @@ echo
 echo "      $(sjh_resume_cmd "$full_sid" "$dest" "$installed")"
 echo
 echo "  (or, inside a session in this directory, run /resume and pick ${full_sid:0:8}.)"
+emit '{mode:"native", staged:$staged, installed:($installed == "1"), cmd:$cmd}' --arg staged "$dest" \
+  --arg installed "$installed" --arg cmd "$(sjh_resume_cmd "$full_sid" "$dest" "$installed")"
 if [ "$tgt_harness" = claude ]; then
   echo "  To branch instead of continue:  claude --resume $full_sid --fork-session"
 fi
