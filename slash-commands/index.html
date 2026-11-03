@@ -1052,6 +1052,11 @@ JSON, the live steps of a publish or sync above the prompt, and a toast when a s
 including the SessionStart sync, which otherwise fails unseen.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/plugin install scrubjay-ui --marketplace henba1/scrubjay
 </code></pre></div>
+<p>Both draw scrubjay in one blue, so an <code>/sj*</code> command stands apart from an ordinary turn. The mod
+paints <code>/sj…</code> blue as you type it and draws the sent prompt in blue under a <code>◆ scrubjay</code> tag.
+opencode's TUI plugin API cannot restyle the transcript, so there <code>hooks/opencode/scrubjay-tui.tsx</code>
+(registered in <code>tui.json</code> by <code>/sjsync</code>) shows a blue <code>◆ scrubjay /sj…</code> badge beside the prompt while
+the command runs, and lists the session's <code>/sj*</code> commands in the sidebar.</p>
 
 
 
