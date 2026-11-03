@@ -40,7 +40,8 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `SCRUBJAY_HARNESSES`; which one a hook invocation belongs to is `SCRUBJAY_HARNESS`.
 - `skeleton/data/` — the seed for a fresh `scrubjay-data`. `settings/settings.base.json` is
   load-bearing: `claude-sync.sh` requires it, and it registers the SessionStart/SessionEnd hooks.
-- `hooks/` — `sync-session.sh` (SessionStart), `log-session.sh` (SessionEnd), and
+- `hooks/` — `sync-session.sh` (SessionStart), `log-session.sh` (SessionEnd, and Stop: every
+  turn — `claude-sync.sh` registers that one), and
   `transports/<backend>.sh` (`git` / `rsync-wg` / `local`) — **the transport seam.** A backend
   defines `transport_ship` (write) plus `transport_resolve` / `transport_fetch` (read — used only
   by session hand-off).

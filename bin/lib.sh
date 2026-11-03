@@ -579,15 +579,23 @@ sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when
 # because the line IS the interface: sjmcp's _LOG regex and sj_log_catalogue's pipe-split both
 # parse it, and tests/test_log.sh pins its shape. A second place that formatted it would drift.
 #
-# Returns 0 when a row was written, 1 when there was nothing to write (catalogued with this topic
-# already, or the session recorded nothing) — callers count on that to decide whether to push.
+# Returns 0 when a row was written, 1 when there was nothing to write (the row is already current,
+# or the session recorded nothing) — callers count on that to decide whether to push.
 #
 # <ts> and <topic> may be empty: ts defaults to now, topic to sj_session_topic's. Both are
 # parameters rather than reads of the ambient environment so the function stays testable — the
 # `/sjlog` essence (SCRUBJAY_TOPIC) is passed in by the hook, not picked up here.
-sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic>
+#
+# Write-once by default: a session's first turn writes its row, titled by the first real prompt,
+# with no model call. <mode> `refresh` (session end, /sjlog) appends a superseding copy when
+# anything moved — turns, size, topic — keeping the first row's time. Only a refresh asks a small
+# model to title the session (sj_ai_topic), and only when it has prompts the last title did not see
+# (prompts=<n>). An /sjlog essence (essence=1) is only ever replaced by another essence, and a
+# failed model call never downgrades a model title. Appending rather than editing keeps logs/*.log
+# append-only for `merge=union`; every reader takes the LAST row per session.
+sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic> [refresh]
   local log="$1" sid="$2" cwd="$3" tpath="$4" harness="$5" host="$6" ts="$7" topic="${8:-}"
-  local model="" turns="" size=0
+  local mode="${9:-}" model="" turns="" size=0 last="" prevtopic="" essence="" aimark="" line
 
   # A session with no transcript produced no records at all: nothing is shipped for it and nothing
   # is rendered, so a row would advertise an archive entry that does not exist. This is not
@@ -596,28 +604,38 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # covers both the missing file and the empty one.
   [ -s "${tpath:-}" ] || return 1
   [ -n "$sid" ] || return 1
-  # A session gets a new row only when its topic moved (readers take the last row per session).
-  # An /sjlog essence (marked essence=1) is only ever replaced by another essence.
-  local last essence=""
-  last="$(grep "session=$sid" "$log" 2>/dev/null | tail -1)"
-  if [ -n "$topic" ]; then essence=" | essence=1"
-  else case "$last" in *' | essence=1'*) return 1 ;; esac; fi
-
+  last="$(grep "session=$sid" "$log" 2>/dev/null | tail -n 1)"
+  if [ -n "$last" ]; then
+    [ "$mode" = refresh ] || return 1                       # write-once per session
+    ts="${last%% | *}"
+    prevtopic="$(printf '%s' "$last" | awk -F' [|] ' '{ t = $4; gsub(/^"|"$/, "", t); print t }')"
+  fi
   [ -n "$ts" ] || ts="$(date '+%Y-%m-%d %H:%M')"
-  # Topic: prefer the caller's (a model-authored essence from /sjlog); else a small model's title
-  # of the session's prompts (sj_ai_topic), billed only when there are prompts it has not titled
-  # (prompts=<n>); else the first real user prompt. The adapter knows how to read its own
-  # transcript format; sj_session_topic is the Claude/JSONL shape and the fallback for a caller
-  # with no adapter loaded (backfill).
-  local prompts n aimark=""
-  if [ -z "$topic" ] && [ "$harness" = claude ] && [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ]; then
+
+  # Topic: the caller's (an /sjlog essence) wins; an earlier essence is kept.
+  if [ -n "$topic" ]; then essence=" | essence=1"
+  else case "$last" in *' | essence=1'*) topic="$prevtopic"; essence=" | essence=1" ;; esac; fi
+  # Else, on a refresh, a small model's title — billed only for prompts it has not titled yet.
+  local prompts n
+  if [ -z "$topic" ] && [ "$mode" = refresh ] && [ "$harness" = claude ] \
+     && [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ]; then
     prompts="$(sj_session_topic "$tpath" prompts)"
     n="$(printf '%s' "$prompts" | jq 'length' 2>/dev/null)" || n=0
-    case "$last" in *" | prompts=$n"|*" | prompts=$n | "*) return 1 ;; esac
-    [ "${n:-0}" -gt 0 ] && topic="$(sj_ai_topic "$prompts")" && aimark=" | prompts=$n"
+    case "$last" in
+      *" | prompts=$n"|*" | prompts=$n | "*) topic="$prevtopic"; aimark=" | prompts=$n" ;;
+      *) [ "${n:-0}" -gt 0 ] && topic="$(sj_ai_topic "$prompts")" && aimark=" | prompts=$n" ;;
+    esac
     # A failed call never downgrades a model title to the first prompt.
-    if [ -z "$topic" ]; then case "$last" in *" | prompts="*) return 1 ;; esac; fi
+    if [ -z "$topic" ]; then
+      case "$last" in *" | prompts="*)
+        topic="$prevtopic"
+        aimark="$(printf '%s' "$last" | grep -o ' | prompts=[0-9]*' | tail -n 1)" ;;
+      esac
+    fi
   fi
+  # Else the first real user prompt. The adapter knows how to read its own transcript format;
+  # sj_session_topic is the Claude/JSONL shape and the fallback for a caller with no adapter
+  # loaded (backfill).
   if [ -z "$topic" ]; then
     if declare -F sjh_session_topic >/dev/null 2>&1; then topic="$(sjh_session_topic "$tpath")"
     else topic="$(sj_session_topic "$tpath")"; fi
@@ -632,7 +650,6 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   [ -n "$topic" ] || topic="(no text)"
   # One writer of the "safe in a row" rule, so the backfill path cannot drift from this one.
   topic="$(sj_topic_sanitize "$topic")"
-  case "$last" in *" | \"$topic\" | session="*) return 1 ;; esac   # topic unchanged
   size="$(sj_size "$tpath")" || size=0
   # Lineage: only a forked session carries `forked_from=`, and only an id-shaped one.
   local fork=""
@@ -642,9 +659,11 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
-  printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s\n' \
+  line="$(printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s' \
     "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size$aimark$essence" \
-    "${fork:+ | forked_from=$fork}" >> "$log"
+    "${fork:+ | forked_from=$fork}")"
+  [ "$line" = "$last" ] && return 1        # nothing moved: nothing to push either
+  printf '%s\n' "$line" >> "$log"
 }
 
 # A short title for a session, from a small model reading its prose prompts (JSON array, as
