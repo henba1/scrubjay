@@ -47,9 +47,14 @@ row per archive call (`⏺ Recall("retry backoff") · scrubjay`) with a one-line
 JSON, the live steps of a publish or sync above the prompt, and a toast when a step fails —
 including the SessionStart sync, which otherwise fails unseen.
 
+```sh
+claude plugin marketplace add henba1/scrubjay
+claude plugin install scrubjay-ui@scrubjay
 ```
-/plugin install scrubjay-ui --marketplace henba1/scrubjay
-```
+
+`/sjsync` keeps a plugin installed this way: it rebuilds `~/.claude/settings.json` from the data
+repo but carries `enabledPlugins` and `extraKnownMarketplaces` over. To have the mod on every
+machine, add both keys to `settings/settings.base.json` in your data repo.
 
 Both draw scrubjay in one blue, so an `/sj*` command stands apart from an ordinary turn. The mod
 paints `/sj…` blue as you type it and draws the sent prompt in blue under a `◆ scrubjay` tag.

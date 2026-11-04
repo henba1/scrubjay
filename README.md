@@ -143,6 +143,22 @@ without `gh` the onboarder prints the exact `gh repo create` commands and stops,
 yourself. No root required. Full walkthrough:
 [Onboarding](https://henba1.github.io/scrubjay/onboarding/).
 
+**Optional extras.**
+
+- **The Claude Code mod** shows scrubjay in Claude Code's own interface: `/sj*` commands in blue, a
+  named row per archive lookup, and live sync steps above the prompt. (opencode gets its version
+  automatically.)
+
+  ```sh
+  claude plugin marketplace add henba1/scrubjay
+  claude plugin install scrubjay-ui@scrubjay
+  ```
+
+- **Session topics.** Each session's catalogue entry has a short title, written by Haiku
+  (`claude -p`) when a session ends with prompts it hasn't titled yet. That counts against your own
+  Claude usage. To use the session's first prompt instead, add `SCRUBJAY_AI_TOPIC=0` to
+  `~/.config/scrubjay/config`.
+
 **Platforms.** Linux and **Windows via WSL 2** are supported. macOS should work but isn't regularly
 tested yet. Native Windows (PowerShell/CMD/Git Bash) is not supported — the config sync is built on
 symlinks, which Git Bash turns into copies. On WSL, install Claude Code *inside* the distro and

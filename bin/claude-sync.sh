@@ -285,9 +285,14 @@ BASE="$DATA/settings/settings.base.json"
 OVER="$HOSTDIR/claude/settings.json"
 OUT="$CLAUDE_DIR/settings.json"
 [ -f "$OVER" ] && OVERJSON="$(cat "$OVER")" || OVERJSON='{}'
+# Plugins installed here (`claude plugin install` writes enabledPlugins and extraKnownMarketplaces
+# into this file) survive the rebuild; the data repo still wins where it names the same plugin.
+KEEPJSON='{}'
+[ -f "$OUT" ] && KEEPJSON="$(jq -c '{enabledPlugins, extraKnownMarketplaces} | with_entries(select(.value | type == "object"))' "$OUT" 2>/dev/null)" || KEEPJSON='{}'
+[ -n "$KEEPJSON" ] || KEEPJSON='{}'
 tmp="$(mktemp)"
-jq -n --argjson base "$(cat "$BASE")" --argjson host "$OVERJSON" --arg turn "$(sj_load_config; printf %s "${SCRUBJAY_TURN_PUBLISH:-1}")" '
-  ($base * $host)
+jq -n --argjson keep "$KEEPJSON" --argjson base "$(cat "$BASE")" --argjson host "$OVERJSON" --arg turn "$(sj_load_config; printf %s "${SCRUBJAY_TURN_PUBLISH:-1}")" '
+  ($keep * ($base * $host))
   | .permissions.allow = (($base.permissions.allow // []) + ($host.permissions.allow // []) | unique)
   | .permissions.deny  = (($base.permissions.deny  // []) + ($host.permissions.deny  // []) | unique)
   # Publish after every turn, not only at session end (hooks/log-session.sh): the app registers it
