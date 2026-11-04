@@ -77,7 +77,9 @@ If the same folders are in a Nextcloud, set `SCRUBJAY_VIEW_NEXTCLOUD` to its add
 `SCRUBJAY_VIEW_NEXTCLOUD_MAP` to which local folder it shows as which (`/mnt/nas=/NAS`) in
 `~/.config/scrubjay/config`. Every path under that folder then gets an **☁ open** link: a session's
 folder, its archived transcript, a local repo or folder, each file written. A folder opens in
-Nextcloud's Files app; a file opens its folder with the file picked out.
+Nextcloud's Files app; a file opens its folder with the file picked out. The link is checked when
+you click it: a file deleted since, or a folder renamed, opens the deepest folder of its path that
+still exists.
 
 ## What the commands show while they run
 

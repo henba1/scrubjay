@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import signal
 import subprocess
@@ -29,7 +30,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 HERE = Path(__file__).resolve().parent
 APP = HERE.parent
@@ -201,6 +202,45 @@ def cloud_links() -> dict | None:
     return {"base": base, "map": pairs} if pairs else None
 
 
+def cloud_url(path: str) -> str | None:
+    """The Nextcloud address for a local path, checked against the disk here: a file that is gone,
+    or a folder since renamed, opens the deepest part of its path that still exists (never above
+    the mapped folder). A file that exists opens its folder with the file picked out."""
+    c = cloud_links()
+    if not c or not path.startswith("/"):
+        return None
+    want = os.path.normpath(path)
+    hit = next(((loc, rem) for loc, rem in c["map"] if want == loc or want.startswith(loc.rstrip("/") + "/")), None)
+    if not hit:
+        return None
+    loc, rem = hit
+    # Symlinks resolved, then held inside the mapped folder: only what it shares is ever looked at.
+    # Each candidate, from the path itself up to the folder, is resolved and checked right before
+    # it touches the disk.
+    root = os.path.realpath(loc)
+    inside = root.rstrip(os.sep) + os.sep
+    p, cand = root, want
+    while cand.startswith(loc):
+        safe = os.path.realpath(cand)
+        if safe.startswith(inside) and os.path.exists(safe):
+            p = safe
+            break
+        if cand == loc:
+            break
+        cand = os.path.dirname(cand)
+    shown = "/" + (rem.strip("/") + "/" + p[len(root):].strip("/")).strip("/")
+    if p == root:
+        return f"{c['base']}/apps/files/files?dir={quote(shown, safe='/')}"
+    safe = os.path.realpath(p)
+    if safe.startswith(inside) and os.path.isdir(safe):
+        return f"{c['base']}/apps/files/files?dir={quote(shown, safe='/')}"
+    parent, _, name = shown.rpartition("/")
+    return f"{c['base']}/apps/files/files?dir={quote(parent or '/', safe='/')}&scrollto={quote(name, safe='')}"
+
+
+_HEADER_SAFE = re.compile(r"[\x21-\x7e]+")
+
+
 def graph(st: "State") -> dict:
     rows = _rows(st.r)
     nodes = [_node(s, rs, st.arch) for s, rs in rows.items()]
@@ -357,6 +397,21 @@ def handler_for(st: State):
             if method == "GET" and u.path == "/api/session":
                 s = session(st, (q.get("sid") or [""])[0])
                 return self._json(s) if s else self._json({"error": "no such session"}, 404)
+            if method == "GET" and u.path == "/go":
+                # A link the page opens in a new tab: resolved now, so it follows the disk.
+                url = cloud_url((q.get("path") or [""])[0])
+                # Printable ASCII only into a header: the address is percent-encoded, and this
+                # also stops a configured base with a line break in it.
+                url = (url or "").replace("\r", "").replace("\n", "")
+                if not url or not _HEADER_SAFE.fullmatch(url):
+                    return self._json({"error": "not a folder this machine shares with Nextcloud"}, 404)
+                self.send_response(302)
+                self.send_header("Location", url)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return None
             if method == "GET" and u.path == "/api/transcript":
                 return self._json(transcript(st.r, st.arch, (q.get("sid8") or [""])[0],
                                              (q.get("format") or ["readable"])[0]))
