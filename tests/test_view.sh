@@ -383,6 +383,9 @@ assert_eq "a file that is gone: its folder" "302 https://cloud.example/apps/file
 assert_eq "a deeper path that is gone: the deepest folder left" "302 https://cloud.example/apps/files/files?dir=/Share/a" "$(go "$sh/a/x/y/z.md")"
 assert_eq "a folder: itself" "302 https://cloud.example/apps/files/files?dir=/Share" "$(go "$sh")"
 assert_eq "outside the mapped folder: no link" "404 " "$(go /etc/passwd)"
+ln -s /etc "$sh/out"
+assert_eq "a symlink out of the mapped folder: no link" "404 " "$(go "$sh/out/passwd")"
+assert_eq "climbing out with ..: no link" "404 " "$(go "$sh/../../etc/passwd")"
 assert_eq "no token: no redirect" 403 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$P2/go?path=$sh")"
 SCRUBJAY_RUN_DIR="$R2" bash "$APP/bin/sj-view.sh" stop >/dev/null
 

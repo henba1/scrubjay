@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import signal
 import subprocess
@@ -208,19 +209,27 @@ def cloud_url(path: str) -> str | None:
     c = cloud_links()
     if not c or not path.startswith("/"):
         return None
-    path = os.path.normpath(path)
-    for loc, rem in c["map"]:
-        if path != loc and not path.startswith(loc.rstrip("/") + "/"):
-            continue
-        p = path
-        while p != loc and not os.path.exists(p):
-            p = os.path.dirname(p)
-        full = "/" + (rem.strip("/") + "/" + p[len(loc):].strip("/")).strip("/")
-        if os.path.isdir(p) or p == loc:
-            return f"{c['base']}/apps/files/files?dir={quote(full, safe='/')}"
-        parent, _, name = full.rpartition("/")
-        return f"{c['base']}/apps/files/files?dir={quote(parent or '/', safe='/')}&scrollto={quote(name, safe='')}"
-    return None
+    want = os.path.normpath(path)
+    hit = next(((loc, rem) for loc, rem in c["map"] if want == loc or want.startswith(loc.rstrip("/") + "/")), None)
+    if not hit:
+        return None
+    loc, rem = hit
+    # Symlinks resolved, then held inside the mapped folder: only what it shares is ever looked at.
+    root = os.path.realpath(loc)
+    full = os.path.realpath(want)
+    if full != root and not full.startswith(root.rstrip(os.sep) + os.sep):
+        return None
+    p = full
+    while p != root and not os.path.exists(p):
+        p = os.path.dirname(p)
+    shown = "/" + (rem.strip("/") + "/" + p[len(root):].strip("/")).strip("/")
+    if p == root or os.path.isdir(p):
+        return f"{c['base']}/apps/files/files?dir={quote(shown, safe='/')}"
+    parent, _, name = shown.rpartition("/")
+    return f"{c['base']}/apps/files/files?dir={quote(parent or '/', safe='/')}&scrollto={quote(name, safe='')}"
+
+
+_HEADER_SAFE = re.compile(r"[\x21-\x7e]+")
 
 
 def graph(st: "State") -> dict:
@@ -382,7 +391,9 @@ def handler_for(st: State):
             if method == "GET" and u.path == "/go":
                 # A link the page opens in a new tab: resolved now, so it follows the disk.
                 url = cloud_url((q.get("path") or [""])[0])
-                if not url:
+                # Printable ASCII only into a header: the address is percent-encoded, and this
+                # also stops a configured base with a line break in it.
+                if not url or not _HEADER_SAFE.fullmatch(url):
                     return self._json({"error": "not a folder this machine shares with Nextcloud"}, 404)
                 self.send_response(302)
                 self.send_header("Location", url)
