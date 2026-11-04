@@ -136,8 +136,8 @@ sjh_apply_config() {
   mkdir -p "$cfgdir" || return 1
   [ -f "$hooks" ] || echo '{}' > "$hooks"
   if ! jq empty "$hooks" 2>/dev/null; then
-    echo "  SKIP  $hooks is not valid JSON — fix it by hand, then rerun (refusing to overwrite)"
-    return 0
+    echo "  FAIL  $hooks is not valid JSON — fix it by hand, then rerun (left as-is)"
+    return 1
   fi
 
   sync_cmd="SCRUBJAY_HARNESS=codex bash \"$app/hooks/sync-session.sh\""

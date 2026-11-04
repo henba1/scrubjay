@@ -77,9 +77,14 @@ wait
 
 
 # 2) apply into each harness's config root (idempotent; mostly a no-op thanks to symlinks)
+# A file an adapter refused to touch (say, a hand-edit that broke opencode.json) is a failure, and
+# the step names it: the adapter's own FAIL line, which says which file and what to do.
 sj_step config run
-if "$APP/bin/sync-config.sh" >/dev/null 2>&1; then sj_step config ok "applied"
-else sj_step config fail "sync-config.sh failed"; fi
+if cfg_out="$("$APP/bin/sync-config.sh" 2>&1)"; then sj_step config ok "applied"
+else
+  why="$(printf '%s\n' "$cfg_out" | sed -n 's/^ *FAIL  //p' | head -1)"
+  sj_step config fail "${why:-sync-config.sh failed}"
+fi
 
 # 2b) re-render logs/CATALOGUE.md — the human-browsable chat table — now that the pull in (1)
 #     has brought in other machines' log lines. --no-pull: (1) already did it, and honors
