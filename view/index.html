@@ -221,24 +221,18 @@ const tail = (p) => { const h = home(p), parts = h.split("/"); return parts.leng
 const KIND = { github: "GitHub", gitlab: "GitLab", git: "git", repo: "repo", folder: "folder", record: "scrubjay" };
 const GIT_KINDS = new Set(["github", "gitlab", "git", "repo"]);
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
-// A path this machine's Nextcloud also shows (SCRUBJAY_VIEW_NEXTCLOUD[_MAP]) as a link into its
-// Files app: a folder opens there, a file opens its folder with the file picked out.
-function cloud(path, isDir) {
+// A path this machine's Nextcloud also shows (SCRUBJAY_VIEW_NEXTCLOUD[_MAP]) gets a link into its
+// Files app. It goes through the viewer, which checks the disk when it is clicked: a path that is
+// gone opens the deepest folder of it that still exists.
+function cloud(path) {
   const c = G.cloud;
   if (!c || !path) return "";
-  for (const [loc, rem] of c.map) {
-    if (path !== loc && !path.startsWith(loc === "/" ? "/" : loc + "/")) continue;
-    const full = (rem + path.slice(loc.length)).replace(/\/+/g, "/");
-    const enc = (p) => encodeURIComponent(p).replace(/%2F/g, "/");
-    if (isDir) return `${c.base}/apps/files/files?dir=${enc(full)}`;
-    const i = full.lastIndexOf("/");
-    return `${c.base}/apps/files/files?dir=${enc(full.slice(0, i) || "/")}&scrollto=${encodeURIComponent(full.slice(i + 1))}`;
-  }
-  return "";
+  if (!c.map.some(([loc]) => path === loc || path.startsWith(loc === "/" ? "/" : loc + "/"))) return "";
+  return `/go?t=${encodeURIComponent(TOKEN)}&path=${encodeURIComponent(path)}`;
 }
-const cloudA = (path, isDir) => {
-  const u = cloud(path, isDir);
-  return u ? `<a class="cloud" href="${esc(u)}" target="_blank" rel="noopener" title="open in Nextcloud">☁ open</a>` : "";
+const cloudA = (path) => {
+  const u = cloud(path);
+  return u ? `<a class="cloud" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="open in Nextcloud">☁ open</a>` : "";
 };
 
 let G = { nodes: [], edges: [], artefacts: [], host: "" }, bySid = new Map(), byArt = new Map();
@@ -482,7 +476,7 @@ async function open(sid) {
     `<h3>Session</h3>` + kv([
       ["started", esc(`${n.date} ${n.time}`)], ["host", esc(n.host) + (n.host === G.host ? ' <span class="note">(this machine)</span>' : "")],
       ["ran on", n.hosts.length > 1 ? esc(n.hosts.join(" → ")) + ' <span class="note">(handed off with /sjresume)</span>' : ""],
-      ["folder", esc(n.cwd) + cloudA(n.cwd, true)], ["project", esc(n.project)],
+      ["folder", esc(n.cwd) + cloudA(n.cwd)], ["project", esc(n.project)],
       ["agent", `<span class="chip" style="--h: var(--${esc(n.harness)})">${esc(n.harness)}</span>`],
       ...extra.filter(([k]) => !["harness", "summary", "resumed_from", "forked_from"].includes(k)),
       ["topic from", n.essence ? "written with /sjlog" : last.prompts ? `Haiku, over ${esc(last.prompts)} prompts` : "the first prompt"],
@@ -503,7 +497,7 @@ async function open(sid) {
       ["forks of it", s.children.length ? s.children.map(sidLink).join("<br>") : '<span class="note">none</span>'],
     ]) +
     `<h3>Transcript</h3>` + (s.readable
-      ? kv([["readable", esc(s.readable) + cloudA(s.readable, false)], ["raw", s.raw ? esc(s.raw) + cloudA(s.raw, false) : ""]]) +
+      ? kv([["readable", esc(s.readable) + cloudA(s.readable)], ["raw", s.raw ? esc(s.raw) + cloudA(s.raw) : ""]]) +
         `<p><button id="readc">Read transcript</button></p>`
       : `<p class="note">Not in the archive on this machine${G.archive ? "" : " (this machine has no archive mounted)"}.` +
         ` Recall it on ${esc(n.host)}.</p>`) +
@@ -553,7 +547,7 @@ function milestones(s, a, titles) {
     (commits.length ? `<details><summary>${plural(commits.length, "commit")}</summary><ul>${commits.map((c) =>
       `<li>${c.sha ? link(c, c.sha) + " " : ""}${esc(c.title || "(message not recorded)")}</li>`).join("")}</ul></details>` : "") +
     (s.files.length ? `<details><summary>${plural(s.files.length, "file")} written</summary><ul>${s.files.map((f) =>
-      `<li><code>${esc(home(f))}</code>${cloudA(f, false)}</li>`).join("")}</ul></details>` : "") +
+      `<li><code>${esc(home(f))}</code>${cloudA(f)}</li>`).join("")}</ul></details>` : "") +
     `</div>`;
 }
 
@@ -574,7 +568,7 @@ async function openArt(aid) {
   $("dbody").innerHTML =
     `<h2>${artName(a)}</h2>` +
     (a.url ? `<div><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)} ↗</a></div>` : "") +
-    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}${cloudA(a.path, true)}</div>` : "") +
+    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}${cloudA(a.path)}</div>` : "") +
     `<div class="stats">` +
       `<span class="stat">${plural(d.sessions.length, "session")}</span>` +
       (merged.length ? `<span class="stat">merged ${merged.map((n) => "#" + n).join(" ")}</span>` : "") +

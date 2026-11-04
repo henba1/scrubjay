@@ -370,6 +370,22 @@ assert_eq "an address that is not http(s) gives no links" null \
   "$(curl -s -H "X-SJ-Token: ${U2#*t=}" "http://127.0.0.1:$(jq -r .port "$R2/view.json")/api/graph" | jq -c .cloud)"
 SCRUBJAY_RUN_DIR="$R2" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
+section "Nextcloud links follow the disk: a missing path opens what is left of it"
+sh="$SANDBOX/share"; mkdir -p "$sh/a/b c"; : > "$sh/a/b c/file 1.txt"
+SCRUBJAY_RUN_DIR="$R2" SCRUBJAY_VIEW_NEXTCLOUD="https://cloud.example" SCRUBJAY_VIEW_NEXTCLOUD_MAP="$sh=/Share" \
+  bash "$APP/bin/sj-view.sh" --no-open --port 0 >/dev/null 2>&1
+U2="$(jq -r .url "$R2/view.json")"; P2="$(jq -r .port "$R2/view.json")"
+go() { curl -s -o /dev/null -w '%{http_code} %{redirect_url}' -G --data-urlencode "t=${U2#*t=}" \
+  --data-urlencode "path=$1" "http://127.0.0.1:$P2/go"; }
+assert_eq "a file that exists: its folder, the file picked out" \
+  "302 https://cloud.example/apps/files/files?dir=/Share/a/b%20c&scrollto=file%201.txt" "$(go "$sh/a/b c/file 1.txt")"
+assert_eq "a file that is gone: its folder" "302 https://cloud.example/apps/files/files?dir=/Share/a/b%20c" "$(go "$sh/a/b c/gone.md")"
+assert_eq "a deeper path that is gone: the deepest folder left" "302 https://cloud.example/apps/files/files?dir=/Share/a" "$(go "$sh/a/x/y/z.md")"
+assert_eq "a folder: itself" "302 https://cloud.example/apps/files/files?dir=/Share" "$(go "$sh")"
+assert_eq "outside the mapped folder: no link" "404 " "$(go /etc/passwd)"
+assert_eq "no token: no redirect" 403 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$P2/go?path=$sh")"
+SCRUBJAY_RUN_DIR="$R2" bash "$APP/bin/sj-view.sh" stop >/dev/null
+
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
 assert_contains "an unknown flag" "$(bash "$APP/bin/sj-view.sh" --bogus 2>&1)" "unknown argument: --bogus"
