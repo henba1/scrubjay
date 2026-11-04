@@ -1071,8 +1071,11 @@ injects it directly with no tool call at all.</p>
 <h2 id="the-session-map">The session map<a class="headerlink" href="#the-session-map" title="Permanent link">&para;</a></h2>
 <p><code>/sjview</code> opens the catalogue as a map: one lane per project, one column per day, and a card per
 session. A card shows the session id and topic, then where it ran (host and folder) and with which
-agent and model, then when, how long and how big. Each agent has its own colour: Claude's clay,
-opencode's grey, codex's green. Forks are arrows from the session they branched off. Sessions that
+agent and model, then its summary and when, how long and how big. Each agent has its own colour:
+Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off.
+A session handed off to another machine with <code>/sjresume</code> stays one card, showing both machines
+(<code>laptop → henpi</code>); one carried over to another agent is joined to its source by a dashed
+"carried over" line. Sessions that
 recorded nothing are hidden unless you tick <strong>show empty</strong>.</p>
 <p>Right of the timeline, under <strong>where the work landed</strong>, are the things the sessions changed, each a
 pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo with no
@@ -1096,6 +1099,11 @@ viewer</strong> button, or by itself after <code>SCRUBJAY_VIEW_IDLE</code> minut
 <code>0</code> keeps it running). <code>/sjview status</code> says whether it runs, and where. On a machine you reach over
 SSH, forward the port it prints: <code>ssh -L 7787:127.0.0.1:7787 &lt;host&gt;</code>. A machine with no archive
 (<code>rsync-wg</code>) shows the map but cannot open transcripts.</p>
+<p>If the same folders are in a Nextcloud, set <code>SCRUBJAY_VIEW_NEXTCLOUD</code> to its address and
+<code>SCRUBJAY_VIEW_NEXTCLOUD_MAP</code> to which local folder it shows as which (<code>/mnt/nas=/NAS</code>) in
+<code>~/.config/scrubjay/config</code>. Every path under that folder then gets an <strong>☁ open</strong> link: a session's
+folder, its archived transcript, a local repo or folder, each file written. A folder opens in
+Nextcloud's Files app; a file opens its folder with the file picked out.</p>
 <h2 id="what-the-commands-show-while-they-run">What the commands show while they run<a class="headerlink" href="#what-the-commands-show-while-they-run" title="Permanent link">&para;</a></h2>
 <p><code>/sjlog</code> and <code>/sjsync</code> print a step report: one line per step, <code>✓</code> done, <code>✗</code> failed, <code>–</code> skipped
 with the reason. Steps are recorded in <code>~/.scrubjay/run/&lt;op&gt;.tsv</code> as they finish (<code>sj_step</code> in

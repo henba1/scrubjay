@@ -523,7 +523,7 @@ Escape hatches (env, in `~/.config/scrubjay/config` or inline): `SCRUBJAY_NOSYNC
 
 ## Find a past chat
 
-Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log` (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`) and pushed, so all machines' histories are searchable from any clone of the data repo. The `topic` is a short title Haiku writes from the session's prompts (`claude -p`, bounded, only when there are prompts it has not titled yet — `prompts=<n>` records how many). Without it (offline, no `claude`, `SCRUBJAY_AI_TOPIC=0`) the topic is the first real prompt, or the slash command the session ran if you typed nothing. A `/sjlog` essence wins over both. When a resumed session's topic changes, a new line is appended and the last one per session counts. The trailing `key=value` fields are additive, so older lines simply have fewer:
+Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.log` (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`) and pushed, so all machines' histories are searchable from any clone of the data repo. The `topic` is a short title Haiku writes from the session's prompts (`claude -p`, bounded, only when there are prompts it has not titled yet — `prompts=<n>` records how many). The same call writes `summary=`, a sentence or two on what was done and where it was left, from the prompts and the agent's last reply. Without it (offline, no `claude`, `SCRUBJAY_AI_TOPIC=0`) the topic is the first real prompt, or the slash command the session ran if you typed nothing, and there is no summary. A `/sjlog` essence wins over both, and keeps the summary an earlier row had. A session that continued one from another machine, or carried one over from another agent, says so: `resumed_from=<host>:<sid>`. When a resumed session's topic changes, a new line is appended and the last one per session counts. The trailing `key=value` fields are additive, so older lines simply have fewer:
 
 ```
 git -C ~/.scrubjay/scrubjay-data pull
@@ -648,18 +648,20 @@ claude --resume <sid>                              # …or /resume inside a sess
 
 Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-off) — no file editing needed:
 
-| Env var                           | Effect                                                                                                                                   |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SCRUBJAY_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                        |
-| `SCRUBJAY_NOSYNC=1`               | skip the start-of-session pull + sync entirely                                                                                           |
-| `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                                                                                                 |
-| `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                                                                                          |
-| `SCRUBJAY_TURN_PUBLISH=0`         | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                            |
-| `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                                                                                             |
-| `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit                                                                                 |
-| `SCRUBJAY_VIEW_PORT=<n>`          | the port `/sjview` listens on (default 7787; the next free one if taken)                                                                 |
-| `SCRUBJAY_VIEW_IDLE=<min>`        | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never)                                                    |
-| `SCRUBJAY_AI_TOPIC=0`             | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt |
+| Env var                                        | Effect                                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `SCRUBJAY_TRANSCRIPT_BACKEND=off`              | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                        |
+| `SCRUBJAY_NOSYNC=1`                            | skip the start-of-session pull + sync entirely                                                                                           |
+| `SCRUBJAY_SYNC_NOPULL=1`                       | sync at start but don't `git pull` first                                                                                                 |
+| `SCRUBJAY_NOSHIP=1`                            | end the session without shipping its transcript                                                                                          |
+| `SCRUBJAY_TURN_PUBLISH=0`                      | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                            |
+| `SCRUBJAY_LOG_NOGIT=1`                         | append the log line but don't commit/push it                                                                                             |
+| `SCRUBJAY_NORECONCILE=1`                       | don't sweep for sessions that ended without a clean exit                                                                                 |
+| `SCRUBJAY_VIEW_PORT=<n>`                       | the port `/sjview` listens on (default 7787; the next free one if taken)                                                                 |
+| `SCRUBJAY_VIEW_NEXTCLOUD=<url>`                | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below)                       |
+| `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;`                                           |
+| `SCRUBJAY_VIEW_IDLE=<min>`                     | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never)                                                    |
+| `SCRUBJAY_AI_TOPIC=0`                          | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt |
 
 ## Re-home the scrubjay clones
 
@@ -815,7 +817,7 @@ All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/
 
 ## The session map
 
-`/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per session. A card shows the session id and topic, then where it ran (host and folder) and with which agent and model, then when, how long and how big. Each agent has its own colour: Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off. Sessions that recorded nothing are hidden unless you tick **show empty**.
+`/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per session. A card shows the session id and topic, then where it ran (host and folder) and with which agent and model, then its summary and when, how long and how big. Each agent has its own colour: Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off. A session handed off to another machine with `/sjresume` stays one card, showing both machines (`laptop → henpi`); one carried over to another agent is joined to its source by a dashed "carried over" line. Sessions that recorded nothing are hidden unless you tick **show empty**.
 
 Right of the timeline, under **where the work landed**, are the things the sessions changed, each a pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo with no remote, a local folder, or scrubjay's own memory and plans. A line joins each session to what it changed; hover either end to see what the session did there ("PR #42 merged · 3 commits · 2 files"). Click a repo for its **milestones**: per session, newest first, the PRs opened and merged, issues, releases, branches, pushes, commits and files written, each PR and issue linked to the forge.
 
@@ -824,6 +826,8 @@ These come from the archived transcripts: the files the agent wrote and the `git
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic moved), its forks, where its transcript is archived, and the command that continues it. That is the harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from another machine ([hand-off](https://henba1.github.io/scrubjay/handoff/index.md)). **Read transcript** shows the archived conversation, condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
 
 The viewer runs only while you use it. It listens on `127.0.0.1` alone and answers only requests carrying the token in the address it prints. It stops on `/sjview stop`, on the page's **Stop viewer** button, or by itself after `SCRUBJAY_VIEW_IDLE` minutes without a request (default 30; `0` keeps it running). `/sjview status` says whether it runs, and where. On a machine you reach over SSH, forward the port it prints: `ssh -L 7787:127.0.0.1:7787 <host>`. A machine with no archive (`rsync-wg`) shows the map but cannot open transcripts.
+
+If the same folders are in a Nextcloud, set `SCRUBJAY_VIEW_NEXTCLOUD` to its address and `SCRUBJAY_VIEW_NEXTCLOUD_MAP` to which local folder it shows as which (`/mnt/nas=/NAS`) in `~/.config/scrubjay/config`. Every path under that folder then gets an **☁ open** link: a session's folder, its archived transcript, a local repo or folder, each file written. A folder opens in Nextcloud's Files app; a file opens its folder with the file picked out.
 
 ## What the commands show while they run
 
@@ -902,6 +906,8 @@ Two guards keep that honest:
 - Any file it does overwrite is backed up to `<sid>.jsonl.bak` first.
 
 To *branch* rather than continue, use Claude Code's native flag: `claude --resume <sid> --fork-session`.
+
+The catalogue records the hand-off. The first row this machine writes for the session carries `resumed_from=<host>:<sid>`, so `/sjview` draws it as one session that ran on two machines (`laptop → henpi`). A carry-over into another agent starts a new session. Its first row names the session it came from, and `/sjview` joins the two with a "carried over" link. That session is recognised as the first one started in the same folder and agent within a day.
 
 ## Reading back from a write-only relay
 

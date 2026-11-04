@@ -31,7 +31,7 @@ All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/
 
 ## The session map
 
-`/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per session. A card shows the session id and topic, then where it ran (host and folder) and with which agent and model, then when, how long and how big. Each agent has its own colour: Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off. Sessions that recorded nothing are hidden unless you tick **show empty**.
+`/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per session. A card shows the session id and topic, then where it ran (host and folder) and with which agent and model, then its summary and when, how long and how big. Each agent has its own colour: Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off. A session handed off to another machine with `/sjresume` stays one card, showing both machines (`laptop → henpi`); one carried over to another agent is joined to its source by a dashed "carried over" line. Sessions that recorded nothing are hidden unless you tick **show empty**.
 
 Right of the timeline, under **where the work landed**, are the things the sessions changed, each a pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo with no remote, a local folder, or scrubjay's own memory and plans. A line joins each session to what it changed; hover either end to see what the session did there ("PR #42 merged · 3 commits · 2 files"). Click a repo for its **milestones**: per session, newest first, the PRs opened and merged, issues, releases, branches, pushes, commits and files written, each PR and issue linked to the forge.
 
@@ -40,6 +40,8 @@ These come from the archived transcripts: the files the agent wrote and the `git
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic moved), its forks, where its transcript is archived, and the command that continues it. That is the harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from another machine ([hand-off](https://henba1.github.io/scrubjay/handoff/index.md)). **Read transcript** shows the archived conversation, condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
 
 The viewer runs only while you use it. It listens on `127.0.0.1` alone and answers only requests carrying the token in the address it prints. It stops on `/sjview stop`, on the page's **Stop viewer** button, or by itself after `SCRUBJAY_VIEW_IDLE` minutes without a request (default 30; `0` keeps it running). `/sjview status` says whether it runs, and where. On a machine you reach over SSH, forward the port it prints: `ssh -L 7787:127.0.0.1:7787 <host>`. A machine with no archive (`rsync-wg`) shows the map but cannot open transcripts.
+
+If the same folders are in a Nextcloud, set `SCRUBJAY_VIEW_NEXTCLOUD` to its address and `SCRUBJAY_VIEW_NEXTCLOUD_MAP` to which local folder it shows as which (`/mnt/nas=/NAS`) in `~/.config/scrubjay/config`. Every path under that folder then gets an **☁ open** link: a session's folder, its archived transcript, a local repo or folder, each file written. A folder opens in Nextcloud's Files app; a file opens its folder with the file picked out.
 
 ## What the commands show while they run
 

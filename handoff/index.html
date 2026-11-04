@@ -1114,6 +1114,11 @@ since a hand-off only ever appends turns.</p>
 </ul>
 <p>To <em>branch</em> rather than continue, use Claude Code's native flag: <code>claude --resume &lt;sid&gt;
 --fork-session</code>.</p>
+<p>The catalogue records the hand-off. The first row this machine writes for the session carries
+<code>resumed_from=&lt;host&gt;:&lt;sid&gt;</code>, so <code>/sjview</code> draws it as one session that ran on two machines
+(<code>laptop → henpi</code>). A carry-over into another agent starts a new session. Its first row names the
+session it came from, and <code>/sjview</code> joins the two with a "carried over" link. That session is
+recognised as the first one started in the same folder and agent within a day.</p>
 <h2 id="reading-back-from-a-write-only-relay">Reading back from a write-only relay<a class="headerlink" href="#reading-back-from-a-write-only-relay" title="Permanent link">&para;</a></h2>
 <p>The <code>rsync-wg</code> relay key is pinned to <code>rrsync -wo</code> — <strong>write-only, on purpose</strong>, so a stolen relay
 key can never read the archive back. That property is not weakened here.</p>
