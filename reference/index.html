@@ -1216,6 +1216,14 @@ editing needed:</p>
 <td>don't sweep for sessions that ended without a clean exit</td>
 </tr>
 <tr>
+<td><code>SCRUBJAY_VIEW_PORT=&lt;n&gt;</code></td>
+<td>the port <code>/sjview</code> listens on (default 7787; the next free one if taken)</td>
+</tr>
+<tr>
+<td><code>SCRUBJAY_VIEW_IDLE=&lt;min&gt;</code></td>
+<td>minutes without a request before the <code>/sjview</code> viewer stops (default 30; <code>0</code> = never)</td>
+</tr>
+<tr>
 <td><code>SCRUBJAY_AI_TOPIC=0</code></td>
 <td>don't ask Haiku for the session's topic (one <code>claude -p</code> call per session end with new prompts, on your own usage); use its first prompt</td>
 </tr>

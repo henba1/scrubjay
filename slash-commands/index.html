@@ -558,6 +558,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-session-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The session map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-the-commands-show-while-they-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -905,6 +916,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-session-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The session map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-the-commands-show-while-they-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1035,12 +1057,33 @@ injects it directly with no tool call at all.</p>
 <td><strong>Put the clipboard into this project's assets and read it.</strong> For the thing a terminal can't do: a screenshot, a copied PDF, a diagram. Writes to <code>$SCRUBJAY_ASSETS/&lt;project-slug&gt;/</code> (machine-local, not synced) and hands the path straight to the session. Needs a clipboard on the machine running the session — over SSH use <code>cat &lt;file&gt; \| bin/sj-paste.sh -</code> instead.</td>
 </tr>
 <tr>
+<td><code>/sjview [stop\|status]</code></td>
+<td>—</td>
+<td><strong>See your sessions as a map</strong> in the browser (runs <code>bin/sj-view.sh</code>). One lane per project, newest on the right, forks drawn as arrows; click a session for everything scrubjay holds on it, its transcript, and the command that continues it. Nothing runs until you ask: it starts a small local server and stops on <code>/sjview stop</code>, the page's Stop button, or after 30 minutes unused. See <a href="#the-session-map">The session map</a>.</td>
+</tr>
+<tr>
 <td><code>/sjdoctor [section…]</code></td>
 <td>—</td>
 <td><strong>Check that this machine's sync actually works</strong> (runs <code>bin/sj-doctor.sh</code>). With no argument it verifies everything: config, the data repo, the memory clone, relay reachability, adapters and the last recorded outcomes. Name sections — <code>config</code>, <code>data</code>, <code>memory</code>, <code>relay</code>, <code>harnesses</code>, <code>outcomes</code> — to check just those, which skips the slow network probes for the rest. Read-only and safe to run any time; reach for it when something <em>should</em> have synced and didn't.</td>
 </tr>
 </tbody>
 </table>
+<h2 id="the-session-map">The session map<a class="headerlink" href="#the-session-map" title="Permanent link">&para;</a></h2>
+<p><code>/sjview</code> opens the catalogue as a map: one lane per project, one column per day, and a card per
+session. A card shows the session id and topic, then where it ran (host and folder) and with which
+agent and model, then when, how long and how big. Forks are arrows from the session they branched
+off. Sessions that recorded nothing are hidden unless you tick <strong>show empty</strong>.</p>
+<p>Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
+moved), its forks, where its transcript is archived, and the command that continues it. That is the
+harness's own resume command for a session from this machine, or <code>sj-resume.sh</code> first for one from
+another machine (<a href="../handoff/">hand-off</a>). <strong>Read transcript</strong> shows the archived conversation,
+condensed or in full. A link ending in <code>#sid=&lt;id&gt;</code> opens that session's panel.</p>
+<p>The viewer runs only while you use it. It listens on <code>127.0.0.1</code> alone and answers only requests
+carrying the token in the address it prints. It stops on <code>/sjview stop</code>, on the page's <strong>Stop
+viewer</strong> button, or by itself after <code>SCRUBJAY_VIEW_IDLE</code> minutes without a request (default 30;
+<code>0</code> keeps it running). <code>/sjview status</code> says whether it runs, and where. On a machine you reach over
+SSH, forward the port it prints: <code>ssh -L 7787:127.0.0.1:7787 &lt;host&gt;</code>. A machine with no archive
+(<code>rsync-wg</code>) shows the map but cannot open transcripts.</p>
 <h2 id="what-the-commands-show-while-they-run">What the commands show while they run<a class="headerlink" href="#what-the-commands-show-while-they-run" title="Permanent link">&para;</a></h2>
 <p><code>/sjlog</code> and <code>/sjsync</code> print a step report: one line per step, <code>✓</code> done, <code>✗</code> failed, <code>–</code> skipped
 with the reason. Steps are recorded in <code>~/.scrubjay/run/&lt;op&gt;.tsv</code> as they finish (<code>sj_step</code> in
