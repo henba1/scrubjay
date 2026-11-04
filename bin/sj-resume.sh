@@ -266,6 +266,8 @@ if [ "$src_harness" != "$tgt_harness" ]; then
   sj_adapter_call "$src_harness" sjh_render "$raw" > "$primer" 2>/dev/null
   [ -s "$primer" ] || die "could not render the $src_harness session into readable form"
   ok "rendered the $src_harness session as context -> $primer"
+  # The new session's catalogue row will say where it came from (resumed_from=).
+  sj_resume_mark "$src_host" "$full_sid" context "$tgt_harness" "$dest_cwd"
   echo
   echo "  '$full_sid' is a **$src_harness** session, and $tgt_harness cannot resume it natively."
   echo "  Continue the conversation in $tgt_harness with:"
@@ -297,6 +299,7 @@ mkdir -p "$proj_dir" || die "cannot create $proj_dir"
 if [ -f "$dest" ]; then cp -f "$dest" "$dest.bak" && info "backed up existing copy -> $(basename "$dest").bak"; fi
 cp -f "$raw" "$dest" || die "could not write $dest"
 ok "staged $dest"
+sj_resume_mark "$src_host" "$full_sid" native "$full_sid"   # its next row here says resumed_from=
 
 # The session's siblings: subagent transcripts + tool-results live in <sid>/, and ship-transcript.sh
 # tucks tasks/ and file-history/ in there too. The adapter splits them back to wherever this harness

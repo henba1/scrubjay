@@ -84,6 +84,12 @@ Two guards keep that honest:
 To *branch* rather than continue, use Claude Code's native flag: `claude --resume <sid>
 --fork-session`.
 
+The catalogue records the hand-off. The first row this machine writes for the session carries
+`resumed_from=<host>:<sid>`, so `/sjview` draws it as one session that ran on two machines
+(`laptop → henpi`). A carry-over into another agent starts a new session. Its first row names the
+session it came from, and `/sjview` joins the two with a "carried over" link. That session is
+recognised as the first one started in the same folder and agent within a day.
+
 ## Reading back from a write-only relay
 
 The `rsync-wg` relay key is pinned to `rrsync -wo` — **write-only, on purpose**, so a stolen relay
