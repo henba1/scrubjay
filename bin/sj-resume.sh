@@ -15,7 +15,7 @@
 #   {"ok":true,"mode":"context",…,"primer":<rendered transcript>,"cmd":…}
 #   {"ok":false,"error":…}
 # With --list it prints the WHOLE catalogue as JSON lines (this host's sessions too, marked "here"),
-# {"ts","host","sid","sid8","cwd","topic","harness","here"} — the human list filters to other hosts
+# {"ts","host","sid","sid8","cwd","topic","harness","summary","here"} — the human list filters to other hosts
 # because a hand-off is from elsewhere, but a front-end lists every session and decides itself.
 #
 # Why this is small: `claude --resume <sid>` reads exactly ONE file —
@@ -97,8 +97,12 @@ if [ "$list" -eq 1 ] && [ "$json" -eq 1 ]; then
   # one jq over the whole TSV — a jq per row took 20 s for ~800 sessions on a Raspberry Pi
   sj_log_catalogue | jq -R -c --arg me "$(sj_host)" '
     split("\t") | select(length >= 3 and .[2] != "")
-    | {ts:.[0], host:.[1], sid:.[2], sid8:.[2][0:8], cwd:.[3], topic:(.[4] // ""),
-       harness:(if (.[5] // "-") == "-" or .[5] == "" then null else .[5] end), here:(.[1] == $me)}' >&3
+    | {ts:.[0], host:.[1], sid:.[2], sid8:(.[2] | ltrimstr("ses_") | gsub("-"; "") | .[0:8] | ascii_downcase),
+       cwd:.[3], topic:(.[4] // ""),
+       # a row from before the harness field: an opencode id says so itself, else it was Claude
+       harness:(if (.[5] // "-") != "-" and .[5] != "" then .[5]
+                elif (.[2] | startswith("ses_")) then "opencode" else null end),
+       summary:(.[6] // ""), here:(.[1] == $me)}' >&3
   exit 0
 fi
 if [ "$list" -eq 1 ]; then
@@ -107,7 +111,7 @@ if [ "$list" -eq 1 ]; then
   # Filter to *other* machines BEFORE limiting — a hand-off is by definition from another host, and
   # a busy local machine would otherwise fill the whole window with sessions you can't hand off.
   # HARNESS matters now: a session from another agent can be carried over, but not natively resumed.
-  sj_log_catalogue | while IFS=$'\t' read -r _ts host s cwd topic harness; do
+  sj_log_catalogue | while IFS=$'\t' read -r _ts host s cwd topic harness _summary; do
     [ "$host" = "$me" ] && continue
     printf '%-10s  %-9s  %-8s  %-20s  %s\n' \
       "$host" "${harness:--}" "${s:0:8}" "$(basename "$cwd")" "${topic:0:52}"

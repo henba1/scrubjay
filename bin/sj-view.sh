@@ -6,8 +6,12 @@
 # small local server (view/sj_view.py) in the background and opens it; it stops on `stop`, on the
 # page's Stop button, or by itself after SCRUBJAY_VIEW_IDLE minutes without a request.
 #
-#   usage: sj-view.sh [start] [--port N] [--idle MIN] [--no-open]
-#          sj-view.sh stop | status
+#   usage: sj-view.sh [start] [--port N] [--idle MIN] [--no-open] [--json]
+#          sj-view.sh stop | status [--json]
+#
+# --json is for front-ends (an editor that opens the address itself): stdout is one JSON object,
+# {"running":true,"url":…,"port":…,"idle":…,"ssh":"ssh -L …"|null} or {"running":false}, and
+# start never opens a browser.
 #
 # Listens on 127.0.0.1 only, port SCRUBJAY_VIEW_PORT (default 7787, the next free one if taken).
 # On a machine you reach over SSH, forward it: ssh -L 7787:127.0.0.1:7787 <host>.
@@ -22,13 +26,14 @@ LOGF="$(sj_progress_dir)/view.log"
 
 cmd=start
 case "${1:-}" in start|stop|status) cmd="$1"; shift ;; esac
-port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1
+port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) port="${2:-}"; shift 2 ;;
     --idle) idle="${2:-}"; shift 2 ;;
     --no-open) open=0; shift ;;
-    -h|--help) sed -n '7,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --json) json=1; open=0; shift ;;
+    -h|--help) sed -n '9,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "sj-view: unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -56,6 +61,11 @@ open_url() {
 
 report() {
   local u p i; u="$(url)"; p="$(jq -r '.port' "$STATE")"; i="$(jq -r '.idle // 30 | floor' "$STATE")"
+  if [ "$json" = 1 ]; then
+    jq -c --arg ssh "$([ -n "${SSH_CONNECTION:-}" ] && echo "ssh -L $p:127.0.0.1:$p $(sj_host)")" \
+      '{running:true, url, port, idle: (.idle // 30 | floor), ssh: (if $ssh == "" then null else $ssh end)}' "$STATE"
+    return 0
+  fi
   echo "scrubjay view: $u"
   if [ "$i" = 0 ]; then echo "  runs until /sjview stop or the page's Stop button"
   else echo "  stops by itself after $i min unused; /sjview stop or the page's Stop button ends it now"; fi
@@ -65,14 +75,14 @@ report() {
 
 case "$cmd" in
   status)
-    if running; then report; else echo "scrubjay view: not running"; fi
+    if running; then report; elif [ "$json" = 1 ]; then echo '{"running":false}'; else echo "scrubjay view: not running"; fi
     exit 0 ;;
   stop)
     if running; then
       pid="$(jq -r '.pid' "$STATE")"; kill "$pid" 2>/dev/null
       for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
-      rm -f "$STATE"; echo "scrubjay view: stopped"
-    else echo "scrubjay view: not running"; fi
+      rm -f "$STATE"; [ "$json" = 1 ] && echo '{"running":false}' || echo "scrubjay view: stopped"
+    else [ "$json" = 1 ] && echo '{"running":false}' || echo "scrubjay view: not running"; fi
     exit 0 ;;
 esac
 
@@ -109,7 +119,7 @@ done
 if ! running; then
   echo "sj-view: the viewer did not start:" >&2; sed 's/^/  /' "$LOGF" >&2; exit 1
 fi
-[ -z "$chats" ] && echo "  (no archive on this machine: the map shows the catalogue; transcripts are not readable here)"
+[ -z "$chats" ] && [ "$json" = 0 ] && echo "  (no archive on this machine: the map shows the catalogue; transcripts are not readable here)"
 report
 open_url "$(url)"
 exit 0

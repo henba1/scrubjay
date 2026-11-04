@@ -866,18 +866,24 @@ sj_log_retopic() {  # sj_log_retopic <line> <topic>
 # session can legitimately have two rows, so every reader of these files resolves them the same
 # way: the later row supersedes the earlier one. See the same rule in bin/sj-catalogue.sh and in
 # mcp/sjmcp_server.py's _iter_logs.
-sj_log_catalogue() {  # sj_log_catalogue [limit]
+sj_log_catalogue() {  # sj_log_catalogue [limit] — TSV: ts host sid cwd topic harness summary
   local limit="${1:-0}" data
   data="$(sj_data)" || return 1
+  # The newest row per session wins, by time and then by position: a session handed off to another
+  # machine has rows in two hosts' files, which are read in name order, not time order. (A refresh
+  # keeps its row's first time, so within one file the later line wins a tie.)
   awk -F' *\\| *' '
-    { sid=""; harness="-"
+    { sid=""; harness="-"; summary=""
       for (i=1; i<=NF; i++) {
         if ($i ~ /^session=/) sid=substr($i, 9)
         if ($i ~ /^harness=/) harness=substr($i, 9)
+        if ($i ~ /^summary=/) summary=substr($i, 9)
       }
       if (sid == "") next
+      if ((sid in at) && $1 < at[sid]) next
+      at[sid] = $1
       topic=$4; gsub(/^"|"$/, "", topic)
-      row[sid] = $1 "\t" $2 "\t" sid "\t" $3 "\t" topic "\t" harness }
+      row[sid] = $1 "\t" $2 "\t" sid "\t" $3 "\t" topic "\t" harness "\t" summary }
     END { for (s in row) print row[s] }
   ' "$data"/logs/*.log 2>/dev/null | sort -r | { [ "$limit" -gt 0 ] && head -n "$limit" || cat; }
 }
