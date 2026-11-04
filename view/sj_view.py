@@ -35,6 +35,7 @@ HERE = Path(__file__).resolve().parent
 APP = HERE.parent
 sys.path.insert(0, str(APP / "mcp"))
 import sjmcp_server as sj  # noqa: E402
+import artefacts as art  # noqa: E402
 
 PAGE = HERE / "index.html"
 TRANSCRIPT_MAX = 2_000_000  # chars; a page this big is already unreadable, past it we say so
@@ -82,6 +83,77 @@ class Archive:
                 self.by_sid8, self.at = idx, time.time()
             return self.by_sid8.get(sid8, "")
 
+    def all(self) -> dict[str, str]:
+        self.readable("")
+        with self.lock:
+            return dict(self.by_sid8)
+
+
+class Artefacts:
+    """What each archived session changed (view/artefacts.py), read in the background so the map
+    is up at once. The per-transcript facts are cached on disk, keyed by the transcript's size and
+    mtime, so a later start reads only what changed."""
+
+    VERSION = 3   # bump with any change to what view/artefacts.py:facts() returns
+
+    def __init__(self, arch: Archive, cache: Path, host: str):
+        self.arch, self.cache = arch, cache
+        self.resolver = art.Resolver(host)
+        self.facts: dict[str, dict] = {}       # sid8 -> facts
+        self.done = self.total = 0
+        self.ready = False
+        self.lock = threading.Lock()
+
+    def start(self, cwd_of: dict[str, str]):
+        threading.Thread(target=self._run, args=(cwd_of,), daemon=True).start()
+
+    def _run(self, cwd_of: dict[str, str]):
+        try:
+            disk = json.loads(self.cache.read_text())
+            entries = disk.get("entries", {}) if disk.get("version") == self.VERSION else {}
+        except (OSError, ValueError):
+            entries = {}
+        todo = [(s8, p) for s8, p in self.arch.all().items() if s8 in cwd_of]
+        self.total, fresh = len(todo), {}
+        for s8, path in todo:
+            cwd = cwd_of[s8]
+            try:
+                st = os.stat(path)
+                key = [st.st_size, int(st.st_mtime), cwd]
+                hit = entries.get(path)
+                if hit and hit.get("key") == key:
+                    f = hit["facts"]
+                else:
+                    with open(path, errors="replace") as fh:
+                        f = art.facts(fh.read(), cwd)
+                fresh[path] = {"key": key, "facts": f}
+                with self.lock:
+                    self.facts[s8] = f
+            except OSError:
+                pass
+            self.done += 1
+        self.ready = True
+        try:
+            tmp = self.cache.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"version": self.VERSION, "entries": fresh}))
+            os.chmod(tmp, 0o600)  # commit messages and paths, like the archive it came from
+            tmp.replace(self.cache)
+        except OSError:
+            pass
+
+    def links(self, sid8: str, host: str, cwd: str, parent: str = "") -> list[dict]:
+        with self.lock:
+            f = self.facts.get(sid8)
+            pf = self.facts.get(sj._handle(parent)) if parent else None
+        if not f:
+            return []
+        if pf:
+            f = art.minus(f, pf)
+        out = self.resolver.links(f, host, cwd)
+        for link in out:
+            link["summary"] = art.summary(link)
+        return out
+
 
 def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
     last, first = rows[-1], rows[0]
@@ -99,14 +171,47 @@ def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
     }
 
 
-def graph(r: sj.Roots, arch: Archive) -> dict:
-    rows = _rows(r)
-    nodes = [_node(s, rs, arch) for s, rs in rows.items()]
+def graph(st: "State") -> dict:
+    rows = _rows(st.r)
+    nodes = [_node(s, rs, st.arch) for s, rs in rows.items()]
     known = {n["sid"] for n in nodes}
     edges = [{"from": n["forked_from"], "to": n["sid"], "kind": "fork"}
              for n in nodes if n["forked_from"] and n["forked_from"] in known]
+    # Artefacts: one node each, and an edge per session that changed it, labelled with what it did.
+    arts: dict[str, dict] = {}
+    for n in nodes:
+        if not n["archived"]:
+            continue
+        for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"]):
+            a = arts.setdefault(link["artefact"]["id"], {**link["artefact"], "sessions": 0, "prs": set(), "commits": 0})
+            a["sessions"] += 1
+            a["prs"] |= {x["n"] for x in link["events"] if x["type"] in ("pr_open", "pr_merge") and "n" in x}
+            a["commits"] += sum(1 for x in link["events"] if x["type"] == "commit")
+            edges.append({"from": n["sid"], "to": a["id"], "kind": "artefact", "summary": link["summary"]})
+    for a in arts.values():
+        a["prs"] = len(a["prs"])
     return {"host": os.environ.get("SCRUBJAY_HOST", ""), "nodes": nodes, "edges": edges,
-            "archive": bool(r.chats)}
+            "artefacts": list(arts.values()), "archive": bool(st.r.chats),
+            "indexing": None if st.arts.ready else {"done": st.arts.done, "total": st.arts.total}}
+
+
+def artefact(st: "State", aid: str) -> dict | None:
+    """One artefact and, per session that changed it, what it did there: the milestones."""
+    rows = _rows(st.r)
+    found, sessions = None, []
+    for sid, rs in rows.items():
+        n = _node(sid, rs, st.arch)
+        if not n["archived"]:
+            continue
+        for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"]):
+            if link["artefact"]["id"] == aid:
+                found = link["artefact"]
+                sessions.append({"node": n, "events": link["events"], "files": link["files"],
+                                 "summary": link["summary"]})
+    if not found:
+        return None
+    sessions.sort(key=lambda x: x["node"]["date"] + x["node"]["time"], reverse=True)
+    return {"artefact": found, "sessions": sessions}
 
 
 def _resume_cmd(harness: str, sid: str) -> str:
@@ -121,7 +226,8 @@ def _resume_cmd(harness: str, sid: str) -> str:
         return ""
 
 
-def session(r: sj.Roots, arch: Archive, sid: str) -> dict | None:
+def session(st: "State", sid: str) -> dict | None:
+    r, arch = st.r, st.arch
     all_rows = _rows(r)
     rows = all_rows.get(sid)
     if not rows:
@@ -140,8 +246,9 @@ def session(r: sj.Roots, arch: Archive, sid: str) -> dict | None:
                   "note": f"run it from this project's folder here; it copies the session over "
                           f"from {node['host']} and prints how to continue it"}
     children = [s for s, rs in all_rows.items() if rs[-1].get("forked_from") == sid]
+    links = st.arts.links(node["sid8"], node["host"], node["cwd"], node["forked_from"]) if readable else []
     return {"node": node, "rows": rows, "children": children, "readable": readable,
-            "raw": str(raw) if raw else "", "resume": resume}
+            "raw": str(raw) if raw else "", "resume": resume, "artefacts": links}
 
 
 def _q(s: str) -> str:
@@ -159,9 +266,10 @@ def transcript(r: sj.Roots, arch: Archive, sid8: str, fmt: str) -> dict:
 # ── the server ────────────────────────────────────────────────────────────────────────────────
 
 class State:
-    def __init__(self, token: str, port: int, idle: float, r: sj.Roots):
+    def __init__(self, token: str, port: int, idle: float, r: sj.Roots, cache: Path | None = None):
         self.token, self.port, self.idle, self.r = token, port, idle, r
         self.arch = Archive(r)
+        self.arts = Artefacts(self.arch, cache or Path(os.devnull), os.environ.get("SCRUBJAY_HOST", ""))
         self.last = time.time()
         self.server: ThreadingHTTPServer | None = None
 
@@ -203,9 +311,12 @@ def handler_for(st: State):
             if method == "GET" and u.path == "/":
                 return self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             if method == "GET" and u.path == "/api/graph":
-                return self._json(graph(st.r, st.arch))
+                return self._json(graph(st))
+            if method == "GET" and u.path == "/api/artefact":
+                a = artefact(st, (q.get("id") or [""])[0])
+                return self._json(a) if a else self._json({"error": "no such artefact"}, 404)
             if method == "GET" and u.path == "/api/session":
-                s = session(st.r, st.arch, (q.get("sid") or [""])[0])
+                s = session(st, (q.get("sid") or [""])[0])
                 return self._json(s) if s else self._json({"error": "no such session"}, 404)
             if method == "GET" and u.path == "/api/transcript":
                 return self._json(transcript(st.r, st.arch, (q.get("sid8") or [""])[0],
@@ -247,12 +358,13 @@ def main() -> int:
         print(f"sj-view: cannot listen on 127.0.0.1:{a.port}: {e.strerror}", file=sys.stderr)
         return 1
     port = srv.server_address[1]
-    st = State(secrets.token_urlsafe(18), port, a.idle * 60, r)
+    state = Path(a.state)
+    st = State(secrets.token_urlsafe(18), port, a.idle * 60, r, state.parent / "view-artefacts.json")
     st.server = srv
+    st.arts.start({sj._handle(sid): rs[-1]["cwd"] for sid, rs in _rows(r).items()})
     srv.RequestHandlerClass = handler_for(st)
     srv.daemon_threads = True
 
-    state = Path(a.state)
     url = f"http://127.0.0.1:{port}/?t={st.token}"
     state.parent.mkdir(parents=True, exist_ok=True)
     tmp = state.with_suffix(".tmp")

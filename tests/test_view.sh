@@ -29,7 +29,119 @@ today="$(date +%Y-%m-%d)"
 } > "$LOG"
 read_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_retry-backoff__aaaaaaaa.md"
 mkdir -p "$(dirname "$read_md")"
-printf '# Retry backoff\n\n_1 turns_\n\n## User\n\nwhy does the backoff fire twice?\n\n## Assistant\n\nBecause the timer is armed in both paths.\n' > "$read_md"
+# The parent's transcript, in the shape every renderer emits: writes in the repo, outside it, to
+# memory and to scratch; a branch, a commit, a push, a PR opened and merged, an issue.
+cat > "$read_md" <<'MD'
+# Retry backoff
+
+_2 turns_
+
+## User
+
+why does the backoff fire twice?
+
+## Assistant
+
+Because the timer is armed in both paths.
+
+**→ Edit**
+
+```json
+{"file_path":"/home/user/widget-api/src/retry.ts","old_string":"a","new_string":"b"}
+```
+
+**⎿ output:**
+
+```text
+The file has been updated.
+```
+
+**→ Write**
+
+```json
+{"file_path":"/home/user/notes/backoff.md","content":"x"}
+```
+
+**→ Write**
+
+```json
+{"file_path":"/home/user/.claude/projects/-home-user-widget-api/memory/retry.md","content":"x"}
+```
+
+**→ Write**
+
+```json
+{"file_path":"/tmp/scratch.txt","content":"x"}
+```
+
+**⎿ output:**
+
+```text
+ok
+```
+
+**⎿ output:**
+
+```text
+ok
+```
+
+**⎿ output:**
+
+```text
+ok
+```
+
+**→ Bash**
+
+```bash
+git checkout -q -b fix/backoff && git commit -qam "fix: arm the retry timer once" && git push -q -u origin fix/backoff 2>&1 | tail -1
+```
+
+**⎿ output:**
+
+```text
+```
+
+**→ Bash**
+
+```bash
+gh pr create --title "Arm the retry timer once" --body "x" 2>&1 | tail -1
+```
+
+**⎿ output:**
+
+```text
+https://github.com/acme/widget-api/pull/42
+```
+
+**→ Bash**
+
+```bash
+gh pr merge 42 --squash --delete-branch && gh issue create --title "Jitter is missing" --body "y"
+```
+
+**⎿ output:**
+
+```text
+https://github.com/acme/widget-api/issues/43
+```
+
+**→ Bash**
+
+```bash
+git push origin main
+```
+
+**⎿ error:**
+
+```text
+! [rejected] main -> main (fetch first)
+```
+MD
+# The fork's transcript starts with all of that, then does one thing of its own.
+fork_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_jitter__bbbbbbbb.md"
+{ cat "$read_md"; printf '\n**→ Bash**\n\n```bash\ngit commit -qm "try jitter"\n```\n\n**⎿ output:**\n\n```text\n```\n'; } > "$fork_md"
 
 get() { curl -s -H "X-SJ-Token: $TOK" "http://127.0.0.1:$PORT$1"; }
 
@@ -55,7 +167,7 @@ section "the map: every session once, forks as edges"
 g="$(get /api/graph)"
 assert_eq "one node per session, earlier rows folded in" 5 "$(jq '.nodes | length' <<<"$g")"
 assert_eq "the latest topic wins" "Retry backoff + jitter" "$(jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .topic' <<<"$g")"
-assert_eq "the fork is an edge, parent to child" "$P>$C:fork" "$(jq -r '.edges[] | "\(.from)>\(.to):\(.kind)"' <<<"$g")"
+assert_eq "the fork is an edge, parent to child" "$P>$C:fork" "$(jq -r '.edges[] | select(.kind == "fork") | "\(.from)>\(.to):\(.kind)"' <<<"$g")"
 assert_eq "an opencode id is an opencode session" opencode "$(jq -r --arg s "$O" '.nodes[] | select(.sid == $s) | .harness' <<<"$g")"
 assert_eq "an archived transcript is marked" true "$(jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .archived' <<<"$g")"
 assert_eq "this machine is named" testhost "$(jq -r .host <<<"$g")"
@@ -75,8 +187,33 @@ assert_eq "an unknown session: 404" 404 "$(curl -s -o /dev/null -w '%{http_code}
 section "the transcript"
 t="$(get "/api/transcript?sid8=aaaaaaaa&format=readable")"
 assert_contains "the readable text" "$(jq -r .content <<<"$t")" "Because the timer is armed in both paths."
-assert_contains "a session with none says so" "$(get "/api/transcript?sid8=bbbbbbbb" | jq -r .error)" "not in the archive"
+assert_contains "a session with none says so" "$(get "/api/transcript?sid8=cccccccc" | jq -r .error)" "not in the archive"
 assert_contains "a path is not a session" "$(get "/api/transcript?sid8=../../../etc" | jq -r .error)" "not in the archive"
+
+section "artefacts: what the sessions changed, and the milestones"
+for _ in $(seq 50); do [ "$(get /api/graph | jq -c .indexing)" = null ] && break; sleep 0.1; done
+g="$(get /api/graph)"
+ids="$(jq -r '[.artefacts[].id] | sort | join(" ")' <<<"$g")"
+assert_contains "the GitHub repo, named by the PR the session opened" "$ids" "github.com/acme/widget-api"
+assert_contains "a folder outside the repo" "$ids" "dir:testhost:/home/user/notes"
+assert_contains "the project's memory" "$ids" "memory:widget-api"
+case "$ids" in *tmp*) _no "scratch space is not an artefact" "$ids" ;; *) _ok "scratch space is not an artefact" ;; esac
+assert_eq "kinds are told apart" "folder github record" "$(jq -r '[.artefacts[].kind] | unique | join(" ")' <<<"$g")"
+assert_eq "the edge says what the session did" "PR #42 merged · issue #43 · 1 commit · 1 file" \
+  "$(jq -r --arg s "$P" '.edges[] | select(.from == $s and .to == "github.com/acme/widget-api") | .summary' <<<"$g")"
+a="$(get "/api/artefact?id=github.com/acme/widget-api")"
+pev="$(jq -c --arg s "$P" '.sessions[] | select(.node.sid == $s) | .events' <<<"$a")"
+assert_eq "milestones in order" "branch commit push pr_open pr_merge issue_open" "$(jq -r 'map(.type) | join(" ")' <<<"$pev")"
+assert_eq "the commit message, from -qam" "fix: arm the retry timer once" "$(jq -r '.[] | select(.type == "commit") | .title' <<<"$pev")"
+assert_eq "the pushed branch, not the redirection" "fix/backoff" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$pev")"
+assert_eq "a rejected push is not a push" 1 "$(jq '[.[] | select(.type == "push")] | length' <<<"$pev")"
+assert_eq "the PR links to GitHub" "https://github.com/acme/widget-api/pull/42" "$(jq -r '.[] | select(.type == "pr_merge") | .url' <<<"$pev")"
+assert_eq "the PR's title" "Arm the retry timer once" "$(jq -r '.[] | select(.type == "pr_open") | .title' <<<"$pev")"
+assert_eq "the fork shows only what it did after branching" '["commit:try jitter"]' \
+  "$(jq -c --arg s "$C" '[.sessions[] | select(.node.sid == $s) | .events[] | "\(.type):\(.title)"]' <<<"$a")"
+assert_eq "a session lists what it changed" 3 "$(get "/api/session?sid=$P" | jq '.artefacts | length')"
+assert_eq "an unknown artefact: 404" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-SJ-Token: $TOK" "http://127.0.0.1:$PORT/api/artefact?id=nope")"
+assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
 section "stop: the command, the page's button, and idle"
 out="$(bash "$APP/bin/sj-view.sh" stop 2>&1)"

@@ -8,20 +8,28 @@
 <style>
 :root {
   --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --dim: #5d6678; --line: #d9dee7;
-  --lane: #eef1f6; --blue: #4f8ff7; --blue-soft: #e3edfe; --fork: #4f8ff7;
-  --claude: #d97757; --opencode: #3a3f4b; --codex: #10a37f; --warn: #b4690e;
+  --lane: #eef1f6; --blue: #4f8ff7; --blue-soft: #e3edfe; --warn: #b4690e;
+  /* agents: each harness its own colour */
+  --claude: #c96442; --opencode: #868e96; --codex: #10a37f;
+  /* artefacts: each kind its own colour */
+  --k-github: #8957e5; --k-gitlab: #d6336c; --k-git: #1098ad; --k-repo: #5c7cfa;
+  --k-folder: #c99a06; --k-record: #4f8ff7;
+  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #12151b; --panel: #1b1f27; --ink: #e4e8ef; --dim: #98a1b3; --line: #2c323d;
-    --lane: #171b22; --blue-soft: #1d2a42; --opencode: #c5cad4; --warn: #e0a24a;
+    --lane: #171b22; --blue-soft: #1d2a42; --warn: #e0a24a;
+    --claude: #d97757; --opencode: #a7adb6; --k-github: #a371f7; --k-folder: #e3b341;
+    --ok: #51cf66; --merged: #a371f7; --closed: #ff6b6b;
   }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
 body { display: flex; flex-direction: column; }
+a { color: var(--blue); }
 header { z-index: 5; display: flex; flex-wrap: wrap; gap: 8px;
   align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 header h1 { font-size: 15px; margin: 0 12px 0 0; color: var(--blue); white-space: nowrap; }
@@ -34,35 +42,64 @@ button { cursor: pointer; }
 button:hover { border-color: var(--blue); }
 #count { color: var(--dim); white-space: nowrap; }
 #stop { margin-left: auto; }
-#legend { display: flex; gap: 14px; padding: 6px 16px; color: var(--dim); font-size: 12px; flex-wrap: wrap; }
-#legend span::before { content: ""; display: inline-block; width: 22px; height: 0; margin-right: 6px;
-  vertical-align: middle; border-top: 2px solid var(--fork); }
-#legend .lg-lane::before { border-top: 8px solid var(--lane); }
+#legend { display: flex; gap: 6px 16px; padding: 6px 16px; color: var(--dim); font-size: 12px; flex-wrap: wrap; align-items: center; }
+#legend b { font-weight: 600; color: var(--ink); }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; background: var(--c); }
+.sw.pill { width: 18px; border-radius: 6px; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border: 1.5px solid var(--c); }
+.sw.line { width: 22px; height: 0; border-radius: 0; border-top: 2px solid var(--c); background: none; vertical-align: middle; }
+.sw.dash { border-top-style: dashed; }
 #map { position: relative; overflow: auto; flex: 1; min-height: 0; }
 #canvas { position: relative; }
-svg#edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 3; }
+svg#edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 1; }
 .lane { position: absolute; left: 0; background: var(--lane); border-bottom: 1px solid var(--line); }
 .lane-label { position: sticky; left: 0; display: inline-block; padding: 6px 10px; font-weight: 600;
   color: var(--dim); background: var(--lane); z-index: 2; max-width: 220px; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
-.day { position: absolute; top: 0; height: 22px; font-size: 12px; color: var(--dim); }
-.card { position: absolute; z-index: 2; width: 250px; background: var(--panel); border: 1px solid var(--line);
-  border-left: 4px solid var(--dim); border-radius: 8px; cursor: pointer; overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0,0,0,.06); }
-.card:hover, .card.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-soft); }
-.card.h-claude { border-left-color: var(--claude); }
-.card.h-opencode { border-left-color: var(--opencode); }
-.card.h-codex { border-left-color: var(--codex); }
+.day { position: absolute; top: 0; height: 22px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.day.landed { color: var(--ink); font-weight: 600; }
+
+/* a session: three boxes, its agent's colour down the side and across the top */
+.card { --h: var(--dim); position: absolute; z-index: 2; width: 250px; background: var(--panel);
+  border: 1px solid var(--line); border-left: 6px solid var(--h); border-radius: 8px; cursor: pointer;
+  overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.card.h-claude { --h: var(--claude); } .card.h-opencode { --h: var(--opencode); } .card.h-codex { --h: var(--codex); }
+.card:hover, .card.sel, .card.hl { box-shadow: 0 0 0 2px var(--h); }
 .card > div { padding: 5px 9px; }
 .card .top { font-weight: 600; border-bottom: 1px solid var(--line); display: -webkit-box;
-  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 47px; }
-.card .top code { color: var(--blue); font-weight: 500; }
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 47px;
+  background: color-mix(in srgb, var(--h) 12%, var(--panel)); }
+.card .top code { color: var(--h); font-weight: 600; filter: brightness(.9); }
 .card .mid { font-size: 12px; color: var(--dim); border-bottom: 1px solid var(--line);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card .mid b { color: var(--ink); font-weight: 500; }
+.chip { display: inline-block; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 600;
+  color: #fff; background: var(--h, var(--c)); line-height: 16px; }
 .card .low { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.edge-label { font: 11px var(--mono); fill: var(--fork); }
-aside { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); z-index: 10;
+
+/* an artefact: a pill in its kind's colour */
+.art { --c: var(--dim); position: absolute; z-index: 2; width: 236px; height: 58px; border-radius: 29px;
+  border: 1.5px solid var(--c); background: color-mix(in srgb, var(--c) 12%, var(--panel));
+  padding: 7px 16px; cursor: pointer; overflow: hidden; }
+.art.k-github { --c: var(--k-github); } .art.k-gitlab { --c: var(--k-gitlab); } .art.k-git { --c: var(--k-git); }
+.art.k-repo { --c: var(--k-repo); } .art.k-folder { --c: var(--k-folder); border-style: dashed; }
+.art.k-record { --c: var(--k-record); border-style: dashed; }
+.art:hover, .art.sel, .art.hl { box-shadow: 0 0 0 2px var(--c); }
+.art .l1 { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.art .l1 .kind { color: var(--c); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-right: 5px; }
+.art .l2 { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* edges */
+.fork { stroke: var(--blue); }
+.edge-label { font: 11px var(--mono); fill: var(--blue); }
+g.ae path { fill: none; stroke: var(--c); stroke-width: 1.4; opacity: .3; }
+g.ae.soft path { stroke-dasharray: 5 4; }
+#edges.focus g.ae path { opacity: .06; }
+#edges.focus .fork, #edges.focus .edge-label { opacity: .25; }
+g.ae.hl path, #edges.focus g.ae.hl path { opacity: 1; stroke-width: 2.6; }
+g.ae text { display: none; font: 11px system-ui, sans-serif; fill: var(--ink); paint-order: stroke;
+  stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+g.ae.hl-s text.at-a, g.ae.hl-a text.at-s { display: block; }
+
+aside { position: fixed; top: 0; right: 0; bottom: 0; width: min(580px, 100%); z-index: 10;
   background: var(--panel); border-left: 1px solid var(--line); overflow: auto; padding: 16px;
   box-shadow: -4px 0 16px rgba(0,0,0,.12); display: none; }
 aside.open { display: block; }
@@ -77,6 +114,25 @@ pre.cmd { font: 12px var(--mono); background: var(--bg); border: 1px solid var(-
 .note { color: var(--dim); font-size: 12px; }
 .warn { color: var(--warn); }
 a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
+.alist { list-style: none; padding: 0; margin: 0; }
+.alist li { padding: 6px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.alist li:hover b { text-decoration: underline; }
+.alist .sw { margin-right: 6px; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.stat { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.ms { border: 1px solid var(--line); border-left: 4px solid var(--h, var(--dim)); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.ms.h-claude { --h: var(--claude); } .ms.h-opencode { --h: var(--opencode); } .ms.h-codex { --h: var(--codex); }
+.ms .who { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+.ms .who b { color: var(--ink); }
+.ev { font-size: 13px; margin: 3px 0; display: flex; gap: 6px; align-items: baseline; }
+.ev .tag { flex: none; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 8px; color: #fff; background: var(--t, var(--dim)); }
+.ev.merged { --t: var(--merged); } .ev.opened { --t: var(--ok); } .ev.closed { --t: var(--closed); }
+.ev.issue { --t: #e8590c; } .ev.release { --t: #1098ad; }
+.ms details { font-size: 13px; margin-top: 4px; }
+.ms details summary { cursor: pointer; color: var(--dim); }
+.ms details li { margin: 2px 0; word-break: break-word; }
+.ms code { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.ev .names { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 #reader { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: none; flex-direction: column; }
 #reader.open { display: flex; }
 #reader .bar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--panel);
@@ -95,7 +151,7 @@ a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
 <body>
 <header>
   <h1>◆ scrubjay sessions</h1>
-  <input id="q" type="search" placeholder="search topic, folder, session id">
+  <input id="q" type="search" placeholder="search topic, folder, session id, repo">
   <select id="project"><option value="">all projects</option></select>
   <select id="host"><option value="">all hosts</option></select>
   <select id="harness"><option value="">all agents</option></select>
@@ -103,16 +159,28 @@ a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
     <option value="7">last 7 days</option><option value="30" selected>last 30 days</option>
     <option value="90">last 90 days</option><option value="0">everything</option>
   </select>
+  <select id="arts" title="which artefacts to draw">
+    <option value="all">all artefacts</option><option value="git">repos only</option><option value="none">no artefacts</option>
+  </select>
   <label title="sessions that recorded nothing: size 0, no topic"><input id="empty-too" type="checkbox"> show empty</label>
   <span id="count"></span>
   <button id="stop" title="Shut the viewer down; /sjview starts it again">Stop viewer</button>
 </header>
 <div id="legend">
-  <span>fork (branched off the session on the left)</span>
-  <span class="lg-lane">one lane per project, newest on the right</span>
-  <span style="--fork: var(--claude)">claude</span>
-  <span style="--fork: var(--opencode)">opencode</span>
-  <span style="--fork: var(--codex)">codex</span>
+  <b>agents</b>
+  <span><i class="sw" style="--c: var(--claude)"></i>claude</span>
+  <span><i class="sw" style="--c: var(--opencode)"></i>opencode</span>
+  <span><i class="sw" style="--c: var(--codex)"></i>codex</span>
+  <b>artefacts</b>
+  <span><i class="sw pill" style="--c: var(--k-github)"></i>GitHub</span>
+  <span><i class="sw pill" style="--c: var(--k-gitlab)"></i>GitLab</span>
+  <span><i class="sw pill" style="--c: var(--k-git)"></i>other git remote</span>
+  <span><i class="sw pill" style="--c: var(--k-repo)"></i>local repo</span>
+  <span><i class="sw pill" style="--c: var(--k-folder)"></i>local folder</span>
+  <span><i class="sw pill" style="--c: var(--k-record)"></i>scrubjay memory/plans</span>
+  <b>links</b>
+  <span><i class="sw line" style="--c: var(--blue)"></i>fork</span>
+  <span><i class="sw line" style="--c: var(--dim)"></i>changed (hover a node for what)</span>
 </div>
 <div id="map"><div id="canvas"><svg id="edges"></svg></div><div id="empty" hidden></div></div>
 <aside id="detail"><button class="x" id="close">✕</button><div id="dbody"></div></aside>
@@ -137,12 +205,17 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const human = (n) => { n = Number(n) || 0; for (const u of ["B", "K", "M", "G"]) {
   if (n < 1024) return (u === "B" ? n : n.toFixed(n < 10 ? 1 : 0)) + u; n /= 1024; } return n.toFixed(0) + "T"; };
-const home = (p) => p.replace(/^\/(home|Users)\/[^/]+/, "~");
+const home = (p) => String(p || "").replace(/^\/(home|Users)\/[^/]+/, "~");
 // The end of a path is the part that tells folders apart; the lane already names the project.
 const tail = (p) => { const h = home(p), parts = h.split("/"); return parts.length > 3 ? "…/" + parts.slice(-2).join("/") : h; };
+const KIND = { github: "GitHub", gitlab: "GitLab", git: "git", repo: "repo", folder: "folder", record: "scrubjay" };
+const GIT_KINDS = new Set(["github", "gitlab", "git", "repo"]);
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
-let G = { nodes: [], edges: [], host: "" }, bySid = new Map();
-const CARD_W = 250, CARD_H = 124, GAP_X = 46, GAP_Y = 12, LABEL_W = 0, TOP = 28, LANE_PAD = 34;
+let G = { nodes: [], edges: [], artefacts: [], host: "" }, bySid = new Map(), byArt = new Map();
+let selected = null; // {sid} or {aid}: kept highlighted while its panel is open
+const CARD_W = 250, CARD_H = 124, GAP_X = 46, GAP_Y = 12, TOP = 28, LANE_PAD = 34;
+const ART_W = 236, ART_H = 58, ART_GAP = 10, ART_COL_GAP = 120;
 
 function fillSelect(id, values) {
   const el = $(id), keep = el.value;
@@ -151,31 +224,45 @@ function fillSelect(id, values) {
   el.value = values.includes(keep) ? keep : "";
 }
 
+let first = true;
 async function load() {
   G = await api("/api/graph");
   bySid = new Map(G.nodes.map((n) => [n.sid, n]));
+  byArt = new Map((G.artefacts || []).map((a) => [a.id, a]));
   const uniq = (k) => [...new Set(G.nodes.map((n) => n[k]).filter(Boolean))].sort();
   fillSelect("project", uniq("project"));
   fillSelect("host", uniq("host"));
   fillSelect("harness", uniq("harness"));
   draw();
+  if (first) { first = false; const m = $("map"); m.scrollLeft = m.scrollWidth; }
+  // The artefact index fills in the background on a cold start; redraw until it is done.
+  if (G.indexing) setTimeout(load, 1500);
 }
 
 function visible() {
   const q = $("q").value.trim().toLowerCase(), p = $("project").value, h = $("host").value,
     a = $("harness").value, days = Number($("since").value), all = $("empty-too").checked;
   const cut = days ? new Date(Date.now() - days * 864e5).toISOString().slice(0, 10) : "";
+  const hitArt = new Set();
+  if (q) for (const e of G.edges) if (e.kind === "artefact") {
+    const x = byArt.get(e.to); if (x && (x.label + " " + (x.url || "") + " " + (x.path || "")).toLowerCase().includes(q)) hitArt.add(e.from);
+  }
   return G.nodes.filter((n) => (all || n.size !== "0" || n.topic) && (!p || n.project === p) && (!h || n.host === h) && (!a || n.harness === a)
     && (!cut || n.date >= cut)
-    && (!q || [n.topic, n.cwd, n.sid, n.host, n.model].join(" ").toLowerCase().includes(q)));
+    && (!q || hitArt.has(n.sid) || [n.topic, n.cwd, n.sid, n.host, n.model].join(" ").toLowerCase().includes(q)));
 }
 
 function draw() {
   const canvas = $("canvas"), svg = $("edges");
-  canvas.querySelectorAll(".lane,.card,.day").forEach((e) => e.remove());
+  canvas.querySelectorAll(".lane,.card,.day,.art").forEach((e) => e.remove());
   svg.innerHTML = "";
   const nodes = visible().sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
-  $("count").textContent = `${nodes.length} of ${G.nodes.length} sessions`;
+  const shown = new Set(nodes.map((n) => n.sid));
+  const mode = $("arts").value;
+  const aedges = G.edges.filter((e) => e.kind === "artefact" && shown.has(e.from) && mode !== "none"
+    && (mode === "all" || GIT_KINDS.has(byArt.get(e.to)?.kind)));
+  const idx = G.indexing ? ` · reading artefacts ${G.indexing.done}/${G.indexing.total}` : "";
+  $("count").textContent = `${nodes.length} of ${G.nodes.length} sessions${idx}`;
   $("empty").hidden = nodes.length > 0;
   $("empty").textContent = G.nodes.length ? "No session matches these filters." :
     "The catalogue is empty on this machine (no logs/*.log in the data repo).";
@@ -189,26 +276,45 @@ function draw() {
     if (!lanes.has(k)) lanes.set(k, []);
     lanes.get(k).push(n);
   }
+  const laneOf = new Map(nodes.map((n) => [n.sid, n.project || "(no folder)"]));
+  // An artefact sits in the lane whose sessions changed it most, in a column right of the timeline.
+  const artLane = new Map();
+  {
+    const votes = new Map();
+    for (const e of aedges) {
+      const v = votes.get(e.to) || new Map(), l = laneOf.get(e.from);
+      v.set(l, (v.get(l) || 0) + 1); votes.set(e.to, v);
+    }
+    for (const [aid, v] of votes) artLane.set(aid, [...v.entries()].sort((a, b) => b[1] - a[1])[0][0]);
+  }
+  const artsIn = new Map();
+  for (const [aid, l] of artLane) { if (!artsIn.has(l)) artsIn.set(l, []); artsIn.get(l).push(aid); }
+  for (const list of artsIn.values()) list.sort((a, b) => (byArt.get(b).sessions - byArt.get(a).sessions));
+
   const order = [...lanes.entries()].sort((a, b) =>
     (b[1].at(-1).date + b[1].at(-1).time).localeCompare(a[1].at(-1).date + a[1].at(-1).time));
 
-  const pos = new Map();
-  let y = TOP;
-  const width = LABEL_W + days.length * (CARD_W + GAP_X) + 40;
-  days.forEach((d, i) => {
+  const pos = new Map(), apos = new Map();
+  const artX = 16 + days.length * (CARD_W + GAP_X) - GAP_X + ART_COL_GAP;
+  const width = (artLane.size ? artX + ART_W : 16 + days.length * (CARD_W + GAP_X)) + 40;
+  const dayEl = (text, x, cls = "") => {
     const el = document.createElement("div");
-    el.className = "day"; el.textContent = d;
-    el.style.left = (LABEL_W + 16 + i * (CARD_W + GAP_X)) + "px"; el.style.top = "6px";
+    el.className = "day " + cls; el.textContent = text; el.style.left = x + "px"; el.style.top = "6px";
     canvas.appendChild(el);
-  });
+  };
+  days.forEach((d, i) => dayEl(d, 16 + i * (CARD_W + GAP_X)));
+  if (artLane.size) dayEl("where the work landed", artX, "landed");
+  let y = TOP;
   for (const [name, list] of order) {
     const stack = new Map();
     for (const n of list) {
       const c = col.get(n.date), s = stack.get(c) || 0;
       stack.set(c, s + 1);
-      pos.set(n.sid, { x: LABEL_W + 16 + c * (CARD_W + GAP_X), y: y + LANE_PAD + s * (CARD_H + GAP_Y) });
+      pos.set(n.sid, { x: 16 + c * (CARD_W + GAP_X), y: y + LANE_PAD + s * (CARD_H + GAP_Y) });
     }
-    const h = LANE_PAD + Math.max(...stack.values()) * (CARD_H + GAP_Y) + 6;
+    const arts = artsIn.get(name) || [];
+    arts.forEach((aid, i) => apos.set(aid, { x: artX, y: y + LANE_PAD + i * (ART_H + ART_GAP) }));
+    const h = LANE_PAD + Math.max(Math.max(...stack.values()) * (CARD_H + GAP_Y), arts.length * (ART_H + ART_GAP)) + 6;
     const lane = document.createElement("div");
     lane.className = "lane"; lane.style.top = y + "px"; lane.style.height = h + "px";
     lane.style.width = Math.max(width, $("map").clientWidth) + "px";
@@ -225,18 +331,50 @@ function draw() {
     el.innerHTML =
       `<div class="top" title="${esc(topic)}"><code>${esc(n.sid8)}</code> ${esc(topic)}</div>` +
       `<div class="mid" title="${esc(n.host + " · " + n.cwd)}">${esc(n.host)} · ${esc(tail(n.cwd))}<br>` +
-      `<b>${esc(n.harness)}</b>${n.model ? " · " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
+      `<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
       `<div class="low">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
       `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div>`;
     el.onclick = () => open(n.sid);
+    el.onmouseenter = () => focus({ sid: n.sid });
+    el.onmouseleave = () => focus(selected);
+    canvas.appendChild(el);
+  }
+  for (const [aid, p] of apos) {
+    const a = byArt.get(aid), el = document.createElement("div");
+    el.className = `art k-${a.kind}`;
+    el.dataset.aid = aid;
+    el.style.left = p.x + "px"; el.style.top = p.y + "px";
+    const bits = [plural(a.sessions, "session")];
+    if (a.prs) bits.push(plural(a.prs, "PR"));
+    if (a.commits) bits.push(plural(a.commits, "commit"));
+    el.title = a.url || home(a.path || "");
+    el.innerHTML = `<div class="l1"><span class="kind">${esc(KIND[a.kind] || a.kind)}</span>${esc(a.label)}</div>` +
+      `<div class="l2">${esc(bits.join(" · "))}${a.kind === "folder" || a.kind === "repo" ? " · " + esc(a.host) : ""}</div>`;
+    el.onclick = () => openArt(aid);
+    el.onmouseenter = () => focus({ aid });
+    el.onmouseleave = () => focus(selected);
     canvas.appendChild(el);
   }
   canvas.style.width = Math.max(width, $("map").clientWidth) + "px";
   canvas.style.height = y + "px";
   svg.setAttribute("width", width); svg.setAttribute("height", y);
 
+  let html = `<defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">` +
+    `<path d="M0,0 L8,4 L0,8 z" fill="var(--blue)"/></marker></defs>`;
+  // Session → artefact: from the card's right edge to the pill's left; faint until a node is hovered.
+  for (const e of aedges) {
+    const a = pos.get(e.from), b = apos.get(e.to);
+    if (!a || !b) continue;
+    const k = byArt.get(e.to).kind;
+    const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2, x2 = b.x, y2 = b.y + ART_H / 2, mx = (x1 + x2) / 2;
+    html += `<g class="ae k-${k}${k === "folder" || k === "record" ? " soft" : ""}" data-from="${esc(e.from)}" data-to="${esc(e.to)}"` +
+      ` style="--c: var(--k-${k})"><path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>` +
+      `<text class="at-a" x="${x2 - 8}" y="${y2 - 6}" text-anchor="end">${esc(e.summary)}</text>` +
+      `<text class="at-s" x="${x1 + 8}" y="${y1 - 6}">${esc(e.summary)}</text></g>`;
+  }
   // Forks: parent's right edge to child's left edge; a parent filtered out of view draws no line.
   for (const e of G.edges) {
+    if (e.kind !== "fork") continue;
     const a = pos.get(e.from), b = pos.get(e.to);
     if (!a || !b) continue;
     const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2, x2 = b.x, y2 = b.y + CARD_H / 2;
@@ -244,13 +382,38 @@ function draw() {
     const d = back
       ? `M${x1},${y1} C${x1 + 40},${y1} ${x1 + 40},${y2} ${b.x + CARD_W},${y2}`
       : `M${x1},${y1} C${x1 + GAP_X},${y1} ${x2 - GAP_X},${y2} ${x2},${y2}`;
-    svg.insertAdjacentHTML("beforeend",
-      `<path d="${d}" fill="none" stroke="var(--fork)" stroke-width="2" marker-end="url(#arrow)"/>` +
-      `<text class="edge-label" x="${(x1 + (back ? b.x + CARD_W : x2)) / 2 + (back ? 30 : 0)}" y="${(y1 + y2) / 2 - 4}">fork</text>`);
+    html += `<path class="fork" d="${d}" fill="none" stroke-width="2" marker-end="url(#arrow)"/>` +
+      `<text class="edge-label" x="${(x1 + (back ? b.x + CARD_W : x2)) / 2 + (back ? 30 : 0)}" y="${(y1 + y2) / 2 - 4}">fork</text>`;
   }
-  svg.insertAdjacentHTML("afterbegin",
-    `<defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">` +
-    `<path d="M0,0 L8,4 L0,8 z" fill="var(--fork)"/></marker></defs>`);
+  svg.innerHTML = html;
+  focus(selected);
+}
+
+// Hovering (or selecting) a node lights up its links and the nodes at their other end.
+function focus(f) {
+  const svg = $("edges");
+  document.querySelectorAll(".card.hl,.art.hl").forEach((e) => e.classList.remove("hl"));
+  svg.querySelectorAll("g.ae").forEach((g) => g.classList.remove("hl", "hl-s", "hl-a"));
+  svg.classList.toggle("focus", !!f);
+  if (!f) return;
+  svg.querySelectorAll("g.ae").forEach((g) => {
+    if (f.sid && g.dataset.from === f.sid) {
+      g.classList.add("hl", "hl-s");
+      document.querySelector(`.art[data-aid="${CSS.escape(g.dataset.to)}"]`)?.classList.add("hl");
+    } else if (f.aid && g.dataset.to === f.aid) {
+      g.classList.add("hl", "hl-a");
+      document.querySelector(`.card[data-sid="${CSS.escape(g.dataset.from)}"]`)?.classList.add("hl");
+    }
+  });
+}
+
+function select(f) {
+  selected = f;
+  document.querySelectorAll(".card.sel,.art.sel").forEach((c) => c.classList.remove("sel"));
+  const el = f?.sid ? document.querySelector(`.card[data-sid="${CSS.escape(f.sid)}"]`)
+    : f?.aid ? document.querySelector(`.art[data-aid="${CSS.escape(f.aid)}"]`) : null;
+  if (el) { el.classList.add("sel"); el.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  focus(f);
 }
 
 function kv(rows) {
@@ -262,12 +425,16 @@ const sidLink = (sid) => {
   return `<a class="sid" data-sid="${esc(sid)}">${esc(n ? n.sid8 : sid.slice(0, 8))}</a>` +
     (n ? ` ${esc(n.topic || "")}` : ' <span class="note">(not in the catalogue)</span>');
 };
+const artName = (a) => `<i class="sw pill" style="--c: var(--k-${esc(a.kind)})"></i><b>${esc(a.label)}</b>` +
+  ` <span class="note">${esc(KIND[a.kind] || a.kind)}</span>`;
+function wire(root) {
+  root.querySelectorAll("a.sid").forEach((a) => a.onclick = () => open(a.dataset.sid));
+  root.querySelectorAll("[data-aid]").forEach((a) => a.onclick = () => openArt(a.dataset.aid));
+}
 
 async function open(sid) {
   history.replaceState(null, "", location.search + "#sid=" + encodeURIComponent(sid));
-  document.querySelectorAll(".card.sel").forEach((c) => c.classList.remove("sel"));
-  const card = document.querySelector(`.card[data-sid="${CSS.escape(sid)}"]`);
-  if (card) { card.classList.add("sel"); card.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  select({ sid });
   $("detail").classList.add("open");
   $("dbody").innerHTML = '<p class="note">loading…</p>';
   const s = await api("/api/session?sid=" + encodeURIComponent(sid));
@@ -280,9 +447,16 @@ async function open(sid) {
     `<h2>${esc(n.topic || "(untitled)")}</h2><div class="note">${esc(n.sid)}</div>` +
     `<h3>Session</h3>` + kv([
       ["started", esc(`${n.date} ${n.time}`)], ["host", esc(n.host) + (n.host === G.host ? ' <span class="note">(this machine)</span>' : "")],
-      ["folder", esc(n.cwd)], ["project", esc(n.project)], ...extra,
+      ["folder", esc(n.cwd)], ["project", esc(n.project)],
+      ["agent", `<span class="chip" style="--h: var(--${esc(n.harness)})">${esc(n.harness)}</span>`],
+      ...extra.filter(([k]) => k !== "harness"),
       ["topic from", n.essence ? "written with /sjlog" : last.prompts ? `Haiku, over ${esc(last.prompts)} prompts` : "the first prompt"],
     ]) +
+    `<h3>What it changed</h3>` + (s.artefacts?.length
+      ? `<ul class="alist">${s.artefacts.map((l) => `<li data-aid="${esc(l.artefact.id)}">${artName(l.artefact)}` +
+          `<div class="note">${esc(l.summary)}</div></li>`).join("")}</ul>`
+      : `<p class="note">${s.readable ? (G.indexing ? "Still reading the archive…" : "Nothing found: no files written, no git activity.") :
+          "Unknown: the transcript is not in the archive on this machine."}</p>`) +
     `<h3>Connections</h3>` + kv([
       ["forked from", n.forked_from ? sidLink(n.forked_from) : '<span class="note">none recorded</span>'],
       ["forks of it", s.children.length ? s.children.map(sidLink).join("<br>") : '<span class="note">none</span>'],
@@ -299,12 +473,78 @@ async function open(sid) {
     `<h3>Topic history (${s.rows.length} rows)</h3>` +
     kv(s.rows.map((w) => [`${w.date} ${w.time}`, esc(w.topic || "(untitled)") +
       (w.prompts ? ` <span class="note">· ${esc(w.prompts)} prompts</span>` : "")]));
-  $("dbody").querySelectorAll("a.sid").forEach((a) => a.onclick = () => open(a.dataset.sid));
+  wire($("dbody"));
   if ($("readc")) $("readc").onclick = () => read(n);
   if ($("copy")) $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(r.cmd); $("copy").textContent = "Copied"; }
     catch { getSelection().selectAllChildren($("rcmd")); $("copy").textContent = "Selected — press Ctrl+C"; }
   };
+}
+
+// What one session did to one artefact, most telling first: PRs, issues and releases as their own
+// lines; commits, pushes, branches and files folded beneath.
+function milestones(s, a, titles) {
+  const ev = s.events, link = (x, text) => x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text);
+  const merged = new Set(ev.filter((x) => x.type === "pr_merge" && x.n).map((x) => x.n));
+  const rows = [];
+  const pr = a.kind === "gitlab" ? "MR !" : "PR #";
+  const t = (n) => titles.get(n) ? " " + esc(titles.get(n)) : "";
+  for (const x of ev) {
+    if (x.type === "pr_open") rows.push([merged.has(x.n) ? "merged" : "opened", merged.has(x.n) ? "merged" : "opened",
+      link(x, pr + x.n) + (x.title ? " " + esc(x.title) : "")]);
+    else if (x.type === "pr_merge" && !ev.some((o) => o.type === "pr_open" && o.n === x.n))
+      rows.push(["merged", "merged", x.n ? link(x, pr + x.n) + t(x.n) : "the branch's PR"]);
+    else if (x.type === "pr_close") rows.push(["closed", "closed", x.n ? link(x, pr + x.n) + t(x.n) : "a PR"]);
+    else if (x.type === "issue_open") rows.push(["issue", "issue", link(x, "#" + x.n) + (x.title ? " " + esc(x.title) : "")]);
+    else if (x.type === "issue_close") rows.push(["closed", "closed", link(x, "issue #" + x.n)]);
+    else if (x.type === "issue_comment") rows.push(["issue", "comment", link(x, "on #" + x.n)]);
+    else if (x.type === "release") rows.push(["release", "release", link(x, x.tag)]);
+  }
+  const commits = ev.filter((x) => x.type === "commit");
+  const pushed = [...new Set(ev.filter((x) => x.type === "push").map((x) => x.branch || "upstream"))];
+  const branches = [...new Set(ev.filter((x) => x.type === "branch").map((x) => x.branch))];
+  const n = s.node;
+  return `<div class="ms h-${esc(n.harness)}"><div class="who">${esc(n.date)} ${esc(n.time)} · ` +
+    `<a class="sid" data-sid="${esc(n.sid)}">${esc(n.sid8)}</a> <b>${esc(n.topic || "(untitled)")}</b> · ${esc(n.harness)} on ${esc(n.host)}</div>` +
+    rows.map(([cls, tag, text]) => `<div class="ev ${cls}"><span class="tag">${tag}</span><span>${text}</span></div>`).join("") +
+    (branches.length ? `<div class="ev"><span class="note">branch</span><span class="names">${branches.map((b) => `<code>${esc(b)}</code>`).join("")}</span></div>` : "") +
+    (pushed.length ? `<div class="ev"><span class="note">pushed</span><span class="names">${pushed.map((b) => `<code>${esc(b)}</code>`).join("")}</span></div>` : "") +
+    (commits.length ? `<details><summary>${plural(commits.length, "commit")}</summary><ul>${commits.map((c) =>
+      `<li>${c.sha ? link(c, c.sha) + " " : ""}${esc(c.title || "(message not recorded)")}</li>`).join("")}</ul></details>` : "") +
+    (s.files.length ? `<details><summary>${plural(s.files.length, "file")} written</summary><ul>${s.files.map((f) =>
+      `<li><code>${esc(home(f))}</code></li>`).join("")}</ul></details>` : "") +
+    `</div>`;
+}
+
+async function openArt(aid) {
+  history.replaceState(null, "", location.search + "#art=" + encodeURIComponent(aid));
+  select({ aid });
+  $("detail").classList.add("open");
+  $("dbody").innerHTML = '<p class="note">loading…</p>';
+  const d = await api("/api/artefact?id=" + encodeURIComponent(aid));
+  if (d.error) { $("dbody").innerHTML = `<p class="warn">${esc(d.error)}</p>`; return; }
+  const a = d.artefact, all = d.sessions.flatMap((s) => s.events);
+  const nums = (t) => [...new Set(all.filter((x) => x.type === t && x.n).map((x) => x.n))].sort((p, q) => p - q);
+  const merged = nums("pr_merge"), opened = nums("pr_open").filter((n) => !merged.includes(n)), issues = nums("issue_open");
+  const commits = all.filter((x) => x.type === "commit").length;
+  const files = new Set(d.sessions.flatMap((s) => s.files)).size;
+  const titles = new Map(all.filter((x) => x.title && (x.type === "pr_open" || x.type === "issue_open")).map((x) => [x.n, x.title]));
+  const span = d.sessions.length ? `${d.sessions.at(-1).node.date} → ${d.sessions[0].node.date}` : "";
+  $("dbody").innerHTML =
+    `<h2>${artName(a)}</h2>` +
+    (a.url ? `<div><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)} ↗</a></div>` : "") +
+    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}</div>` : "") +
+    `<div class="stats">` +
+      `<span class="stat">${plural(d.sessions.length, "session")}</span>` +
+      (merged.length ? `<span class="stat">merged ${merged.map((n) => "#" + n).join(" ")}</span>` : "") +
+      (opened.length ? `<span class="stat" title="opened in these sessions; a merge was not seen in any of them">opened ${opened.map((n) => "#" + n).join(" ")}</span>` : "") +
+      (issues.length ? `<span class="stat">issues ${issues.map((n) => "#" + n).join(" ")}</span>` : "") +
+      (commits ? `<span class="stat">${plural(commits, "commit")}</span>` : "") +
+      (files ? `<span class="stat">${plural(files, "file")}</span>` : "") +
+      (span ? `<span class="stat">${esc(span)}</span>` : "") +
+    `</div>` +
+    `<h3>Milestones, newest first</h3>` + d.sessions.map((s) => milestones(s, a, titles)).join("");
+  wire($("dbody"));
 }
 
 // The archive's readable Markdown, drawn as turns. Everything is escaped first; only the few
@@ -346,25 +586,30 @@ async function read(n) {
   $("rformat").onchange = () => read(n);
 }
 
-$("close").onclick = () => { $("detail").classList.remove("open"); history.replaceState(null, "", location.search); };
+function closePanel() {
+  $("detail").classList.remove("open");
+  history.replaceState(null, "", location.search);
+  select(null);
+}
+$("close").onclick = closePanel;
 $("rclose").onclick = () => $("reader").classList.remove("open");
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if ($("reader").classList.contains("open")) $("reader").classList.remove("open");
-  else $("detail").classList.remove("open");
+  else closePanel();
 });
-for (const id of ["q", "project", "host", "harness", "since", "empty-too"]) $(id).addEventListener("input", draw);
+for (const id of ["q", "project", "host", "harness", "since", "arts", "empty-too"]) $(id).addEventListener("input", draw);
 $("stop").onclick = async () => {
   await api("/api/stop", { method: "POST" }).catch(() => {});
   document.body.innerHTML = '<p id="empty">The viewer has stopped. Run <code>/sjview</code> to start it again.</p>';
 };
-// `#sid=<id>` opens that session's panel, `#read=<id>` its transcript: links you can keep.
+// `#sid=<id>` opens a session's panel, `#read=<id>` its transcript, `#art=<id>` an artefact's
+// milestones: links you can keep.
 load().then(async () => {
-  const m = $("map"); m.scrollLeft = m.scrollWidth;
-  const h = new URLSearchParams(location.hash.slice(1)), sid = h.get("sid") || h.get("read");
+  const h = new URLSearchParams(location.hash.slice(1)), sid = h.get("sid") || h.get("read"), aid = h.get("art");
   if (sid && bySid.has(sid)) { await open(sid); if (h.get("read")) read(bySid.get(sid)); }
-})
-  .catch(() => { $("empty").hidden = false; $("empty").textContent = "Could not reach the viewer — it may have stopped. Run /sjview again."; });
+  else if (aid) openArt(aid);
+}).catch(() => { $("empty").hidden = false; $("empty").textContent = "Could not reach the viewer — it may have stopped. Run /sjview again."; });
 </script>
 </body>
 </html>
