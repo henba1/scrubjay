@@ -15,6 +15,34 @@ Start a conversation on the laptop, finish it on the workstation. `/sjresume` st
 /resume                       # and pick it out of the list
 ```
 
+## From a terminal: `claude resume <sid>`
+
+Outside a session, skip the slash command. With scrubjay's shell integration installed, this works for a session recorded on **any** machine:
+
+```
+cd ~/code/widget-api          # the folder to continue it in, on this machine
+claude resume da79fffa        # the 8-hex handle, or a full id
+claude --resume da79fffa      # same thing; so is -r, and any other flags are kept
+```
+
+It finds the session, stages it here exactly as `/sjresume` would, and then runs the real `claude --resume <full-id>`:
+
+1. **Which session.** The prefix is expanded against this machine's own transcripts and the cross-machine catalogue (`logs/<host>.log`, already on every machine, so no network). If it matches more than one session it lists them — host, date, folder, topic — and stops.
+1. **Already here?** Then it is simply resumed. A session that belongs to another folder on this machine is resumed *from that folder* (Claude Code only looks in the current folder's project dir), as long as the folder still exists.
+1. **Otherwise it is handed off** with `bin/sj-resume.sh` into the folder you are standing in — the other host's paths rewritten to it, the source host and folder printed — with `--no-clobber`: a local transcript is never replaced by a different one, not even with a backup. If the folder it was recorded in exists here too and you're somewhere else, it says so: `cd` there and re-run if that's where you meant to continue.
+
+A session from a different agent (opencode, codex) can't be resumed by `claude`; you get the same carry-over command `/sjresume` prints instead.
+
+**What gets intercepted, and what doesn't.** The integration is a `claude` shell function (bash and zsh) in `bin/sj-shell.sh`. It intercepts only `resume <id>` as the *first* word, or `--resume` / `-r` / `--resume=` followed by something that looks like a session id (8–36 hex digits and dashes). Everything else — `claude`, `claude -p "resume the build"`, `claude --resume` (the picker), `claude --resume <search words>` — goes straight to the binary after one pattern match on the arguments, so there is no startup cost.
+
+**Installing it.** Once per machine:
+
+```
+bash ~/.scrubjay/scrubjay/bin/sj-shell-install.sh     # then open a new shell
+```
+
+It adds one marked block to `~/.bashrc` and/or `~/.zshrc` that sources the snippet *through* `~/.claude/hooks` — the symlink scrubjay's config sync keeps aimed at the app — so later updates arrive with every app pull and no further rc edit. `--status` checks it, `--uninstall` removes the block and nothing else. `bin/onboard.sh` offers it on new machines (`SCRUBJAY_SHELL_HOOK=1|0` answers unattended), and `/sjdoctor` notes when it's missing.
+
 ## Why this is barely any machinery
 
 `claude --resume <sid>` reads exactly **one file**: `~/.claude/projects/<slug>/<sid>.jsonl`. There is no session database to reconstruct. And the relay already archives that file *byte-for-byte* at `<archive>/<host>/<slug>/<sid>.jsonl` — the transcript **is** the resumable artifact, which is why [transports.md](https://henba1.github.io/scrubjay/transports/index.md) calls the `.jsonl` "the thing you'd resume or feed to a tool."
@@ -93,6 +121,7 @@ sj-resume.sh <sid|sid8>        # stage it into the project dir you're standing i
 | Flag                 | Why you'd reach for it                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--into <dir>`       | The project lives somewhere else here. Stage against `<dir>` instead of `$PWD`.                                                                                                                                                                                                                                                                                                                                |
+| `--no-clobber`       | Never replace an existing local transcript that differs from the archive's — refuse instead, even where `--force`-less staging would back it up and replace it. `claude resume <sid>` always passes it.                                                                                                                                                                                                        |
 | `--force`            | Import even when the local copy is **longer** than the archive's. The refusal exists to protect unpublished turns — prefer `/sjlog` on the other machine first. The overwritten file is still backed up to `<sid>.jsonl.bak`.                                                                                                                                                                                  |
 | `--no-rewrite-paths` | Install the archive copy **verbatim**. For inspecting a transcript as it was recorded; a session staged this way still points at the other machine's paths.                                                                                                                                                                                                                                                    |
 | `--json`             | For a program driving the hand-off (an editor's session list): stdout is exactly one JSON object — `mode` (`native` or `context`), `sid`, `src_host`, `src_harness`, `tgt_harness`, `cwd`, `cmd`, plus `staged`/`installed` or `primer` — or `{"ok":false,"error":…}`; the narration goes to stderr. With `--list` it prints the **whole** catalogue as JSON lines, this host's sessions too (`"here": true`). |

@@ -1221,6 +1221,11 @@ prompt has a default (or preset it via env, e.g. <code>SCRUBJAY_OWNER</code>, <c
 </code></pre></div>
 <p>Run <code>bin/sj-bootstrap.sh</code> on its own to create/seed the private repos without onboarding, and
 <code>bin/onboard.sh --version</code> to see which commit you're on.</p>
+<p>Near the end it offers the <strong>shell integration</strong>: one marked block in <code>~/.bashrc</code> / <code>~/.zshrc</code> so
+that <code>claude resume &lt;sid&gt;</code> in a terminal resumes a session recorded on <em>any</em> machine (see
+<a href="../handoff/#from-a-terminal-claude-resume-sid">hand-off</a>). Preset <code>SCRUBJAY_SHELL_HOOK=1</code> or <code>0</code> to
+answer it unattended. On a machine that is already onboarded, add it on its own with
+<code>bin/sj-shell-install.sh</code>.</p>
 <div class="admonition warning">
 <p class="admonition-title">One manual step the script can't do for you — authorize the new host on the receiver.</p>
 <p>For the peer-to-peer backends, <code>onboard.sh</code> (transcripts) and <code>onboard-memory.sh</code> (memory) each

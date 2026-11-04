@@ -1034,7 +1034,7 @@ injects it directly with no tool call at all.</p>
 <tr>
 <td><code>/sjresume [sid8 \| words]</code></td>
 <td>—</td>
-<td><strong>Continue a session from another machine here</strong> (<a href="../handoff/">hand-off</a>). Stages the archived transcript — plus its subagents, tasks and file history — into this machine's <code>~/.claude/projects/</code>, rewriting the other host's paths to this one's, so Claude Code's own <code>/resume</code> can pick it up. Run it from the project dir; then <code>/resume</code>.</td>
+<td><strong>Continue a session from another machine here</strong> (<a href="../handoff/">hand-off</a>). Stages the archived transcript — plus its subagents, tasks and file history — into this machine's <code>~/.claude/projects/</code>, rewriting the other host's paths to this one's, so Claude Code's own <code>/resume</code> can pick it up. Run it from the project dir; then <code>/resume</code>. Outside a session, <code>claude resume &lt;sid8&gt;</code> in a terminal does both steps (<a href="../handoff/#from-a-terminal-claude-resume-sid">shell integration</a>).</td>
 </tr>
 <tr>
 <td><code>/sjonboard [hint]</code></td>

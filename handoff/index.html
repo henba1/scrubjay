@@ -509,6 +509,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#from-a-terminal-claude-resume-sid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a terminal: claude resume &lt;sid&gt;
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#why-this-is-barely-any-machinery" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -927,6 +938,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#from-a-terminal-claude-resume-sid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a terminal: claude resume &lt;sid&gt;
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#why-this-is-barely-any-machinery" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1038,6 +1060,44 @@ with its full history — subagents, task list and file history included.</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># then, as Claude Code always has:</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>/resume<span class="w">                       </span><span class="c1"># and pick it out of the list</span>
 </code></pre></div>
+<h2 id="from-a-terminal-claude-resume-sid">From a terminal: <code>claude resume &lt;sid&gt;</code><a class="headerlink" href="#from-a-terminal-claude-resume-sid" title="Permanent link">&para;</a></h2>
+<p>Outside a session, skip the slash command. With scrubjay's shell integration installed, this works
+for a session recorded on <strong>any</strong> machine:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>~/code/widget-api<span class="w">          </span><span class="c1"># the folder to continue it in, on this machine</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>claude<span class="w"> </span>resume<span class="w"> </span>da79fffa<span class="w">        </span><span class="c1"># the 8-hex handle, or a full id</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>claude<span class="w"> </span>--resume<span class="w"> </span>da79fffa<span class="w">      </span><span class="c1"># same thing; so is -r, and any other flags are kept</span>
+</code></pre></div>
+<p>It finds the session, stages it here exactly as <code>/sjresume</code> would, and then runs the real
+<code>claude --resume &lt;full-id&gt;</code>:</p>
+<ol>
+<li><strong>Which session.</strong> The prefix is expanded against this machine's own transcripts and the
+   cross-machine catalogue (<code>logs/&lt;host&gt;.log</code>, already on every machine, so no network). If it
+   matches more than one session it lists them — host, date, folder, topic — and stops.</li>
+<li><strong>Already here?</strong> Then it is simply resumed. A session that belongs to another folder on this
+   machine is resumed <em>from that folder</em> (Claude Code only looks in the current folder's project
+   dir), as long as the folder still exists.</li>
+<li><strong>Otherwise it is handed off</strong> with <code>bin/sj-resume.sh</code> into the folder you are standing in — the
+   other host's paths rewritten to it, the source host and folder printed — with <code>--no-clobber</code>:
+   a local transcript is never replaced by a different one, not even with a backup. If the folder
+   it was recorded in exists here too and you're somewhere else, it says so: <code>cd</code> there and re-run
+   if that's where you meant to continue.</li>
+</ol>
+<p>A session from a different agent (opencode, codex) can't be resumed by <code>claude</code>; you get the same
+carry-over command <code>/sjresume</code> prints instead.</p>
+<p><strong>What gets intercepted, and what doesn't.</strong> The integration is a <code>claude</code> shell function (bash
+and zsh) in <code>bin/sj-shell.sh</code>. It intercepts only <code>resume &lt;id&gt;</code> as the <em>first</em> word, or <code>--resume</code> /
+<code>-r</code> / <code>--resume=</code> followed by something that looks like a session id (8–36 hex digits and dashes).
+Everything else — <code>claude</code>, <code>claude -p "resume the build"</code>, <code>claude --resume</code> (the picker),
+<code>claude --resume &lt;search words&gt;</code> — goes straight to the binary after one pattern match on the
+arguments, so there is no startup cost.</p>
+<p><strong>Installing it.</strong> Once per machine:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bash<span class="w"> </span>~/.scrubjay/scrubjay/bin/sj-shell-install.sh<span class="w">     </span><span class="c1"># then open a new shell</span>
+</code></pre></div>
+<p>It adds one marked block to <code>~/.bashrc</code> and/or <code>~/.zshrc</code> that sources the snippet <em>through</em>
+<code>~/.claude/hooks</code> — the symlink scrubjay's config sync keeps aimed at the app — so later updates
+arrive with every app pull and no further rc edit. <code>--status</code> checks it, <code>--uninstall</code> removes the
+block and nothing else. <code>bin/onboard.sh</code> offers it on new machines (<code>SCRUBJAY_SHELL_HOOK=1|0</code> answers
+unattended), and <code>/sjdoctor</code> notes when it's missing.</p>
 <h2 id="why-this-is-barely-any-machinery">Why this is barely any machinery<a class="headerlink" href="#why-this-is-barely-any-machinery" title="Permanent link">&para;</a></h2>
 <p><code>claude --resume &lt;sid&gt;</code> reads exactly <strong>one file</strong>: <code>~/.claude/projects/&lt;slug&gt;/&lt;sid&gt;.jsonl</code>. There
 is no session database to reconstruct. And the relay already archives that file <em>byte-for-byte</em> at
@@ -1090,8 +1150,8 @@ on the raw text (paths inside JSON strings carry no escapes, so it's exact), and
 validated — same record count, every line still parses — before anything is installed. If validation
 fails, the verbatim archive copy is installed instead and you're told.</p>
 <p>Anything the importer can't infer goes in <code>~/.config/scrubjay/config</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># old:new, one per line — e.g. a home that is /home/you here and /gpfs/home2/you there</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">SCRUBJAY_PATH_MAP</span><span class="o">=</span><span class="s2">"/gpfs/home2/you:/home/you"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># old:new, one per line — e.g. a home that is /home/you here and /gpfs/home2/you there</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">SCRUBJAY_PATH_MAP</span><span class="o">=</span><span class="s2">"/gpfs/home2/you:/home/you"</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Symlinked homes are handled automatically</p>
@@ -1160,8 +1220,8 @@ the box already, so reading it back is just a copy.</p>
 <p><code>/sjresume</code> is a thin wrapper — it resolves a description to a session id and calls the script. You
 can run it yourself; it must be run <strong>from the project directory on this machine</strong>, since that is
 what the other host's paths get rewritten <em>to</em>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sj-resume.sh<span class="w"> </span>--list<span class="w"> </span><span class="o">[</span>n<span class="o">]</span><span class="w">        </span><span class="c1"># what's resumable, from other machines (default 15)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sj-resume.sh<span class="w"> </span>&lt;sid<span class="p">|</span>sid8&gt;<span class="w">        </span><span class="c1"># stage it into the project dir you're standing in</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sj-resume.sh<span class="w"> </span>--list<span class="w"> </span><span class="o">[</span>n<span class="o">]</span><span class="w">        </span><span class="c1"># what's resumable, from other machines (default 15)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>sj-resume.sh<span class="w"> </span>&lt;sid<span class="p">|</span>sid8&gt;<span class="w">        </span><span class="c1"># stage it into the project dir you're standing in</span>
 </code></pre></div>
 <table>
 <thead>
@@ -1174,6 +1234,10 @@ what the other host's paths get rewritten <em>to</em>.</p>
 <tr>
 <td><code>--into &lt;dir&gt;</code></td>
 <td>The project lives somewhere else here. Stage against <code>&lt;dir&gt;</code> instead of <code>$PWD</code>.</td>
+</tr>
+<tr>
+<td><code>--no-clobber</code></td>
+<td>Never replace an existing local transcript that differs from the archive's — refuse instead, even where <code>--force</code>-less staging would back it up and replace it. <code>claude resume &lt;sid&gt;</code> always passes it.</td>
 </tr>
 <tr>
 <td><code>--force</code></td>
@@ -1193,8 +1257,8 @@ what the other host's paths get rewritten <em>to</em>.</p>
 <em>distinct</em> session the script lists them and stops, rather than guess which conversation you meant.</p>
 <h2 id="under-the-hood">Under the hood<a class="headerlink" href="#under-the-hood" title="Permanent link">&para;</a></h2>
 <p><code>hooks/transports/&lt;backend&gt;.sh</code> now defines a read side alongside <code>transport_ship</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>transport_resolve<span class="w"> </span>&lt;sid&gt;<span class="w">            </span><span class="c1"># -&gt; TSV: &lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>transport_fetch<span class="w">   </span>&lt;relpath&gt;<span class="w"> </span>&lt;dst&gt;<span class="w">  </span><span class="c1"># file or directory</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>transport_resolve<span class="w"> </span>&lt;sid&gt;<span class="w">            </span><span class="c1"># -&gt; TSV: &lt;relpath&gt; &lt;lines&gt; &lt;mtime&gt;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>transport_fetch<span class="w">   </span>&lt;relpath&gt;<span class="w"> </span>&lt;dst&gt;<span class="w">  </span><span class="c1"># file or directory</span>
 </code></pre></div>
 <p><code>local</code> and <code>git</code> implement both against the filesystem; <code>rsync-wg</code> implements them over the sjmcp
 SSH channel above. <code>bin/sj-resume.sh</code> is the only caller.</p>

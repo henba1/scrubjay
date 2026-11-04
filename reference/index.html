@@ -1173,8 +1173,12 @@ future sessions — read them back with <code>/sjrecall</code>, <code>/sjbrowse 
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>~/.scrubjay/scrubjay/bin/sj-resume.sh<span class="w"> </span>&lt;sid8&gt;<span class="w">       </span><span class="c1"># stage it (rewrites the other host's paths)</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>claude<span class="w"> </span>--resume<span class="w"> </span>&lt;sid&gt;<span class="w">                              </span><span class="c1"># …or /resume inside a session here</span>
 </code></pre></div>
+<p>Or in one step from a terminal, with the <a href="../handoff/#from-a-terminal-claude-resume-sid">shell integration</a>
+installed (<code>~/.scrubjay/scrubjay/bin/sj-shell-install.sh</code>, once per machine):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>claude<span class="w"> </span>resume<span class="w"> </span>&lt;sid8&gt;<span class="w">                               </span><span class="c1"># also: claude --resume &lt;sid8&gt;, claude -r &lt;sid8&gt;</span>
+</code></pre></div>
 <h2 id="register-the-current-machine-first-time-onboarding">Register the current machine (first-time onboarding)<a class="headerlink" href="#register-the-current-machine-first-time-onboarding" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
 </code></pre></div>
 <h2 id="toggle-behaviour">Toggle behaviour<a class="headerlink" href="#toggle-behaviour" title="Permanent link">&para;</a></h2>
 <p>Set in <code>~/.config/scrubjay/config</code> (persistent) or inline before a command (one-off) — no file
@@ -1239,17 +1243,17 @@ editing needed:</p>
 </table>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Move the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s">: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="s">: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="s">: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="s">EOF</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s">: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s">EOF</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
 </code></pre></div>
 <p><code>claude-sync.sh</code> recomputes the app location from its own path and re-links every scope, so
 nothing else needs touching. Confirm with
