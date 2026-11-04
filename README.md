@@ -158,6 +158,14 @@ yourself. No root required. Full walkthrough:
   claude plugin install scrubjay-ui@scrubjay
   ```
 
+- **`claude resume <sid>` from any terminal.** Resumes a session recorded on any of your
+  machines: it fetches the transcript from the archive, then opens it. The onboarder offers this. A
+  machine onboarded before it existed needs it run once by hand, then a new shell:
+
+  ```sh
+  bash ~/.scrubjay/scrubjay/bin/sj-shell-install.sh    # --status to check, --uninstall to remove
+  ```
+
 - **Session topics.** Each session's catalogue entry has a short title, written by Haiku
   (`claude -p`) when a session ends with prompts it hasn't titled yet. That counts against your own
   Claude usage. To use the session's first prompt instead, add `SCRUBJAY_AI_TOPIC=0` to
