@@ -98,7 +98,7 @@ class Artefacts:
     is up at once. The per-transcript facts are cached on disk, keyed by the transcript's size and
     mtime, so a later start reads only what changed."""
 
-    VERSION = 3   # bump with any change to what view/artefacts.py:facts() returns
+    VERSION = 4   # bump with any change to what view/artefacts.py:facts() returns
 
     def __init__(self, arch: Archive, cache: Path, host: str):
         self.arch, self.cache = arch, cache

@@ -142,6 +142,66 @@ git push origin main
 ! [rejected] main -> main (fetch first)
 ```
 MD
+# The opencode session works in a repo with TWO remotes, opens a GitLab MR through the API from a
+# scratch folder, comments upstream on GitHub, and reads an unrelated repo's releases.
+oc_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_port__01234567.md"
+cat > "$oc_md" <<'MD'
+# Port
+
+## Assistant
+
+**→ bash**
+
+```bash
+cd /home/user/greyk && git remote -v
+```
+
+**⎿ output:**
+
+```text
+origin	git@github.com:me/greyk.git (fetch)
+origin	git@github.com:me/greyk.git (push)
+gitlab	https://gitlab.com/team/greyk.git (fetch)
+gitlab	https://gitlab.com/team/greyk.git (push)
+```
+
+**→ bash**
+
+```bash
+cd /home/user/greyk && git push -q gitlab feat-x:feat-x
+```
+
+**⎿ output:**
+
+```text
+```
+
+**→ bash**
+
+```bash
+cd /tmp/scratch && N=$(glab api -X POST "projects/team%2Fgreyk/merge_requests" -f source_branch=feat-x -f title=x | jq .iid); echo "made !$N"; glab api "projects/team%2Fgreyk/merge_requests?state=opened" | jq -r '.[].web_url'
+```
+
+**⎿ output:**
+
+```text
+made !12
+https://gitlab.com/team/greyk/-/merge_requests/11
+```
+
+**→ bash**
+
+```bash
+gh api repos/someone/else/releases --jq '.[0].html_url'; gh issue comment 5 -R upstream/lib --body "same here"
+```
+
+**⎿ output:**
+
+```text
+https://github.com/someone/else/releases/tag/v1
+https://github.com/upstream/lib/issues/5#issuecomment-1
+```
+MD
 # The fork's transcript starts with all of that, then does one thing of its own.
 fork_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_jitter__bbbbbbbb.md"
 { cat "$read_md"; printf '\n**→ Bash**\n\n```bash\ngit commit -qm "try jitter"\n```\n\n**⎿ output:**\n\n```text\n```\n'; } > "$fork_md"
@@ -211,7 +271,7 @@ assert_contains "the GitHub repo, named by the PR the session opened" "$ids" "gi
 assert_contains "a folder outside the repo" "$ids" "dir:testhost:/home/user/notes"
 assert_contains "the project's memory" "$ids" "memory:widget-api"
 case "$ids" in *tmp*) _no "scratch space is not an artefact" "$ids" ;; *) _ok "scratch space is not an artefact" ;; esac
-assert_eq "kinds are told apart" "folder github record" "$(jq -r '[.artefacts[].kind] | unique | join(" ")' <<<"$g")"
+assert_eq "kinds are told apart" "folder github gitlab record" "$(jq -r '[.artefacts[].kind] | unique | join(" ")' <<<"$g")"
 assert_eq "the edge says what the session did" "PR #42 merged · issue #43 · 1 commit · 1 file" \
   "$(jq -r --arg s "$P" '.edges[] | select(.from == $s and .to == "github.com/acme/widget-api") | .summary' <<<"$g")"
 a="$(get "/api/artefact?id=github.com/acme/widget-api")"
@@ -226,6 +286,14 @@ assert_eq "the fork shows only what it did after branching" '["commit:try jitter
   "$(jq -c --arg s "$C" '[.sessions[] | select(.node.sid == $s) | .events[] | "\(.type):\(.title)"]' <<<"$a")"
 assert_eq "a session lists what it changed" 3 "$(get "/api/session?sid=$P" | jq '.artefacts | length')"
 assert_eq "an unknown artefact: 404" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-SJ-Token: $TOK" "http://127.0.0.1:$PORT/api/artefact?id=nope")"
+sumto() { jq -r --arg s "$1" --arg a "$2" '.edges[] | select(.from == $s and .to == $a) | .summary' <<<"$g"; }
+assert_eq "an MR opened through the API, by the !N it printed (not the listing)" "MR !12 opened" "$(sumto "$O" gitlab.com/team/greyk)"
+assert_eq "gh -R names the repo it commented on" "comment on #5" "$(sumto "$O" github.com/upstream/lib)"
+case "$(jq -r '[.artefacts[].id] | join(" ")' <<<"$g")" in *someone/else*) _no "an unrelated URL in an output is no artefact" "$ids" ;;
+  *) _ok "an unrelated URL in an output is no artefact" ;; esac
+mr="$(get "/api/artefact?id=gitlab.com/team/greyk" | jq -c '[.sessions[].events[] | {type, n, url, branch}]')"
+assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_requests/12" "$(jq -r '.[] | select(.type == "pr_open") | .url' <<<"$mr")"
+assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
 section "stop: the command, the page's button, and idle"
