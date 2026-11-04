@@ -1071,8 +1071,20 @@ injects it directly with no tool call at all.</p>
 <h2 id="the-session-map">The session map<a class="headerlink" href="#the-session-map" title="Permanent link">&para;</a></h2>
 <p><code>/sjview</code> opens the catalogue as a map: one lane per project, one column per day, and a card per
 session. A card shows the session id and topic, then where it ran (host and folder) and with which
-agent and model, then when, how long and how big. Forks are arrows from the session they branched
-off. Sessions that recorded nothing are hidden unless you tick <strong>show empty</strong>.</p>
+agent and model, then when, how long and how big. Each agent has its own colour: Claude's clay,
+opencode's grey, codex's green. Forks are arrows from the session they branched off. Sessions that
+recorded nothing are hidden unless you tick <strong>show empty</strong>.</p>
+<p>Right of the timeline, under <strong>where the work landed</strong>, are the things the sessions changed, each a
+pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo with no
+remote, a local folder, or scrubjay's own memory and plans. A line joins each session to what it
+changed; hover either end to see what the session did there ("PR #42 merged · 3 commits · 2 files").
+Click a repo for its <strong>milestones</strong>: per session, newest first, the PRs opened and merged, issues,
+releases, branches, pushes, commits and files written, each PR and issue linked to the forge.</p>
+<p>These come from the archived transcripts: the files the agent wrote and the <code>git</code>, <code>gh</code> and <code>glab</code>
+commands it ran, with their output. A repo is named by the remote that output shows (a PR's URL, a
+push's <code>To …</code>); failing that, on this machine, by the folder's <code>origin</code>. A fork's transcript repeats
+its parent's history, so a fork shows only what it did after branching. The map reads the archive in
+the background on start and caches the result, so a later start reads only new transcripts.</p>
 <p>Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
 moved), its forks, where its transcript is archived, and the command that continues it. That is the
 harness's own resume command for a session from this machine, or <code>sj-resume.sh</code> first for one from
