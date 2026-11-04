@@ -64,6 +64,17 @@ out="$(bash "$APP/bin/sj-resume.sh" --list --json 2>/dev/null)"
 assert_eq "one line per session" "2" "$(printf '%s\n' "$out" | wc -l | tr -d ' ')"
 assert_eq "other host's row" "retry backoff|claude|false" "$(printf '%s\n' "$out" | jq -r 'select(.host=="otherhost") | .topic + "|" + .harness + "|" + (.here|tostring)')"
 assert_eq "this host's row is listed, marked here" "opencode" "$(printf '%s\n' "$out" | jq -r 'select(.here) | .harness')"
+assert_eq "an opencode handle is what the archive files it by" "66a71b6f" "$(printf '%s\n' "$out" | jq -r 'select(.here) | .sid8')"
+# A hand-off: the session's rows sit in two hosts' files. The newer one counts, whichever file sorts
+# first; a row from before the harness field with an opencode id is opencode; the summary comes along.
+printf '%s\n' '2026-10-05 09:00 | aaa-first-by-name | /home/user/widget-api | "continued" | session=11111111-2222-4333-8444-555555555555 | harness=claude | summary=Retry fixed; tests pass.' \
+  > "$SCRUBJAY_DATA/logs/aaa-first-by-name.log"
+printf '%s\n' '2026-10-06 09:00 | otherhost | /w | "old opencode" | session=ses_0123456789abcdefGHIJKL' >> "$SCRUBJAY_DATA/logs/otherhost.log"
+out="$(bash "$APP/bin/sj-resume.sh" --list --json 2>/dev/null)"
+assert_eq "the newer row wins across files" "continued|aaa-first-by-name|Retry fixed; tests pass." \
+  "$(printf '%s\n' "$out" | jq -r 'select(.sid8=="11111111") | .topic + "|" + .host + "|" + .summary')"
+assert_eq "an opencode id without a harness field is opencode" "opencode" \
+  "$(printf '%s\n' "$out" | jq -r 'select(.sid=="ses_0123456789abcdefGHIJKL") | .harness')"
 
 section "an unknown handle fails cleanly (does not stage garbage)"
 check_fails "resolving a nonexistent session" \

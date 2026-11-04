@@ -389,6 +389,16 @@ assert_eq "climbing out with ..: no link" "404 " "$(go "$sh/../../etc/passwd")"
 assert_eq "no token: no redirect" 403 "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$P2/go?path=$sh")"
 SCRUBJAY_RUN_DIR="$R2" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
+section "--json, for a front-end that opens the address itself"
+R3="$SANDBOX/run3"
+assert_eq "status when stopped" '{"running":false}' "$(SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" status --json)"
+j="$(env -u SSH_CONNECTION SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" --json --port 0)"
+assert_eq "start: one JSON object, the address in it" true "$(jq -r '.running and (.url | startswith("http://127.0.0.1:"))' <<<"$j")"
+assert_eq "no SSH here: no tunnel hint" null "$(jq -r .ssh <<<"$j")"
+assert_eq "over SSH: the tunnel to open" "ssh -L $(jq -r .port <<<"$j"):127.0.0.1:$(jq -r .port <<<"$j") testhost" \
+  "$(SSH_CONNECTION="10.0.0.1 1 10.0.0.2 22" SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" status --json | jq -r .ssh)"
+assert_eq "stop" '{"running":false}' "$(SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" stop --json)"
+
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
 assert_contains "an unknown flag" "$(bash "$APP/bin/sj-view.sh" --bogus 2>&1)" "unknown argument: --bogus"
