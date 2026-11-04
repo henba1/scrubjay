@@ -102,29 +102,36 @@ def remote_id(url: str) -> dict | None:
     return None
 
 
-# A forge URL in a command's output, and the repo it names. GitHub repos are owner/name; GitLab's
-# may nest groups, and its object paths start at `/-/`.
-_GH_URL = re.compile(r"https://github\.com/(?P<path>[\w.-]+/[\w.-]+?)(?:\.git)?(?=[/\s)\]'\"#?]|$)")
-_GL_URL = re.compile(r"https://(?P<host>[\w.-]*gitlab[\w.-]*)/(?P<path>[\w.-]+(?:/[\w.-]+)+?)/-/")
+# Forge URLs for one PR/MR, issue or release, and the repo each names. GitHub repos are owner/name;
+# GitLab's may nest groups, and its object paths start at `/-/`. Only these name a repo: any other URL
+# in an output (an API listing, a link in a README) says nothing about what the session changed.
 _PULL = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+/pull|[\w.-]*gitlab[\w.-]*/[\w./-]+?/-/merge_requests)/(\d+)")
 _ISSUE = re.compile(r"https://(?:github\.com/[\w.-]+/[\w.-]+|[\w.-]*gitlab[\w.-]*/[\w./-]+?/-)/issues/(\d+)")
 _RELEASE = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/releases/tag/(\S+)")
+_REPO_OF = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+|https://[\w.-]*gitlab[\w.-]*/[\w./-]+?)(?:/-)?/(?:pull|merge_requests|issues|releases)/")
 
 
-def _remote_in(text: str) -> dict | None:
-    m = _GH_URL.search(text)
-    if m:
-        return remote_id(f"https://github.com/{m.group('path')}")
-    m = _GL_URL.search(text)
-    if m:
-        return remote_id(f"https://{m.group('host')}/{m.group('path')}")
-    m = re.search(r"^To (\S+)$", text, re.M)  # git push
-    if m:
-        return remote_id(m.group(1))
-    m = re.search(r"^origin\s+(\S+)\s+\((?:fetch|push)\)$", text, re.M)  # git remote -v
-    if m:
-        return remote_id(m.group(1))
-    return None
+def _repo_of(url: str) -> dict | None:
+    m = _REPO_OF.match(url)
+    return remote_id(m.group(1)) if m else None
+
+
+def _named_remotes(text: str) -> dict[str, dict]:
+    """`git remote -v` output: {name: remote}."""
+    out = {}
+    for name, url in re.findall(r"^(\S+)\s+(\S+)\s+\((?:fetch|push)\)$", text, re.M):
+        r = remote_id(url)
+        if r:
+            out.setdefault(name, r)
+    return out
+
+
+def _repo_flag(cmd: str, tool: str) -> dict | None:
+    """`gh … -R owner/name` is a GitHub repo, `glab … -R group/name` a GitLab one."""
+    m = re.search(rf"\b{tool}\b[^\n;&|]*?(?:--repo|-R)[= ]\s*['\"]?([\w.-]+(?:/[\w.-]+)+)", cmd)
+    if not m:
+        return None
+    return remote_id(("https://github.com/" if tool == "gh" else "https://gitlab.com/") + m.group(1))
 
 
 # ── one shell command → directory and events ─────────────────────────────────────────────────
@@ -175,6 +182,53 @@ def _failed(c: dict) -> bool:
                                         r"denied|\brejected\b|could not", o, re.M | re.I))
 
 
+# `gh api` / `glab api` writing to a forge: how a session opens PRs/MRs or issues in bulk, or from
+# a helper. The endpoint names the repo (GitLab URL-encodes it: projects/group%2Fname).
+_API = re.compile(r"\b(?P<cli>gh|glab)\s+api\b(?P<args>[^\n;&|]*)")
+_ENDPOINT = re.compile(r"['\"]?/?(?:projects/(?P<gl>[^/\s'\"?]+)|repos/(?P<gh>[\w.-]+/[\w.-]+))"
+                       r"/(?P<what>merge_requests|pulls|issues)(?:/(?P<n>\d+)(?:/(?P<sub>merge|notes|comments))?)?\b")
+
+
+def _api_events(cmd: str, c: dict) -> list[tuple[int, dict]]:
+    from urllib.parse import unquote
+    ev: list[tuple[int, dict]] = []
+    out = c["output"]
+    if _failed(c):
+        return ev
+    for m in _API.finditer(cmd):
+        args = m.group("args")
+        meth = re.search(r"(?:-X|--method)[= ]\s*['\"]?([A-Z]+)", args)
+        method = meth.group(1) if meth else ("POST" if re.search(r"\s-[fF]\s|--(?:raw-)?field\b|--input\b", args) else "GET")
+        e = _ENDPOINT.search(args)
+        if method == "GET" or not e:
+            continue
+        forge = "gitlab" if m.group("cli") == "glab" else "github"
+        repo = None
+        if e.group("gl") and "$" not in e.group("gl"):
+            repo = remote_id("https://gitlab.com/" + unquote(e.group("gl")))
+        elif e.group("gh"):
+            repo = remote_id("https://github.com/" + e.group("gh"))
+        tag = {"forge": forge, **({"remote": repo["id"]} if repo else {})}
+        what, n, sub = e.group("what"), e.group("n"), e.group("sub")
+        pr = what in ("merge_requests", "pulls")
+        if sub == "merge" and method == "PUT":
+            ev.append((m.start(), {"type": "pr_merge", "n": int(n), **tag}))
+        elif sub in ("notes", "comments") and method == "POST":
+            ev.append((m.start(), {"type": "issue_comment", "n": int(n), **tag}))
+        elif not n and method == "POST":
+            # The numbers it created. GitLab's own `!N` first: a URL in the same output may belong to
+            # a listing the command printed afterwards. Else the URLs it printed.
+            nums = []
+            if pr and forge == "gitlab":
+                nums = list(dict.fromkeys(int(x) for x in re.findall(r"!(\d+)\b", out)))
+            if not nums:
+                rx = _PULL if pr else _ISSUE
+                nums = list(dict.fromkeys(int(u.group(1)) for u in rx.finditer(out)))
+            for k in nums:
+                ev.append((m.start(), {"type": "pr_open" if pr else "issue_open", "n": k, "title": "", **tag}))
+    return ev
+
+
 def _shell_events(cmd: str, c: dict) -> list[dict]:
     """The git milestones one command made, in the order it made them."""
     ev: list[tuple[int, dict]] = []
@@ -192,52 +246,74 @@ def _shell_events(cmd: str, c: dict) -> list[dict]:
         # `git push [opts] [remote [refspec…]]`: options and redirections are not names.
         words = [w for w in m.group(1).split() if not w.startswith("-") and not re.match(r"^\d*[<>]", w)]
         e = {"type": "push"}
+        if words and "$" not in words[0]:
+            e["remote_name"] = words[0]
         if len(words) > 1 and "$" not in words[1]:
             e["branch"] = words[1].split(":")[-1].strip("'\"")
+        to = re.search(r"^To (\S+)$", out, re.M)
+        if to and remote_id(to.group(1)):
+            e["remote"] = remote_id(to.group(1))["id"]
         ev.append((m.start(), e))
     for m in re.finditer(r"\bgit\b(?:\s+-C\s+\S+)?\s+(?:checkout\s+(?:-q\s+)?-b|switch\s+(?:-q\s+)?(?:-c|--create))\s+([^\s;&|]+)", cmd):
         ev.append((m.start(), {"type": "branch", "branch": m.group(1)}))
-    for tool in ("gh pr", "glab mr"):
-        m = re.search(rf"\b{tool} create\b", cmd)
+    for cli, noun, forge in (("gh", "pr", "github"), ("glab", "mr", "gitlab")):
+        flag = _repo_flag(cmd, cli)
+        tag = {"forge": forge, **({"remote": flag["id"]} if flag else {})}
+        m = re.search(rf"\b{cli} {noun} create\b", cmd)
         if m:
-            u = _PULL.search(out)
-            if u:
-                ev.append((m.start(), {"type": "pr_open", "n": int(u.group(1)), "url": u.group(0), "title": _title(cmd)}))
-        for m in re.finditer(rf"\b{tool} (merge|close|reopen)\b(?:\s+(\d+))?", cmd):
+            # One command may open several (a helper called once per branch): every URL counts.
+            urls = list(dict.fromkeys(u.group(0) for u in _PULL.finditer(out)))
+            title = _title(cmd) if len(urls) == 1 else ""
+            for u in urls:
+                r = _repo_of(u)
+                ev.append((m.start(), {"type": "pr_open", "n": int(u.rsplit("/", 1)[1]), "url": u, "title": title,
+                                       **tag, **({"remote": r["id"]} if r else {})}))
+        for m in re.finditer(rf"\b{cli} {noun} (merge|close|reopen)\b(?:\s+(\d+))?", cmd):
             if not _failed(c):
-                e = {"type": f"pr_{m.group(1)}"}
+                e = {"type": f"pr_{m.group(1)}", **tag}
                 if m.group(2):
                     e["n"] = int(m.group(2))
                 ev.append((m.start(), e))
-    for tool in ("gh issue", "glab issue"):
-        m = re.search(rf"\b{tool} create\b", cmd)
+        m = re.search(rf"\b{cli} issue create\b", cmd)
         if m:
-            u = _ISSUE.search(out)
-            if u:
-                ev.append((m.start(), {"type": "issue_open", "n": int(u.group(1)), "url": u.group(0), "title": _title(cmd[m.start():])}))
-        for m in re.finditer(rf"\b{tool} (close|comment|reopen)\s+(\d+)", cmd):
+            urls = list(dict.fromkeys(u.group(0) for u in _ISSUE.finditer(out)))
+            title = _title(cmd[m.start():]) if len(urls) == 1 else ""
+            for u in urls:
+                r = _repo_of(u)
+                ev.append((m.start(), {"type": "issue_open", "n": int(u.rsplit("/", 1)[1]), "url": u, "title": title,
+                                       **tag, **({"remote": r["id"]} if r else {})}))
+        for m in re.finditer(rf"\b{cli} issue (close|comment|reopen)\s+(\d+)", cmd):
             if not _failed(c):
-                ev.append((m.start(), {"type": f"issue_{m.group(1)}", "n": int(m.group(2))}))
+                ev.append((m.start(), {"type": f"issue_{m.group(1)}", "n": int(m.group(2)), **tag}))
+    ev += _api_events(cmd, c)
     m = re.search(r"\bgh release create\s+([^\s;&|]+)", cmd)
     if m and not _failed(c):
-        e = {"type": "release", "tag": _unq(m.group(1))}
+        e = {"type": "release", "tag": _unq(m.group(1)), "forge": "github"}
+        flag = _repo_flag(cmd, "gh")
+        if flag:
+            e["remote"] = flag["id"]
         u = _RELEASE.search(out)
         if u:
             e["url"] = u.group(0)
+            r = _repo_of(u.group(0))
+            if r:
+                e["remote"] = r["id"]
         ev.append((m.start(), e))
     return [e for _, e in sorted(ev, key=lambda x: x[0])]
 
 
 def facts(md: str, cwd: str) -> dict:
-    """The transcript alone → {files: {path: n}, events: [...], remotes: {dir: remote}, dirs: [...]}.
-    Every event carries the directory it ran in, so a later step can tell which repo it belongs to."""
+    """The transcript alone → {files: {path: n}, events: [...], remotes: {dir: [remote…]},
+    names: {dir: {remote-name: remote}}, repos: {id: remote}}. Every event carries the directory it
+    ran in and, where its own command or output said, its repo; the rest is resolved later."""
     home_m = _HOME.match(cwd or "")
     home = home_m.group(1) if home_m else ""
     here = cwd or ""
     files: dict[str, int] = {}
     events: list[dict] = []
-    remotes: dict[str, dict] = {}
-    git_dirs: set[str] = set()
+    remotes: dict[str, list[dict]] = {}
+    names: dict[str, dict[str, dict]] = {}
+    repos: dict[str, dict] = {}
 
     for c in calls(md):
         name = c["name"].lower()
@@ -273,21 +349,23 @@ def facts(md: str, cwd: str) -> dict:
         gm = _GIT_C.search(cmd)
         where = (_resolve(gm.group(1), start, home) if gm else None) or start
         if re.search(r"\b(?:git|gh|glab)\b", cmd):
-            rem = _remote_in(c["output"]) if re.search(r"\b(?:git|gh|glab)\b", cmd) else None
-            m = re.search(r"(?:--repo|-R)\s+([\w.-]+/[\w.-]+)", cmd)
-            if m and not rem:
-                rem = remote_id(f"https://github.com/{m.group(1)}")
-            if rem and where and where not in remotes:
-                remotes[where] = rem
+            if re.search(r"\bgit\b[^\n;&|]*\bremote\b", cmd):
+                for nm, r in _named_remotes(c["output"]).items():
+                    names.setdefault(where, {}).setdefault(nm, r)
+                    repos[r["id"]] = r
             for e in _shell_events(cmd, c):
                 e["dir"] = where
-                if rem:
-                    e["remote"] = rem["id"]
+                if e.get("remote"):
+                    r = remote_id("https://" + e["remote"])
+                    if r:
+                        repos[r["id"]] = r
+                        lst = remotes.setdefault(where, [])
+                        if all(x["id"] != r["id"] for x in lst):
+                            lst.append(r)
                 events.append(e)
-                git_dirs.add(where)
         reset = _RESET.search(c["output"])
         here = reset.group(1) if reset else start
-    return {"files": files, "events": events, "remotes": remotes, "dirs": sorted(d for d in git_dirs if d)}
+    return {"files": files, "events": events, "remotes": remotes, "names": names, "repos": repos}
 
 
 # ── facts → artefacts ────────────────────────────────────────────────────────────────────────
@@ -301,59 +379,78 @@ def _git(args: list[str]) -> str:
 
 
 class Resolver:
-    """Directories → repos. A remote the transcript named wins; on this machine a directory may
-    also be asked. Answers are cached for the server's lifetime."""
+    """Events and files → repos. Answers about this machine's folders are cached for the server's
+    lifetime."""
 
     def __init__(self, this_host: str):
         self.host = this_host
-        self.cache: dict[str, tuple[str, dict | None]] = {}
+        self.cache: dict[str, tuple[str, dict[str, dict]]] = {}
 
-    def local(self, d: str) -> tuple[str, dict | None]:
-        """(repo root or "", its origin) for a directory on THIS machine."""
+    def local(self, d: str) -> tuple[str, dict[str, dict]]:
+        """(repo root or "", {remote name: remote}) for a folder on THIS machine."""
         if d in self.cache:
             return self.cache[d]
         p = d
         while p and p != "/" and not os.path.isdir(p):  # a file's folder may be gone; ask its parent
             p = os.path.dirname(p)
         root = _git(["-C", p, "rev-parse", "--show-toplevel"]) if p and p != "/" else ""
-        rem = remote_id(_git(["-C", root, "remote", "get-url", "origin"])) if root else None
-        self.cache[d] = (root, rem)
+        self.cache[d] = (root, _named_remotes(_git(["-C", root, "remote", "-v"])) if root else {})
         return self.cache[d]
 
     def links(self, f: dict, host: str, cwd: str) -> list[dict]:
         """One entry per artefact the session touched: {artefact, events, files}."""
         local = host == self.host
-        known = dict(f.get("remotes", {}))   # dir -> remote, from the transcript
+        seen = f.get("remotes", {})      # dir -> [remote], each named by an event's own evidence
+        named = f.get("names", {})       # dir -> {name: remote}, from `git remote -v` it ran
+        repos = f.get("repos", {})
         out: dict[str, dict] = {}
 
-        def repo_for(d: str) -> dict | None:
-            for k, rem in known.items():                    # the transcript named it
-                if d == k or d.startswith(k.rstrip("/") + "/"):
-                    return rem
-            if local:
-                root, rem = self.local(d)
-                if rem:
-                    return rem
-                if root:
-                    return {"id": f"git:{host}:{root}", "kind": "repo", "label": _tail(root),
-                            "path": root, "host": host}
+        def under(d: str, table: dict):
+            """The entry for d or the nearest folder above it."""
+            best = ""
+            for k in table:
+                if (d == k or d.startswith(k.rstrip("/") + "/")) and len(k) > len(best):
+                    best = k
+            return table.get(best) if best else None
+
+        def remotes_of(d: str) -> tuple[str, dict[str, dict], list[dict]]:
+            """(local repo root, {name: remote}, [remotes seen]) for folder d."""
+            root, names = self.local(d) if local else ("", {})
+            names = {**names, **(under(d, named) or {})}
+            return root, names, list(under(d, seen) or [])
+
+        def pick(e: dict, d: str) -> dict | None:
+            if e.get("remote"):                                   # its own command or output said
+                return repos.get(e["remote"]) or remote_id("https://" + e["remote"])
+            root, names, seen_here = remotes_of(d)
+            pool = list(names.values()) + seen_here
+            if e.get("forge"):                                     # gh → GitHub, glab → GitLab
+                return next((r for r in pool if r["kind"] == e["forge"]), None)
+            if e.get("remote_name"):                               # git push <name> …
+                nm = e["remote_name"]
+                if nm in names:
+                    return names[nm]
+                hint = next((k for k in ("github", "gitlab") if k in nm), None)
+                if hint:
+                    return next((r for r in pool if r["kind"] == hint), None)
+            if "origin" in names:                                  # a commit, a branch: origin's
+                return names["origin"]
+            if pool:
+                return pool[0]
+            if root:
+                return {"id": f"git:{host}:{root}", "kind": "repo", "label": _tail(root), "path": root, "host": host}
             return None
 
         def add(a: dict) -> dict:
-            e = out.setdefault(a["id"], {"artefact": a, "events": [], "files": []})
-            return e
+            return out.setdefault(a["id"], {"artefact": a, "events": [], "files": []})
 
         for e in f.get("events", []):
-            rem = None
-            if e.get("remote"):
-                rem = next((r for r in known.values() if r["id"] == e["remote"]), None)
-            if SCRATCH.search((e.get("dir") or cwd or "") + "/"):
+            d = e.get("dir") or cwd or ""
+            # Scratch space is no repo of yours, unless the command itself named one (`-R`, a URL).
+            if SCRATCH.search(d + "/") and not e.get("remote"):
                 continue
-            rem = rem or repo_for(e.get("dir", ""))
-            if not rem:
-                d = e.get("dir", "") or cwd
-                rem = {"id": f"git:{host}:{d}", "kind": "repo", "label": _tail(d), "path": d, "host": host}
-            ev = {k: v for k, v in e.items() if k not in ("dir", "remote")}
+            rem = pick(e, d) or {"id": f"git:{host}:{d}", "kind": "repo", "label": _tail(d), "path": d, "host": host}
+            ev = {k: v for k, v in e.items() if k not in ("dir", "remote", "forge", "remote_name")}
             add(rem)["events"].append(ev)
 
         for path, n in f.get("files", {}).items():
@@ -362,7 +459,7 @@ class Resolver:
             a = _record(path, host, cwd)
             if not a:
                 d = os.path.dirname(path)
-                a = repo_for(d)
+                a = pick({}, d) if (local or under(d, named) or under(d, seen)) else None
                 if not a:
                     inside = cwd and (path == cwd or path.startswith(cwd.rstrip("/") + "/"))
                     folder = cwd if inside else d
@@ -372,17 +469,26 @@ class Resolver:
 
         # A PR merged without its number (`gh pr merge` on the current branch) is the one opened here.
         for e in out.values():
+            once, kept = set(), []
+            for x in e["events"]:   # opened twice (a retry, a listing): once
+                k = (x["type"], x.get("n")) if x["type"] in ("pr_open", "issue_open") and "n" in x else None
+                if k and k in once:
+                    continue
+                once.add(k) if k else None
+                kept.append(x)
+            e["events"] = kept
             opened = [x["n"] for x in e["events"] if x["type"] == "pr_open"]
             for x in e["events"]:
                 if x["type"] in ("pr_merge", "pr_close") and "n" not in x and opened:
                     x["n"] = opened[-1]
             a = e["artefact"]
             for x in e["events"]:
-                if a["kind"] == "github" and "n" in x and "url" not in x:
-                    kind = "pull" if x["type"].startswith("pr_") else "issues"
-                    x["url"] = f"{a['url']}/{kind}/{x['n']}"
-                if a["kind"] == "github" and x.get("sha"):
-                    x["url"] = f"{a['url']}/commit/{x['sha']}"
+                if "n" in x and "url" not in x and a["kind"] in ("github", "gitlab"):
+                    pr = x["type"].startswith("pr_")
+                    x["url"] = (f"{a['url']}/{'pull' if pr else 'issues'}/{x['n']}" if a["kind"] == "github"
+                                else f"{a['url']}/-/{'merge_requests' if pr else 'issues'}/{x['n']}")
+                if x.get("sha") and a["kind"] in ("github", "gitlab"):
+                    x["url"] = f"{a['url']}{'/-' if a['kind'] == 'gitlab' else ''}/commit/{x['sha']}"
             e["files"].sort()
         return list(out.values())
 
@@ -432,15 +538,19 @@ def summary(link: dict) -> str:
     """One line for an edge: what the session did to this artefact."""
     ev = link["events"]
     bits = []
+    word, mark = ("MR", "!") if link["artefact"]["kind"] == "gitlab" else ("PR", "#")
     merged = sorted({x["n"] for x in ev if x["type"] == "pr_merge" and "n" in x})
     opened = sorted({x["n"] for x in ev if x["type"] == "pr_open" and "n" in x} - set(merged))
     if merged:
-        bits.append(f"PR {' '.join('#' + str(n) for n in merged)} merged")
+        bits.append(f"{word} {' '.join(mark + str(n) for n in merged)} merged")
     if opened:
-        bits.append(f"PR {' '.join('#' + str(n) for n in opened)} opened")
+        bits.append(f"{word} {' '.join(mark + str(n) for n in opened)} opened")
     issues = sorted({x["n"] for x in ev if x["type"] == "issue_open" and "n" in x})
     if issues:
         bits.append(f"issue {' '.join('#' + str(n) for n in issues)}")
+    comments = sorted({x["n"] for x in ev if x["type"] == "issue_comment" and "n" in x})
+    if comments:
+        bits.append(f"comment on {' '.join('#' + str(n) for n in comments)}")
     rel = [x["tag"] for x in ev if x["type"] == "release"]
     if rel:
         bits.append(f"release {', '.join(rel)}")
