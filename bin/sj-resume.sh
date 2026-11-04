@@ -5,7 +5,7 @@
 # Cross-host session hand-off: stage an archived session from ANOTHER machine into this one's
 # ~/.claude/projects/, so Claude Code's own `--resume` / `/resume` picker can continue it here.
 #
-#   usage: sj-resume.sh <sid|sid8> [--into <dir>] [--no-rewrite-paths] [--force] [--json]
+#   usage: sj-resume.sh <sid|sid8> [--into <dir>] [--no-rewrite-paths] [--force|--no-clobber] [--json]
 #          sj-resume.sh --list [n] [--json]
 #
 # --json is for programs that drive a hand-off for the user (an editor's session list): the narration
@@ -64,7 +64,10 @@ command -v jq >/dev/null 2>&1 || die "jq is required"
 # --- args -------------------------------------------------------------------------------------
 # --import (default, where the harness supports it) installs the session into the target harness
 # rather than leaving the user to paste a two-step command. --no-import stages only.
-sid=""; into=""; rewrite=1; force=0; list=0; list_n=15; do_import=1
+# --no-clobber is the strict opposite of --force: a local transcript that differs from the one we
+# would install is never replaced, not even with a backup (bin/sj-claude-resume.sh, the terminal
+# `claude resume <sid>` path, always passes it).
+sid=""; into=""; rewrite=1; force=0; noclobber=0; list=0; list_n=15; do_import=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --list)             list=1; [ $# -ge 2 ] && case "$2" in [0-9]*) list_n="$2"; shift ;; esac ;;
@@ -73,6 +76,7 @@ while [ $# -gt 0 ]; do
     --import)           do_import=1 ;;
     --no-import)        do_import=0 ;;
     --force)            force=1 ;;
+    --no-clobber)       noclobber=1 ;;
     --json)             json=1 ;;
     -*)                 die "unknown flag '$1'" ;;
     *)                  sid="$1" ;;
@@ -299,10 +303,19 @@ if [ -f "$dest" ] && [ "$force" -eq 0 ]; then
   fi
 fi
 
+if [ -f "$dest" ] && [ "$noclobber" -eq 1 ] && ! cmp -s "$raw" "$dest"; then
+  die "a different local copy of ${full_sid:0:8} already exists at $dest — not replacing it.
+            Resume that one with: $(sjh_resume_cmd "$full_sid" "$dest" 0)"
+fi
+
 mkdir -p "$proj_dir" || die "cannot create $proj_dir"
-if [ -f "$dest" ]; then cp -f "$dest" "$dest.bak" && info "backed up existing copy -> $(basename "$dest").bak"; fi
-cp -f "$raw" "$dest" || die "could not write $dest"
-ok "staged $dest"
+if [ -f "$dest" ] && cmp -s "$raw" "$dest"; then
+  ok "already staged, identical: $dest"
+else
+  if [ -f "$dest" ]; then cp -f "$dest" "$dest.bak" && info "backed up existing copy -> $(basename "$dest").bak"; fi
+  cp -f "$raw" "$dest" || die "could not write $dest"
+  ok "staged $dest"
+fi
 sj_resume_mark "$src_host" "$full_sid" native "$full_sid"   # its next row here says resumed_from=
 
 # The session's siblings: subagent transcripts + tool-results live in <sid>/, and ship-transcript.sh

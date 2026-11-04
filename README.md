@@ -68,6 +68,10 @@ it comes back with every turn, the subagents it spawned, its task list, and its 
 /sjresume the foolbox refactor  # …or just describe it
 ```
 
+Not in a session yet? From a plain terminal, `claude resume da79fffa` (or `claude --resume da79fffa`)
+fetches the session from whichever machine recorded it and opens it — once the shell integration is
+in your rc (`bin/sj-shell-install.sh`; onboarding offers it).
+
 **Find the thing you already solved.** Three weeks ago you fixed a nasty auth timeout. You don't
 remember which machine, which repo, or which agent. Ask for it by topic and scrubjay searches every
 session it ever archived — across all your machines and all your agents at once — then pulls the

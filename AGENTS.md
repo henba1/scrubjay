@@ -51,6 +51,9 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   with `hooks/log-session.sh`.
 - `bin/sj-resume.sh` — cross-machine session hand-off: stage another host's archived transcript into
   this machine's `~/.claude/projects/` so `claude --resume` continues it. See `docs/handoff.md`.
+  `bin/sj-shell.sh` (sourced from the user's rc, installed by `bin/sj-shell-install.sh`) wraps the
+  `claude` command so `claude resume <sid>` does that hand-off from a terminal, via
+  `bin/sj-claude-resume.sh`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
   `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
   `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.
