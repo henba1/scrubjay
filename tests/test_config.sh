@@ -161,6 +161,18 @@ SCRUBJAY_TURN_PUBLISH=0 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "SCRUBJAY_TURN_PUBLISH=0 leaves it out" bash -c 'jq -e "$0 == 0" "$1" >/dev/null' "$stops" "$settings"
 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 
+section "claude: a marketplace checked out without lastUpdated gets one back"
+# The data repo's clean filter strips lastUpdated, so a checkout lacks it, and Claude Code then
+# refuses the whole file. Sync restores a placeholder in the working copy; the repo stays stripped.
+km="$SCRUBJAY_DATA/claude-md/plugins/known_marketplaces.json"
+mkdir -p "$(dirname "$km")" "$CLAUDE_CONFIG_DIR/plugins"
+printf '{"m1":{"source":{"source":"github","repo":"o/r"}},"m2":{"source":{"source":"github","repo":"o/s"},"lastUpdated":"2026-11-01T00:00:00.000Z"}}\n' > "$km"
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+check "a missing lastUpdated is restored"  bash -c 'jq -e ".m1.lastUpdated | type == \"string\"" "$1" >/dev/null' _ "$km"
+check "a present lastUpdated is kept"     bash -c 'jq -e ".m2.lastUpdated == \"2026-11-01T00:00:00.000Z\"" "$1" >/dev/null' _ "$km"
+check "the source survives"               bash -c 'jq -e ".m1.source.repo == \"o/r\"" "$1" >/dev/null' _ "$km"
+check "the claude dir still links to it"     test -L "$CLAUDE_CONFIG_DIR/plugins/known_marketplaces.json"
+
 section "opencode: skills are linked into opencode's own dir too"
 mkdir -p "$SCRUBJAY_DATA/claude-md/skills/deploy"
 printf -- '---\nname: deploy\ndescription: Ship it.\n---\nSteps.\n' > "$SCRUBJAY_DATA/claude-md/skills/deploy/SKILL.md"
