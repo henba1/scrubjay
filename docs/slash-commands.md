@@ -40,8 +40,22 @@ read-only [`sjmcp` MCP tools](archive-mcp.md); **lifecycle** commands just run t
 
 `/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per
 session. A card shows the session id and topic, then where it ran (host and folder) and with which
-agent and model, then when, how long and how big. Forks are arrows from the session they branched
-off. Sessions that recorded nothing are hidden unless you tick **show empty**.
+agent and model, then when, how long and how big. Each agent has its own colour: Claude's clay,
+opencode's grey, codex's green. Forks are arrows from the session they branched off. Sessions that
+recorded nothing are hidden unless you tick **show empty**.
+
+Right of the timeline, under **where the work landed**, are the things the sessions changed, each a
+pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo with no
+remote, a local folder, or scrubjay's own memory and plans. A line joins each session to what it
+changed; hover either end to see what the session did there ("PR #42 merged · 3 commits · 2 files").
+Click a repo for its **milestones**: per session, newest first, the PRs opened and merged, issues,
+releases, branches, pushes, commits and files written, each PR and issue linked to the forge.
+
+These come from the archived transcripts: the files the agent wrote and the `git`, `gh` and `glab`
+commands it ran, with their output. A repo is named by the remote that output shows (a PR's URL, a
+push's `To …`); failing that, on this machine, by the folder's `origin`. A fork's transcript repeats
+its parent's history, so a fork shows only what it did after branching. The map reads the archive in
+the background on start and caches the result, so a later start reads only new transcripts.
 
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
 moved), its forks, where its transcript is archived, and the command that continues it. That is the
