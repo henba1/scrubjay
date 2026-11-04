@@ -310,7 +310,7 @@ _sjh_oc_tui() {  # _sjh_oc_tui <tui.json>
   p="$(sj_app)/hooks/opencode/scrubjay-tui.tsx"
   [ -f "$p" ] || return 0
   [ -f "$f" ] || echo '{"$schema":"https://opencode.ai/tui.json"}' > "$f"
-  if ! jq empty "$f" 2>/dev/null; then echo "  SKIP  $f is not valid JSON (refusing to overwrite)"; return 0; fi
+  if ! jq empty "$f" 2>/dev/null; then echo "  FAIL  $f is not valid JSON — fix it by hand, then rerun (left as-is)"; return 1; fi
   tmp="$(mktemp)" || return 1
   jq --arg p "$p" '.plugin = ((.plugin // []) + [$p] | unique)' "$f" > "$tmp" || { rm -f "$tmp"; return 1; }
   if cmp -s "$tmp" "$f"; then echo "  ok    tui plugin"; rm -f "$tmp"
@@ -318,7 +318,7 @@ _sjh_oc_tui() {  # _sjh_oc_tui <tui.json>
 }
 
 sjh_apply_config() {
-  local cfgdir cfg tmp mcp data basejson hostjson instr
+  local cfgdir cfg tmp mcp data basejson hostjson instr rc=0
   cfgdir="$(sjh_config_dir)"
   cfg="$cfgdir/opencode.json"
   data="$(sj_data 2>/dev/null)" || data=""
@@ -330,8 +330,8 @@ sjh_apply_config() {
   mkdir -p "$cfgdir" || return 1
   [ -f "$cfg" ] || echo '{}' > "$cfg"
   if ! jq empty "$cfg" 2>/dev/null; then
-    echo "  SKIP  $cfg is not valid JSON — fix it by hand, then rerun (refusing to overwrite)"
-    return 0
+    echo "  FAIL  $cfg is not valid JSON — fix it by hand, then rerun (left as-is)"
+    return 1
   fi
 
   # Data-repo layers: shared defaults + this host's overlay. Same model as Claude's
@@ -368,10 +368,11 @@ sjh_apply_config() {
   if cmp -s "$tmp" "$cfg"; then echo "  ok    settings + plugin + mcp"; rm -f "$tmp"
   else mv "$tmp" "$cfg"; echo "  wrote $cfg  (settings + plugin$([ -n "$mcp" ] && echo ' + mcp sjmcp'))"; fi
 
-  _sjh_oc_tui "$cfgdir/tui.json"
+  _sjh_oc_tui "$cfgdir/tui.json" || rc=1
   _sjh_oc_commands "$cfgdir/commands" "$data/claude-md/commands"
   _sjh_oc_agents   "$cfgdir/agent"
   _sjh_oc_skills   "$cfgdir/skills"
+  return "$rc"
 }
 
 # --- session hand-off --------------------------------------------------------------------------

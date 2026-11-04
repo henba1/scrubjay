@@ -46,8 +46,31 @@ assert_eq "a second apply leaves tui.json alone" "$tfirst" "$(cat "$tcfg")"
 
 section "opencode: an unparseable config is refused, not clobbered"
 printf '{ this is not json ' > "$cfg"
-sj_adapter_call opencode sjh_apply_config >/dev/null 2>&1 || true
+out="$(sj_adapter_call opencode sjh_apply_config 2>&1)"; rc=$?
 assert_eq "the broken file is left exactly as-is" "{ this is not json " "$(cat "$cfg")"
+assert_eq "a refused config is a failure, not a skip" "1" "$rc"
+assert_contains "the failure names the file" "$out" "FAIL  $cfg is not valid JSON"
+
+section "SessionStart --report: a refused config shows as a failed step, with the file"
+rep="$(SCRUBJAY_HARNESSES="claude opencode" bash "$APP/hooks/sync-session.sh" --report </dev/null 2>/dev/null)"
+assert_contains "config step failed, naming the file" "$rep" "✗ config     $cfg is not valid JSON"
+echo '{}' > "$cfg"
+
+section "opencode: an unparseable tui.json fails the apply, left as-is"
+printf '{ nope' > "$tcfg"
+out="$(sj_adapter_call opencode sjh_apply_config 2>&1)"; rc=$?
+assert_eq "tui.json is left exactly as-is" "{ nope" "$(cat "$tcfg")"
+assert_eq "a refused tui.json is a failure" "1" "$rc"
+assert_contains "the failure names tui.json" "$out" "FAIL  $tcfg is not valid JSON"
+echo '{}' > "$tcfg"
+
+section "codex: an unparseable hooks.json is refused as a failure"
+mkdir -p "$CODEX_HOME"; printf '[ broken' > "$CODEX_HOME/hooks.json"
+out="$(sj_adapter_call codex sjh_apply_config 2>&1)"; rc=$?
+assert_eq "hooks.json is left exactly as-is" "[ broken" "$(cat "$CODEX_HOME/hooks.json")"
+assert_eq "a refused hooks.json is a failure" "1" "$rc"
+assert_contains "the failure names hooks.json" "$out" "FAIL  $CODEX_HOME/hooks.json is not valid JSON"
+rm -f "$CODEX_HOME/hooks.json"
 
 section "generated commands are translated into opencode's dialect"
 rc="$OPENCODE_CONFIG_DIR/commands/sjrecall.md"
