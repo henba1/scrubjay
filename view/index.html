@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>scrubjay sessions</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --dim: #5d6678; --line: #d9dee7;
+  --lane: #eef1f6; --blue: #4f8ff7; --blue-soft: #e3edfe; --fork: #4f8ff7;
+  --claude: #d97757; --opencode: #3a3f4b; --codex: #10a37f; --warn: #b4690e;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --panel: #1b1f27; --ink: #e4e8ef; --dim: #98a1b3; --line: #2c323d;
+    --lane: #171b22; --blue-soft: #1d2a42; --opencode: #c5cad4; --warn: #e0a24a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { display: flex; flex-direction: column; }
+header { z-index: 5; display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 15px; margin: 0 12px 0 0; color: var(--blue); white-space: nowrap; }
+header input, header select, button { font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+header label { color: var(--dim); white-space: nowrap; }
+header label input { min-width: 0; }
+header input[type=search] { min-width: 200px; flex: 1 1 200px; max-width: 360px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--blue); }
+#count { color: var(--dim); white-space: nowrap; }
+#stop { margin-left: auto; }
+#legend { display: flex; gap: 14px; padding: 6px 16px; color: var(--dim); font-size: 12px; flex-wrap: wrap; }
+#legend span::before { content: ""; display: inline-block; width: 22px; height: 0; margin-right: 6px;
+  vertical-align: middle; border-top: 2px solid var(--fork); }
+#legend .lg-lane::before { border-top: 8px solid var(--lane); }
+#map { position: relative; overflow: auto; flex: 1; min-height: 0; }
+#canvas { position: relative; }
+svg#edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 3; }
+.lane { position: absolute; left: 0; background: var(--lane); border-bottom: 1px solid var(--line); }
+.lane-label { position: sticky; left: 0; display: inline-block; padding: 6px 10px; font-weight: 600;
+  color: var(--dim); background: var(--lane); z-index: 2; max-width: 220px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.day { position: absolute; top: 0; height: 22px; font-size: 12px; color: var(--dim); }
+.card { position: absolute; z-index: 2; width: 250px; background: var(--panel); border: 1px solid var(--line);
+  border-left: 4px solid var(--dim); border-radius: 8px; cursor: pointer; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.card:hover, .card.sel { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-soft); }
+.card.h-claude { border-left-color: var(--claude); }
+.card.h-opencode { border-left-color: var(--opencode); }
+.card.h-codex { border-left-color: var(--codex); }
+.card > div { padding: 5px 9px; }
+.card .top { font-weight: 600; border-bottom: 1px solid var(--line); display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 47px; }
+.card .top code { color: var(--blue); font-weight: 500; }
+.card .mid { font-size: 12px; color: var(--dim); border-bottom: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .mid b { color: var(--ink); font-weight: 500; }
+.card .low { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edge-label { font: 11px var(--mono); fill: var(--fork); }
+aside { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); z-index: 10;
+  background: var(--panel); border-left: 1px solid var(--line); overflow: auto; padding: 16px;
+  box-shadow: -4px 0 16px rgba(0,0,0,.12); display: none; }
+aside.open { display: block; }
+aside h2 { font-size: 16px; margin: 0 28px 4px 0; }
+aside h3 { font-size: 13px; margin: 18px 0 6px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+aside .x { position: absolute; top: 12px; right: 12px; }
+table.kv { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.kv td { border-top: 1px solid var(--line); padding: 4px 6px; vertical-align: top; word-break: break-all; }
+table.kv td:first-child { color: var(--dim); white-space: nowrap; width: 1%; word-break: normal; }
+pre.cmd { font: 12px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px; white-space: pre-wrap; word-break: break-all; margin: 4px 0; }
+.note { color: var(--dim); font-size: 12px; }
+.warn { color: var(--warn); }
+a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
+#reader { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: none; flex-direction: column; }
+#reader.open { display: flex; }
+#reader .bar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--panel);
+  border-bottom: 1px solid var(--line); }
+#reader .bar b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#reader .body { overflow: auto; padding: 16px; max-width: 980px; width: 100%; margin: 0 auto; }
+.turn { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; }
+.turn.user { border-left: 4px solid var(--blue); }
+.turn .role { font-size: 12px; color: var(--dim); font-weight: 600; margin-bottom: 4px; }
+.turn pre { font: 12px var(--mono); background: var(--bg); border-radius: 6px; padding: 8px; overflow: auto; max-height: 360px; }
+.turn p { margin: 4px 0; white-space: pre-wrap; word-break: break-word; }
+.turn code { font-family: var(--mono); font-size: 12px; }
+#empty { padding: 40px 16px; color: var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>◆ scrubjay sessions</h1>
+  <input id="q" type="search" placeholder="search topic, folder, session id">
+  <select id="project"><option value="">all projects</option></select>
+  <select id="host"><option value="">all hosts</option></select>
+  <select id="harness"><option value="">all agents</option></select>
+  <select id="since">
+    <option value="7">last 7 days</option><option value="30" selected>last 30 days</option>
+    <option value="90">last 90 days</option><option value="0">everything</option>
+  </select>
+  <label title="sessions that recorded nothing: size 0, no topic"><input id="empty-too" type="checkbox"> show empty</label>
+  <span id="count"></span>
+  <button id="stop" title="Shut the viewer down; /sjview starts it again">Stop viewer</button>
+</header>
+<div id="legend">
+  <span>fork (branched off the session on the left)</span>
+  <span class="lg-lane">one lane per project, newest on the right</span>
+  <span style="--fork: var(--claude)">claude</span>
+  <span style="--fork: var(--opencode)">opencode</span>
+  <span style="--fork: var(--codex)">codex</span>
+</div>
+<div id="map"><div id="canvas"><svg id="edges"></svg></div><div id="empty" hidden></div></div>
+<aside id="detail"><button class="x" id="close">✕</button><div id="dbody"></div></aside>
+<div id="reader">
+  <div class="bar">
+    <b id="rtitle"></b>
+    <select id="rformat"><option value="condensed">condensed</option><option value="readable">full (tool output too)</option></select>
+    <button id="rclose">Close</button>
+  </div>
+  <div class="body" id="rbody"></div>
+</div>
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.search).get("t") || "";
+history.replaceState(null, "", "/?t=" + encodeURIComponent(TOKEN) + location.hash);
+const $ = (id) => document.getElementById(id);
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN } });
+  return r.json();
+};
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const human = (n) => { n = Number(n) || 0; for (const u of ["B", "K", "M", "G"]) {
+  if (n < 1024) return (u === "B" ? n : n.toFixed(n < 10 ? 1 : 0)) + u; n /= 1024; } return n.toFixed(0) + "T"; };
+const home = (p) => p.replace(/^\/(home|Users)\/[^/]+/, "~");
+// The end of a path is the part that tells folders apart; the lane already names the project.
+const tail = (p) => { const h = home(p), parts = h.split("/"); return parts.length > 3 ? "…/" + parts.slice(-2).join("/") : h; };
+
+let G = { nodes: [], edges: [], host: "" }, bySid = new Map();
+const CARD_W = 250, CARD_H = 124, GAP_X = 46, GAP_Y = 12, LABEL_W = 0, TOP = 28, LANE_PAD = 34;
+
+function fillSelect(id, values) {
+  const el = $(id), keep = el.value;
+  el.length = 1;
+  for (const v of values) el.add(new Option(v, v));
+  el.value = values.includes(keep) ? keep : "";
+}
+
+async function load() {
+  G = await api("/api/graph");
+  bySid = new Map(G.nodes.map((n) => [n.sid, n]));
+  const uniq = (k) => [...new Set(G.nodes.map((n) => n[k]).filter(Boolean))].sort();
+  fillSelect("project", uniq("project"));
+  fillSelect("host", uniq("host"));
+  fillSelect("harness", uniq("harness"));
+  draw();
+}
+
+function visible() {
+  const q = $("q").value.trim().toLowerCase(), p = $("project").value, h = $("host").value,
+    a = $("harness").value, days = Number($("since").value), all = $("empty-too").checked;
+  const cut = days ? new Date(Date.now() - days * 864e5).toISOString().slice(0, 10) : "";
+  return G.nodes.filter((n) => (all || n.size !== "0" || n.topic) && (!p || n.project === p) && (!h || n.host === h) && (!a || n.harness === a)
+    && (!cut || n.date >= cut)
+    && (!q || [n.topic, n.cwd, n.sid, n.host, n.model].join(" ").toLowerCase().includes(q)));
+}
+
+function draw() {
+  const canvas = $("canvas"), svg = $("edges");
+  canvas.querySelectorAll(".lane,.card,.day").forEach((e) => e.remove());
+  svg.innerHTML = "";
+  const nodes = visible().sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+  $("count").textContent = `${nodes.length} of ${G.nodes.length} sessions`;
+  $("empty").hidden = nodes.length > 0;
+  $("empty").textContent = G.nodes.length ? "No session matches these filters." :
+    "The catalogue is empty on this machine (no logs/*.log in the data repo).";
+
+  // Columns are days that have a visible session; lanes are projects, busiest-recent first.
+  const days = [...new Set(nodes.map((n) => n.date))].sort();
+  const col = new Map(days.map((d, i) => [d, i]));
+  const lanes = new Map();
+  for (const n of nodes) {
+    const k = n.project || "(no folder)";
+    if (!lanes.has(k)) lanes.set(k, []);
+    lanes.get(k).push(n);
+  }
+  const order = [...lanes.entries()].sort((a, b) =>
+    (b[1].at(-1).date + b[1].at(-1).time).localeCompare(a[1].at(-1).date + a[1].at(-1).time));
+
+  const pos = new Map();
+  let y = TOP;
+  const width = LABEL_W + days.length * (CARD_W + GAP_X) + 40;
+  days.forEach((d, i) => {
+    const el = document.createElement("div");
+    el.className = "day"; el.textContent = d;
+    el.style.left = (LABEL_W + 16 + i * (CARD_W + GAP_X)) + "px"; el.style.top = "6px";
+    canvas.appendChild(el);
+  });
+  for (const [name, list] of order) {
+    const stack = new Map();
+    for (const n of list) {
+      const c = col.get(n.date), s = stack.get(c) || 0;
+      stack.set(c, s + 1);
+      pos.set(n.sid, { x: LABEL_W + 16 + c * (CARD_W + GAP_X), y: y + LANE_PAD + s * (CARD_H + GAP_Y) });
+    }
+    const h = LANE_PAD + Math.max(...stack.values()) * (CARD_H + GAP_Y) + 6;
+    const lane = document.createElement("div");
+    lane.className = "lane"; lane.style.top = y + "px"; lane.style.height = h + "px";
+    lane.style.width = Math.max(width, $("map").clientWidth) + "px";
+    lane.innerHTML = `<span class="lane-label" title="${esc(name)}">${esc(name)} · ${list.length}</span>`;
+    canvas.appendChild(lane);
+    y += h + 8;
+  }
+  for (const n of nodes) {
+    const p = pos.get(n.sid), el = document.createElement("div");
+    el.className = `card h-${n.harness}`;
+    el.dataset.sid = n.sid;
+    el.style.left = p.x + "px"; el.style.top = p.y + "px"; el.style.height = CARD_H + "px";
+    const topic = n.topic || "(untitled)";
+    el.innerHTML =
+      `<div class="top" title="${esc(topic)}"><code>${esc(n.sid8)}</code> ${esc(topic)}</div>` +
+      `<div class="mid" title="${esc(n.host + " · " + n.cwd)}">${esc(n.host)} · ${esc(tail(n.cwd))}<br>` +
+      `<b>${esc(n.harness)}</b>${n.model ? " · " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
+      `<div class="low">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
+      `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div>`;
+    el.onclick = () => open(n.sid);
+    canvas.appendChild(el);
+  }
+  canvas.style.width = Math.max(width, $("map").clientWidth) + "px";
+  canvas.style.height = y + "px";
+  svg.setAttribute("width", width); svg.setAttribute("height", y);
+
+  // Forks: parent's right edge to child's left edge; a parent filtered out of view draws no line.
+  for (const e of G.edges) {
+    const a = pos.get(e.from), b = pos.get(e.to);
+    if (!a || !b) continue;
+    const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2, x2 = b.x, y2 = b.y + CARD_H / 2;
+    const back = x2 <= x1; // same day: route around the right side
+    const d = back
+      ? `M${x1},${y1} C${x1 + 40},${y1} ${x1 + 40},${y2} ${b.x + CARD_W},${y2}`
+      : `M${x1},${y1} C${x1 + GAP_X},${y1} ${x2 - GAP_X},${y2} ${x2},${y2}`;
+    svg.insertAdjacentHTML("beforeend",
+      `<path d="${d}" fill="none" stroke="var(--fork)" stroke-width="2" marker-end="url(#arrow)"/>` +
+      `<text class="edge-label" x="${(x1 + (back ? b.x + CARD_W : x2)) / 2 + (back ? 30 : 0)}" y="${(y1 + y2) / 2 - 4}">fork</text>`);
+  }
+  svg.insertAdjacentHTML("afterbegin",
+    `<defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">` +
+    `<path d="M0,0 L8,4 L0,8 z" fill="var(--fork)"/></marker></defs>`);
+}
+
+function kv(rows) {
+  return `<table class="kv">${rows.filter(([, v]) => v !== "" && v != null)
+    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join("")}</table>`;
+}
+const sidLink = (sid) => {
+  const n = bySid.get(sid);
+  return `<a class="sid" data-sid="${esc(sid)}">${esc(n ? n.sid8 : sid.slice(0, 8))}</a>` +
+    (n ? ` ${esc(n.topic || "")}` : ' <span class="note">(not in the catalogue)</span>');
+};
+
+async function open(sid) {
+  history.replaceState(null, "", location.search + "#sid=" + encodeURIComponent(sid));
+  document.querySelectorAll(".card.sel").forEach((c) => c.classList.remove("sel"));
+  const card = document.querySelector(`.card[data-sid="${CSS.escape(sid)}"]`);
+  if (card) { card.classList.add("sel"); card.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  $("detail").classList.add("open");
+  $("dbody").innerHTML = '<p class="note">loading…</p>';
+  const s = await api("/api/session?sid=" + encodeURIComponent(sid));
+  if (s.error) { $("dbody").innerHTML = `<p class="warn">${esc(s.error)}</p>`; return; }
+  const n = s.node, last = s.rows.at(-1);
+  const known = new Set(["date", "time", "host", "cwd", "topic", "sid"]);
+  const extra = Object.entries(last).filter(([k]) => !known.has(k)).map(([k, v]) => [k, esc(v)]);
+  const r = s.resume;
+  $("dbody").innerHTML =
+    `<h2>${esc(n.topic || "(untitled)")}</h2><div class="note">${esc(n.sid)}</div>` +
+    `<h3>Session</h3>` + kv([
+      ["started", esc(`${n.date} ${n.time}`)], ["host", esc(n.host) + (n.host === G.host ? ' <span class="note">(this machine)</span>' : "")],
+      ["folder", esc(n.cwd)], ["project", esc(n.project)], ...extra,
+      ["topic from", n.essence ? "written with /sjlog" : last.prompts ? `Haiku, over ${esc(last.prompts)} prompts` : "the first prompt"],
+    ]) +
+    `<h3>Connections</h3>` + kv([
+      ["forked from", n.forked_from ? sidLink(n.forked_from) : '<span class="note">none recorded</span>'],
+      ["forks of it", s.children.length ? s.children.map(sidLink).join("<br>") : '<span class="note">none</span>'],
+    ]) +
+    `<h3>Transcript</h3>` + (s.readable
+      ? kv([["readable", esc(s.readable)], ["raw", esc(s.raw)]]) +
+        `<p><button id="readc">Read transcript</button></p>`
+      : `<p class="note">Not in the archive on this machine${G.archive ? "" : " (this machine has no archive mounted)"}.` +
+        ` Recall it on ${esc(n.host)}.</p>`) +
+    `<h3>Continue it</h3>` + (r.cmd
+      ? `<pre class="cmd" id="rcmd">${esc(r.cmd)}</pre><button id="copy">Copy</button>` +
+        (r.where === "here" ? "" : `<p class="note">${esc(r.note)}${r.then ? `, e.g. <code>${esc(r.then)}</code>` : ""}.</p>`)
+      : `<p class="note">No resume command for ${esc(n.harness)} sessions.</p>`) +
+    `<h3>Topic history (${s.rows.length} rows)</h3>` +
+    kv(s.rows.map((w) => [`${w.date} ${w.time}`, esc(w.topic || "(untitled)") +
+      (w.prompts ? ` <span class="note">· ${esc(w.prompts)} prompts</span>` : "")]));
+  $("dbody").querySelectorAll("a.sid").forEach((a) => a.onclick = () => open(a.dataset.sid));
+  if ($("readc")) $("readc").onclick = () => read(n);
+  if ($("copy")) $("copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(r.cmd); $("copy").textContent = "Copied"; }
+    catch { getSelection().selectAllChildren($("rcmd")); $("copy").textContent = "Selected — press Ctrl+C"; }
+  };
+}
+
+// The archive's readable Markdown, drawn as turns. Everything is escaped first; only the few
+// shapes the renderers emit are formatted (## headings, ``` fences, **bold**, `code`).
+function render(md) {
+  const out = [];
+  let turn = null, buf = [], fence = null;
+  const flushText = () => { if (buf.length && turn) turn.html.push(`<p>${inline(buf.join("\n"))}</p>`); buf = []; };
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  for (const line of md.split("\n")) {
+    if (fence !== null) {
+      if (line.startsWith("```")) { turn?.html.push(`<pre>${esc(fence.join("\n"))}</pre>`); fence = null; }
+      else fence.push(line);
+      continue;
+    }
+    const h = /^## (User|Assistant)\b(.*)$/.exec(line);
+    if (h) { flushText(); turn = { role: h[1], html: [] }; out.push(turn); continue; }
+    if (line.startsWith("```")) { flushText(); fence = []; continue; }
+    if (!turn) continue; // the file's own title and turn count are in the bar already
+    if (line.trim() === "") { flushText(); continue; }
+    buf.push(line);
+  }
+  if (fence !== null && turn) turn.html.push(`<pre>${esc(fence.join("\n"))}</pre>`);
+  flushText();
+  return out.map((t) => `<div class="turn ${t.role.toLowerCase()}"><div class="role">${t.role}</div>${t.html.join("")}</div>`).join("")
+    || `<pre>${esc(md)}</pre>`;
+}
+
+async function read(n) {
+  $("reader").classList.add("open");
+  $("rtitle").textContent = `${n.sid8} · ${n.topic || "(untitled)"}`;
+  $("rbody").innerHTML = '<p class="note">loading…</p>';
+  const t = await api(`/api/transcript?sid8=${encodeURIComponent(n.sid8)}&format=${$("rformat").value}`);
+  $("rbody").innerHTML = t.error ? `<p class="warn">${esc(t.error)}</p>` :
+    (t.truncated ? `<p class="warn">Shown in part: ${esc(t.hint || "")}</p>` : "") +
+    (t.elided ? '<p class="note">Tool calls and their output are folded to two lines each; pick "full" above to see them whole.</p>' : "") +
+    render(t.content || "");
+  $("rbody").scrollTop = 0;
+  $("rformat").onchange = () => read(n);
+}
+
+$("close").onclick = () => { $("detail").classList.remove("open"); history.replaceState(null, "", location.search); };
+$("rclose").onclick = () => $("reader").classList.remove("open");
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("reader").classList.contains("open")) $("reader").classList.remove("open");
+  else $("detail").classList.remove("open");
+});
+for (const id of ["q", "project", "host", "harness", "since", "empty-too"]) $(id).addEventListener("input", draw);
+$("stop").onclick = async () => {
+  await api("/api/stop", { method: "POST" }).catch(() => {});
+  document.body.innerHTML = '<p id="empty">The viewer has stopped. Run <code>/sjview</code> to start it again.</p>';
+};
+// `#sid=<id>` opens that session's panel, `#read=<id>` its transcript: links you can keep.
+load().then(async () => {
+  const m = $("map"); m.scrollLeft = m.scrollWidth;
+  const h = new URLSearchParams(location.hash.slice(1)), sid = h.get("sid") || h.get("read");
+  if (sid && bySid.has(sid)) { await open(sid); if (h.get("read")) read(bySid.get(sid)); }
+})
+  .catch(() => { $("empty").hidden = false; $("empty").textContent = "Could not reach the viewer — it may have stopped. Run /sjview again."; });
+</script>
+</body>
+</html>

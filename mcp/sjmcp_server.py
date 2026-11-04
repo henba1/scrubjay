@@ -255,7 +255,7 @@ def _all_artifacts(r: Roots) -> list[Artifact]:
 _LOG = re.compile(
     r'^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}) \| '
     r'(?P<host>[^|]*?) \| (?P<cwd>[^|]*?) \| '
-    r'"(?P<topic>.*)" \| session=(?P<sid>[0-9a-fA-F][0-9a-fA-F-]+)'
+    r'"(?P<topic>.*)" \| session=(?P<sid>(?:ses_)?[0-9A-Za-z][0-9A-Za-z-]+)'
     r'(?P<extra>(?: \| [^|]*)*)\s*$'
 )
 _NOISE_TOPICS = {"", "(no text)"}
