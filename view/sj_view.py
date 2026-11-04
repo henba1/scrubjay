@@ -215,15 +215,24 @@ def cloud_url(path: str) -> str | None:
         return None
     loc, rem = hit
     # Symlinks resolved, then held inside the mapped folder: only what it shares is ever looked at.
+    # Each candidate, from the path itself up to the folder, is resolved and checked right before
+    # it touches the disk.
     root = os.path.realpath(loc)
-    full = os.path.realpath(want)
-    if full != root and not full.startswith(root.rstrip(os.sep) + os.sep):
-        return None
-    p = full
-    while p != root and not os.path.exists(p):
-        p = os.path.dirname(p)
+    inside = root.rstrip(os.sep) + os.sep
+    p, cand = root, want
+    while cand.startswith(loc):
+        safe = os.path.realpath(cand)
+        if safe.startswith(inside) and os.path.exists(safe):
+            p = safe
+            break
+        if cand == loc:
+            break
+        cand = os.path.dirname(cand)
     shown = "/" + (rem.strip("/") + "/" + p[len(root):].strip("/")).strip("/")
-    if p == root or os.path.isdir(p):
+    if p == root:
+        return f"{c['base']}/apps/files/files?dir={quote(shown, safe='/')}"
+    safe = os.path.realpath(p)
+    if safe.startswith(inside) and os.path.isdir(safe):
         return f"{c['base']}/apps/files/files?dir={quote(shown, safe='/')}"
     parent, _, name = shown.rpartition("/")
     return f"{c['base']}/apps/files/files?dir={quote(parent or '/', safe='/')}&scrollto={quote(name, safe='')}"
@@ -393,6 +402,7 @@ def handler_for(st: State):
                 url = cloud_url((q.get("path") or [""])[0])
                 # Printable ASCII only into a header: the address is percent-encoded, and this
                 # also stops a configured base with a line break in it.
+                url = (url or "").replace("\r", "").replace("\n", "")
                 if not url or not _HEADER_SAFE.fullmatch(url):
                     return self._json({"error": "not a folder this machine shares with Nextcloud"}, 404)
                 self.send_response(302)
