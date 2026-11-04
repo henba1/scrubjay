@@ -118,6 +118,12 @@ git clone git@github.com:henba1/scrubjay.git ~/.scrubjay/scrubjay
 Run `bin/sj-bootstrap.sh` on its own to create/seed the private repos without onboarding, and
 `bin/onboard.sh --version` to see which commit you're on.
 
+Near the end it offers the **shell integration**: one marked block in `~/.bashrc` / `~/.zshrc` so
+that `claude resume <sid>` in a terminal resumes a session recorded on *any* machine (see
+[hand-off](handoff.md#from-a-terminal-claude-resume-sid)). Preset `SCRUBJAY_SHELL_HOOK=1` or `0` to
+answer it unattended. On a machine that is already onboarded, add it on its own with
+`bin/sj-shell-install.sh`.
+
 !!! warning "One manual step the script can't do for you — authorize the new host on the receiver."
     For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each
     **print an `authorized_keys` line**; you must paste it into the receiver account's

@@ -13,6 +13,7 @@
 #   - for the rsync-wg (P2P) backend: optionally generate a dedicated relay SSH key,
 #     add the `scrubjay-receiver` ssh-alias, and print the receiver authorized_keys line
 #   - set up cross-machine memory (self-hosted NAS git repo) via onboard-memory.sh
+#   - offer the shell integration (`claude resume <sid>` from any machine) via sj-shell-install.sh
 #
 # Re-runnable: skips anything already in place. Prompts have sensible defaults; any value
 # can be preset via its env var (SCRUBJAY_HOST, SCRUBJAY_BACKEND, …) to run unattended.
@@ -268,7 +269,26 @@ if [ "$BACKEND" != local ]; then
   fi
 fi
 
-# ---- 8) offer to push the new host dir ------------------------------------------------
+# ---- 7d) shell integration: `claude resume <sid>` for a session from any machine -------
+# One marked block in ~/.bashrc / ~/.zshrc that sources bin/sj-shell.sh through ~/.claude/hooks, so
+# later app updates arrive with no further rc edit. It edits a file you own, so it is asked; preset
+# SCRUBJAY_SHELL_HOOK=1 (or 0) to answer it unattended.
+case " $SCRUBJAY_HARNESSES " in
+  *" claude "*)
+    case "${SCRUBJAY_SHELL_HOOK:-}" in
+      1) _shell_hook=1 ;;
+      0) _shell_hook=0 ;;
+      *) if confirm "add 'claude resume <sid>' (resume a session from ANY machine) to your shell rc?" Y
+         then _shell_hook=1; else _shell_hook=0; fi ;;
+    esac
+    if [ "$_shell_hook" = 1 ]; then
+      "$APP/bin/sj-shell-install.sh" || warn "shell integration not installed — later: bash $APP/bin/sj-shell-install.sh"
+    else
+      info "Skipped. Later:  bash $APP/bin/sj-shell-install.sh"
+    fi ;;
+esac
+
+# ---- 8) offer to push the new host dir------------------------------------------------
 if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \
       && { git pull --rebase -q 2>/dev/null; git push -q; } ) \

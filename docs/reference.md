@@ -120,6 +120,13 @@ cd <the project dir on this machine>
 claude --resume <sid>                              # …or /resume inside a session here
 ```
 
+Or in one step from a terminal, with the [shell integration](handoff.md#from-a-terminal-claude-resume-sid)
+installed (`~/.scrubjay/scrubjay/bin/sj-shell-install.sh`, once per machine):
+
+```sh
+claude resume <sid8>                               # also: claude --resume <sid8>, claude -r <sid8>
+```
+
 ## Register the current machine (first-time onboarding)
 
 ```sh

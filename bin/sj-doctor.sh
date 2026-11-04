@@ -210,6 +210,15 @@ doctor_harnesses() {
       note "$h: configured to sync, but not installed on this machine"
     fi
   done
+  # Optional, so a note rather than a failure: `claude resume <sid>` from a plain terminal.
+  case " $(sj_harnesses) " in
+    *" claude "*)
+      if bash "$APP/bin/sj-shell-install.sh" --status >/dev/null 2>&1; then
+        ok "shell integration: 'claude resume <sid>' works from a terminal"
+      else
+        note "shell integration not in your rc — for 'claude resume <sid>' from any machine: bash $(sj_pretty_path "$APP")/bin/sj-shell-install.sh"
+      fi ;;
+  esac
 }
 
 # ── last recorded outcomes ─────────────────────────────────────────────────────────────────────
