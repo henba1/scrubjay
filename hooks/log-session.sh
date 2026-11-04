@@ -42,6 +42,7 @@ fi
 # `cd -P` resolves that symlink physically — see the note in hooks/sync-session.sh.
 APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 . "$APP/bin/lib.sh"
+sj_load_config   # in THIS shell, so the knobs above set in ~/.config/scrubjay/config apply here too
 
 # Which coding harness ended a session. Claude Code and Codex both hand a hook this same payload
 # (session_id / transcript_path / cwd); a harness that doesn't (opencode) sets SCRUBJAY_HARNESS and

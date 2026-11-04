@@ -114,6 +114,17 @@ case "$last" in *prompts=*) _no "a fallback row has no prompt count, so it is re
 c0="$(ncalls)"; rsid="aaaaaaaa-2222-4333-8444-555555555555"
 sj_log_row "$rlog" "$rsid" /w "$t" claude testhost "" ""
 assert_eq "a per-turn (non-refresh) row never calls the model" "$c0" "$(ncalls)"
+
+section "SCRUBJAY_AI_TOPIC=0 in the config file reaches the session-end hook"
+sidc="cccccccc-2222-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sidc.jsonl"
+mkdir -p "$HOME/.config/scrubjay"; echo 'SCRUBJAY_AI_TOPIC=0' > "$HOME/.config/scrubjay/config"
+c0="$(ncalls)"
+SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
+  "$APP" "$(payload "$sidc")"
+assert_eq "no model call" "$c0" "$(ncalls)"
+assert_contains "the first prompt is the topic" "$(grep "session=$sidc" "$LOG")" \
+  '"the retry backoff fires twice per failure — find out why"'
+rm -f "$HOME/.config/scrubjay/config"
 export SCRUBJAY_AI_TOPIC=0
 
 section "the model's own child session fires no scrubjay hook"

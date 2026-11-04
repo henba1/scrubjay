@@ -196,6 +196,19 @@ check "a present lastUpdated is kept"     bash -c 'jq -e ".m2.lastUpdated == \"2
 check "the source survives"               bash -c 'jq -e ".m1.source.repo == \"o/r\"" "$1" >/dev/null' _ "$km"
 check "the claude dir still links to it"     test -L "$CLAUDE_CONFIG_DIR/plugins/known_marketplaces.json"
 
+section "claude: a plugin installed here survives the settings rebuild"
+# `claude plugin install` writes into settings.json, which sync rebuilds from the data repo.
+jq '.enabledPlugins = {"mod@mkt": true, "off@mkt": true} | .extraKnownMarketplaces = {mkt: {source: {source: "github", repo: "o/mkt"}}}' \
+  "$settings" > "$settings.new" && mv "$settings.new" "$settings"
+hj="$SCRUBJAY_DATA/hosts/testhost/claude/settings.json"; hj_had=0; [ -f "$hj" ] && { hj_had=1; cp "$hj" "$hj.orig"; }
+echo '{"enabledPlugins": {"off@mkt": false}}' > "$hj"
+bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
+check "the installed plugin stays enabled"   bash -c 'jq -e ".enabledPlugins[\"mod@mkt\"] == true" "$1" >/dev/null' _ "$settings"
+check "its marketplace stays known"          bash -c 'jq -e ".extraKnownMarketplaces.mkt.source.repo == \"o/mkt\"" "$1" >/dev/null' _ "$settings"
+check "the data repo wins where it names one" bash -c 'jq -e ".enabledPlugins[\"off@mkt\"] == false" "$1" >/dev/null' _ "$settings"
+check "the hooks are still the data repo's"  bash -c 'jq -e ".hooks.SessionEnd" "$1" >/dev/null' _ "$settings"
+if [ "$hj_had" = 1 ]; then mv "$hj.orig" "$hj"; else rm -f "$hj"; fi
+
 section "opencode: skills are linked into opencode's own dir too"
 mkdir -p "$SCRUBJAY_DATA/claude-md/skills/deploy"
 printf -- '---\nname: deploy\ndescription: Ship it.\n---\nSteps.\n' > "$SCRUBJAY_DATA/claude-md/skills/deploy/SKILL.md"
