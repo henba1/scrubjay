@@ -63,6 +63,10 @@ def _rows(r: sj.Roots) -> dict[str, list[dict]]:
             row = {"date": e.date, "time": e.time, "host": e.host, "cwd": e.cwd,
                    "topic": e.topic, "sid": e.sid, **sj._parse_extra(m.group("extra") or "")}
             out.setdefault(e.sid, []).append(row)
+    # Each machine logs to its own file, so a session continued elsewhere has rows in two files: put
+    # them in time order (stable, so one file's refreshes, which keep their first time, stay in order).
+    for rs in out.values():
+        rs.sort(key=lambda w: w["date"] + w["time"])
     return out
 
 
@@ -155,6 +159,11 @@ class Artefacts:
         return out
 
 
+def _hops(hosts: list[str]) -> list[str]:
+    """Hosts in order, a repeat of the one before dropped: laptop, henpi, laptop."""
+    return [h for i, h in enumerate(hosts) if i == 0 or h != hosts[i - 1]]
+
+
 def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
     last, first = rows[-1], rows[0]
     sid8 = sj._handle(sid)
@@ -167,6 +176,10 @@ def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
         "model": last.get("model", ""),
         "turns": last.get("turns", ""), "size": last.get("size", ""),
         "forked_from": last.get("forked_from", ""), "essence": last.get("essence") == "1",
+        "summary": next((w["summary"] for w in reversed(rows) if w.get("summary")), ""),
+        # Where it ran, in order: a hand-off continues the same session on another machine.
+        "hosts": _hops([w["host"] for w in rows]),
+        "resumed_from": next((w["resumed_from"] for w in reversed(rows) if w.get("resumed_from")), ""),
         "rows": len(rows), "archived": bool(arch.readable(sid8)),
     }
 
@@ -177,6 +190,15 @@ def graph(st: "State") -> dict:
     known = {n["sid"] for n in nodes}
     edges = [{"from": n["forked_from"], "to": n["sid"], "kind": "fork"}
              for n in nodes if n["forked_from"] and n["forked_from"] in known]
+    # A carry-over into another harness started a new session from an old one: an edge between them.
+    # (A native hand-off kept the session id, so it is one node that ran on two machines.)
+    by8 = {n["sid8"]: n["sid"] for n in nodes}
+    for n in nodes:
+        src = n["resumed_from"].partition(":")[2]
+        src = src if src in known else by8.get(sj._handle(src), "") if src else ""
+        if src and src != n["sid"]:
+            edges.append({"from": src, "to": n["sid"], "kind": "carry",
+                          "label": f"carried over · {n['resumed_from'].partition(':')[0]}"})
     # Artefacts: one node each, and an edge per session that changed it, labelled with what it did.
     arts: dict[str, dict] = {}
     for n in nodes:

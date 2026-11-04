@@ -17,14 +17,17 @@ LOG="$SCRUBJAY_DATA/logs/testhost.log"
 P="aaaaaaaa-1111-4111-8111-111111111111"   # parent
 C="bbbbbbbb-2222-4222-8222-222222222222"   # its fork
 O="ses_0123456789abcdefGHIJKL"             # an opencode session
-X="cccccccc-3333-4333-8333-333333333333"   # another machine's
+X="cccccccc-3333-4333-8333-333333333333"   # started on another machine, continued here
+Y="99999999-3333-4333-8333-333333333333"   # another machine's alone
 today="$(date +%Y-%m-%d)"
 {
   echo "$today 09:00 | testhost | /home/user/widget-api | \"Retry backoff fires twice\" | session=$P | harness=claude | model=claude-opus-4-8 | turns=5 | size=2048"
-  echo "$today 09:00 | testhost | /home/user/widget-api | \"Retry backoff + jitter\" | session=$P | harness=claude | model=claude-opus-4-8 | turns=9 | size=4096 | prompts=3"
+  echo "$today 09:00 | testhost | /home/user/widget-api | \"Retry backoff + jitter\" | session=$P | harness=claude | model=claude-opus-4-8 | turns=9 | size=4096 | prompts=3 | summary=Armed the retry timer once; PR #42 merged."
   echo "$today 10:00 | testhost | /home/user/widget-api | \"Jitter experiment\" | session=$C | harness=claude | model=claude-opus-4-8 | turns=2 | size=1024 | forked_from=$P"
-  echo "$today 11:00 | testhost | /home/user/widget-api | \"Port the client to opencode\" | session=$O | model= | turns=3 | size=900"
   echo "$today 12:00 | laptop | /home/user/widget-api | \"Laptop-side fix\" | session=$X | harness=claude | turns=4 | size=700"
+  echo "$today 14:00 | testhost | /home/user/widget-api | \"Laptop-side fix, finished here\" | session=$X | harness=claude | turns=9 | size=1700 | resumed_from=laptop:$X"
+  echo "$today 15:00 | testhost | /home/user/widget-api | \"Port the client to opencode\" | session=$O | model= | turns=3 | size=900 | resumed_from=laptop:$X"
+  echo "$today 12:30 | laptop | /home/user/widget-api | \"Laptop only\" | session=$Y | harness=claude | turns=2 | size=500"
   echo "$today 13:00 | testhost | /home/user/widget-api | \"\" | session=dddddddd-4444-4444-8444-444444444444 | harness=claude | turns= | size=0"
 } > "$LOG"
 read_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_retry-backoff__aaaaaaaa.md"
@@ -165,12 +168,22 @@ assert_eq "the page with its token: 200" 200 "$(curl -s -o /dev/null -w '%{http_
 
 section "the map: every session once, forks as edges"
 g="$(get /api/graph)"
-assert_eq "one node per session, earlier rows folded in" 5 "$(jq '.nodes | length' <<<"$g")"
+assert_eq "one node per session, earlier rows folded in" 6 "$(jq '.nodes | length' <<<"$g")"
 assert_eq "the latest topic wins" "Retry backoff + jitter" "$(jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .topic' <<<"$g")"
 assert_eq "the fork is an edge, parent to child" "$P>$C:fork" "$(jq -r '.edges[] | select(.kind == "fork") | "\(.from)>\(.to):\(.kind)"' <<<"$g")"
 assert_eq "an opencode id is an opencode session" opencode "$(jq -r --arg s "$O" '.nodes[] | select(.sid == $s) | .harness' <<<"$g")"
 assert_eq "an archived transcript is marked" true "$(jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .archived' <<<"$g")"
 assert_eq "this machine is named" testhost "$(jq -r .host <<<"$g")"
+
+section "summaries and hand-offs"
+assert_eq "the summary is on the node" "Armed the retry timer once; PR #42 merged." \
+  "$(jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .summary' <<<"$g")"
+assert_eq "a hand-off: one node, both machines in order" "laptop testhost" \
+  "$(jq -r --arg s "$X" '.nodes[] | select(.sid == $s) | .hosts | join(" ")' <<<"$g")"
+assert_eq "it now lives here" testhost "$(jq -r --arg s "$X" '.nodes[] | select(.sid == $s) | .host' <<<"$g")"
+assert_eq "a carry-over: an edge from the source" "$X>$O:carry" \
+  "$(jq -r '.edges[] | select(.kind == "carry") | "\(.from)>\(.to):\(.kind)"' <<<"$g")"
+assert_eq "a native hand-off is not an edge" 1 "$(jq '[.edges[] | select(.kind == "carry")] | length' <<<"$g")"
 
 section "a session: all it holds, and how to continue it"
 s="$(get "/api/session?sid=$P")"
@@ -179,9 +192,9 @@ assert_eq "its fork is listed" "$C" "$(jq -r '.children[0]' <<<"$s")"
 assert_eq "trailing fields kept" 3 "$(jq -r '.rows[-1].prompts' <<<"$s")"
 assert_eq "here: the harness's own resume, in its folder" \
   "cd '/home/user/widget-api' && claude --resume $P" "$(jq -r .resume.cmd <<<"$s")"
-x="$(get "/api/session?sid=$X")"
+x="$(get "/api/session?sid=$Y")"
 assert_eq "another machine's: fetched with sj-resume first" laptop "$(jq -r .resume.where <<<"$x")"
-assert_contains "the sj-resume command" "$(jq -r .resume.cmd <<<"$x")" "sj-resume.sh' cccccccc"
+assert_contains "the sj-resume command" "$(jq -r .resume.cmd <<<"$x")" "sj-resume.sh' 99999999"
 assert_eq "an unknown session: 404" 404 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-SJ-Token: $TOK" "http://127.0.0.1:$PORT/api/session?sid=nope")"
 
 section "the transcript"

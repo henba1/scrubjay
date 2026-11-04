@@ -596,6 +596,7 @@ sj_pending_authorized() {  # sj_pending_authorized <ssh|git> <target>  -> 0 when
 sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts> <topic> [refresh]
   local log="$1" sid="$2" cwd="$3" tpath="$4" harness="$5" host="$6" ts="$7" topic="${8:-}"
   local mode="${9:-}" model="" turns="" size=0 last="" prevtopic="" essence="" aimark="" line
+  local summary="" ai="" from="" mark=""
 
   # A session with no transcript produced no records at all: nothing is shipped for it and nothing
   # is rendered, so a row would advertise an archive entry that does not exist. This is not
@@ -622,13 +623,17 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
     prompts="$(sj_session_topic "$tpath" prompts)"
     n="$(printf '%s' "$prompts" | jq 'length' 2>/dev/null)" || n=0
     case "$last" in
-      *" | prompts=$n"|*" | prompts=$n | "*) topic="$prevtopic"; aimark=" | prompts=$n" ;;
-      *) [ "${n:-0}" -gt 0 ] && topic="$(sj_ai_topic "$prompts")" && aimark=" | prompts=$n" ;;
+      *" | prompts=$n"|*" | prompts=$n | "*) topic="$prevtopic"; aimark=" | prompts=$n"
+        summary="$(sj_row_summary "$last")" ;;
+      *) if [ "${n:-0}" -gt 0 ] && ai="$(sj_ai_topic "$prompts" "$(sj_session_last_reply "$tpath")")"; then
+           topic="${ai%%$'\n'*}"; aimark=" | prompts=$n"
+           case "$ai" in *$'\n'*) summary="${ai#*$'\n'}" ;; esac
+         fi ;;
     esac
     # A failed call never downgrades a model title to the first prompt.
     if [ -z "$topic" ]; then
       case "$last" in *" | prompts="*)
-        topic="$prevtopic"
+        topic="$prevtopic"; summary="$(sj_row_summary "$last")"
         aimark="$(printf '%s' "$last" | grep -o ' | prompts=[0-9]*' | tail -n 1)" ;;
       esac
     fi
@@ -655,35 +660,104 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   local fork=""
   declare -F sjh_session_parent >/dev/null 2>&1 && fork="$(sjh_session_parent "$tpath")"
   case "$fork" in *[!0-9A-Za-z_-]*) fork="" ;; esac
+  # A hand-off: `resumed_from=<host>:<sid>`, from the mark sj-resume.sh left (this session continued
+  # one from another machine, or carried one over from another harness), else as an earlier row said.
+  if mark="$(sj_resume_take "$sid" "$harness" "$cwd")"; then from="$mark"
+  else from="$(printf '%s' "$last" | grep -o ' | resumed_from=[^ |]*' | tail -n 1)"; from="${from#* | resumed_from=}"; fi
+  case "$from" in *[!0-9A-Za-z_.:-]*) from="" ;; esac
+  # The summary goes last: it is the one field of free prose. A row titled another way (an /sjlog
+  # essence, no model this time) keeps the one an earlier row had.
+  [ -n "$summary" ] || summary="$(sj_row_summary "$last")"
+  summary="$(sj_topic_sanitize "$summary" 300)"
 
   # Everything after `harness=` is an additive `key=value` field: a line written before a field
   # existed simply lacks it, and the readers report it as "-"/empty. A `token=` field is reserved
   # for a later pass — the readers already tolerate trailing fields they don't know.
   line="$(printf '%s | %s | %s | "%s" | session=%s | harness=%s | model=%s | turns=%s | size=%s%s' \
     "$ts" "$host" "$cwd" "$topic" "$sid" "$harness" "$model" "$turns" "$size$aimark$essence" \
-    "${fork:+ | forked_from=$fork}")"
+    "${fork:+ | forked_from=$fork}${from:+ | resumed_from=$from}${summary:+ | summary=$summary}")"
   [ "$line" = "$last" ] && return 1        # nothing moved: nothing to push either
   printf '%s\n' "$line" >> "$log"
+  [ -n "$mark" ] && sj_resume_done "$sid" "$harness" "$cwd"
+  return 0
+}
+
+# A row's summary (the last field, free prose), or nothing.
+sj_row_summary() { case "$1" in *' | summary='*) printf '%s' "${1##* | summary=}" ;; esac; }
+
+# The agent's last words in a Claude transcript: what the session ended on, for the summary. Read
+# from the tail only, since a transcript can be tens of MB.
+sj_session_last_reply() {  # sj_session_last_reply <transcript.jsonl>
+  [ -f "${1:-}" ] || return 0
+  tail -n 300 "$1" 2>/dev/null | jq -r 'select(.type == "assistant")
+      | [.message.content[]? | select(.type == "text") | .text] | join("\n") | select(. != "")' 2>/dev/null \
+    | tail -c 1500
+}
+
+# Hand-off marks: sj-resume.sh leaves one when it stages a session here, and the first catalogue row
+# written for the session that continues it records where it came from (`resumed_from=`). A native
+# resume keeps the session id, so the mark is keyed by it. A carry-over into another harness starts a
+# NEW session whose id nobody knows yet, so that mark is keyed by harness + folder and claimed by the
+# first session there within a day.
+sj_resume_dir() { printf '%s/resumed' "$(sj_progress_dir)"; }
+_sj_resume_ctx() { printf 'ctx.%s.%s' "$1" "$(printf '%s' "$2" | cksum | cut -d' ' -f1)"; }
+sj_resume_mark() {  # sj_resume_mark <src_host> <src_sid> native <sid> | context <harness> <cwd>
+  local d f; d="$(sj_resume_dir)"; mkdir -p "$d" 2>/dev/null || return 0
+  case "$3" in
+    native)  f="$d/$4" ;;
+    context) f="$d/$(_sj_resume_ctx "$4" "$5")" ;;
+    *) return 0 ;;
+  esac
+  printf '%s:%s\n' "$1" "$2" > "$f" 2>/dev/null || true
+}
+sj_resume_take() {  # sj_resume_take <sid> <harness> <cwd> — prints "<host>:<sid>", 1 when none
+  local d f; d="$(sj_resume_dir)"
+  f="$d/$1"
+  if [ ! -f "$f" ]; then
+    f="$d/$(_sj_resume_ctx "$2" "$3")"
+    [ -f "$f" ] || return 1
+    [ $(( $(date +%s) - $(sj_mtime "$f") )) -lt 86400 ] || { rm -f "$f"; return 1; }
+    # A carry-over names its source; the source itself is not "resumed from" its own mark.
+    case "$(cat "$f")" in *":$1") return 1 ;; esac
+  fi
+  head -n 1 "$f"
+}
+sj_resume_done() {  # sj_resume_done <sid> <harness> <cwd>
+  local d; d="$(sj_resume_dir)"
+  rm -f "$d/$1" "$d/$(_sj_resume_ctx "$2" "$3")" 2>/dev/null
+  return 0
 }
 
 # A short title for a session, from a small model reading its prose prompts (JSON array, as
 # `sj_session_topic <f> prompts` emits it). Best-effort and bounded: any failure returns 1 and the
 # caller keeps the deterministic topic. The child loads no settings — so none of scrubjay's hooks
 # — and keeps no transcript; SCRUBJAY_NO_HOOKS=1 is the second lock. SCRUBJAY_AI_TOPIC=0 opts out.
-sj_ai_topic() {  # sj_ai_topic <prompts-json>
+sj_ai_topic() {  # sj_ai_topic <prompts-json> [last-reply] — prints the title, then the summary line
   [ "${SCRUBJAY_AI_TOPIC:-1}" != 0 ] && sj_has claude || return 1
-  local digest out
+  local digest out title summary
   digest="$(printf '%s' "$1" | jq -r 'if length > 12 then .[:4] + ["..."] + .[-8:] else . end
             | map("- " + .[:300]) | join("\n")' 2>/dev/null | head -c 4000)"
   [ -n "$digest" ] || return 1
-  out="$(cd "${TMPDIR:-/tmp}" && printf '%s\n\n%s\n' \
-    'Title this coding session for a catalogue, from the user prompts below (in order). Reply with the title only: plain text, at most 10 words. If the session genuinely changed subject, name its two or three topics as "X + Y". Never title it by a lookup or slash command.' \
-    "$digest" | SCRUBJAY_NO_HOOKS=1 sj_timeout "${SCRUBJAY_AI_TOPIC_TIMEOUT:-30}" claude -p \
+  out="$(cd "${TMPDIR:-/tmp}" && {
+      printf '%s\n\n' 'Title and summarise this coding session for a catalogue, from the user prompts below (in order) and the agent'"'"'s last reply. Reply with exactly two lines:
+TITLE: at most 10 words, plain text. If the session genuinely changed subject, name its two or three topics as "X + Y". Never title it by a lookup or slash command.
+SUMMARY: one or two plain sentences, at most 40 words: what was done or decided, and where it was left.'
+      printf 'User prompts:\n%s\n' "$digest"
+      if [ -n "${2:-}" ]; then printf '\nThe agent'"'"'s last reply:\n%s\n' "$2"; fi
+    } | SCRUBJAY_NO_HOOKS=1 sj_timeout "${SCRUBJAY_AI_TOPIC_TIMEOUT:-30}" claude -p \
       --model haiku --no-session-persistence --setting-sources "" --tools "" \
       --strict-mcp-config --disable-slash-commands 2>/dev/null)" || return 1
-  out="$(printf '%s\n' "$out" | tr -d '*#`' | awk 'NF { print; exit }')"
-  out="$(sj_topic_sanitize "$out")"
-  [ -n "$out" ] && printf '%s' "$out"
+  out="$(printf '%s\n' "$out" | tr -d '*#`')"
+  title="$(printf '%s\n' "$out" | sed -n 's/^ *TITLE: *//p' | head -n 1)"
+  summary="$(printf '%s\n' "$out" | sed -n 's/^ *SUMMARY: *//p' | head -n 1)"
+  # A reply that ignored the format still has a usable first line: the title, without a summary.
+  [ -n "$title" ] || title="$(printf '%s\n' "$out" | awk 'NF { print; exit }')"
+  title="$(sj_topic_sanitize "$title")"
+  [ -n "$title" ] || return 1
+  printf '%s' "$title"
+  summary="$(sj_topic_sanitize "$summary" 300)"
+  [ -n "$summary" ] && printf '\n%s' "$summary"
+  return 0
 }
 
 # Commit + push EVERYTHING in the data repo. Shared by the session-end hook and sj-reconcile.sh:

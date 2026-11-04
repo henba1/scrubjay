@@ -14,7 +14,7 @@
   /* artefacts: each kind its own colour */
   --k-github: #8957e5; --k-gitlab: #d6336c; --k-git: #1098ad; --k-repo: #5c7cfa;
   --k-folder: #c99a06; --k-record: #4f8ff7;
-  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a;
+  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a; --carry: #0c8599;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
@@ -73,7 +73,14 @@ svg#edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow:
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip { display: inline-block; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 600;
   color: #fff; background: var(--h, var(--c)); line-height: 16px; }
-.card .low { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .low { font-size: 12px; color: var(--dim); }
+.card .low .sum { color: var(--ink); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; margin-bottom: 2px; }
+.card .low .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .hop { color: var(--carry); font-weight: 600; }
+.carry { stroke: var(--carry); stroke-dasharray: 6 4; }
+.carry-label { font: 11px var(--mono); fill: var(--carry); }
+aside .summary { font-size: 14px; margin: 8px 0 0; padding: 8px 10px; background: var(--bg); border-radius: 6px; }
 
 /* an artefact: a pill in its kind's colour */
 .art { --c: var(--dim); position: absolute; z-index: 2; width: 236px; height: 58px; border-radius: 29px;
@@ -180,6 +187,7 @@ a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
   <span><i class="sw pill" style="--c: var(--k-record)"></i>scrubjay memory/plans</span>
   <b>links</b>
   <span><i class="sw line" style="--c: var(--blue)"></i>fork</span>
+  <span><i class="sw line dash" style="--c: var(--carry)"></i>carried over to another agent</span>
   <span><i class="sw line" style="--c: var(--dim)"></i>changed (hover a node for what)</span>
 </div>
 <div id="map"><div id="canvas"><svg id="edges"></svg></div><div id="empty" hidden></div></div>
@@ -214,7 +222,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 let G = { nodes: [], edges: [], artefacts: [], host: "" }, bySid = new Map(), byArt = new Map();
 let selected = null; // {sid} or {aid}: kept highlighted while its panel is open
-const CARD_W = 250, CARD_H = 124, GAP_X = 46, GAP_Y = 12, TOP = 28, LANE_PAD = 34;
+const CARD_W = 250, CARD_H = 170, GAP_X = 46, GAP_Y = 12, TOP = 28, LANE_PAD = 34;
 const ART_W = 236, ART_H = 58, ART_GAP = 10, ART_COL_GAP = 120;
 
 function fillSelect(id, values) {
@@ -330,10 +338,13 @@ function draw() {
     const topic = n.topic || "(untitled)";
     el.innerHTML =
       `<div class="top" title="${esc(topic)}"><code>${esc(n.sid8)}</code> ${esc(topic)}</div>` +
-      `<div class="mid" title="${esc(n.host + " · " + n.cwd)}">${esc(n.host)} · ${esc(tail(n.cwd))}<br>` +
+      `<div class="mid" title="${esc(n.hosts.join(" → ") + " · " + n.cwd)}">` +
+      (n.hosts.length > 1 ? `<span class="hop" title="continued on another machine">${esc(n.hosts.join(" → "))}</span>` : esc(n.host)) +
+      ` · ${esc(tail(n.cwd))}<br>` +
       `<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
-      `<div class="low">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
-      `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div>`;
+      `<div class="low">${n.summary ? `<div class="sum" title="${esc(n.summary)}">${esc(n.summary)}</div>` : ""}` +
+      `<div class="meta">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
+      `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div></div>`;
     el.onclick = () => open(n.sid);
     el.onmouseenter = () => focus({ sid: n.sid });
     el.onmouseleave = () => focus(selected);
@@ -374,16 +385,17 @@ function draw() {
   }
   // Forks: parent's right edge to child's left edge; a parent filtered out of view draws no line.
   for (const e of G.edges) {
-    if (e.kind !== "fork") continue;
+    if (e.kind !== "fork" && e.kind !== "carry") continue;
     const a = pos.get(e.from), b = pos.get(e.to);
     if (!a || !b) continue;
+    const cls = e.kind === "carry" ? "carry" : "fork", label = e.kind === "carry" ? e.label : "fork";
     const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2, x2 = b.x, y2 = b.y + CARD_H / 2;
     const back = x2 <= x1; // same day: route around the right side
     const d = back
       ? `M${x1},${y1} C${x1 + 40},${y1} ${x1 + 40},${y2} ${b.x + CARD_W},${y2}`
       : `M${x1},${y1} C${x1 + GAP_X},${y1} ${x2 - GAP_X},${y2} ${x2},${y2}`;
-    html += `<path class="fork" d="${d}" fill="none" stroke-width="2" marker-end="url(#arrow)"/>` +
-      `<text class="edge-label" x="${(x1 + (back ? b.x + CARD_W : x2)) / 2 + (back ? 30 : 0)}" y="${(y1 + y2) / 2 - 4}">fork</text>`;
+    html += `<path class="${cls}" d="${d}" fill="none" stroke-width="2"${cls === "fork" ? ' marker-end="url(#arrow)"' : ""}/>` +
+      `<text class="${cls === "fork" ? "edge-label" : "carry-label"}" x="${(x1 + (back ? b.x + CARD_W : x2)) / 2 + (back ? 30 : 0)}" y="${(y1 + y2) / 2 - 4}">${esc(label)}</text>`;
   }
   svg.innerHTML = html;
   focus(selected);
@@ -445,11 +457,13 @@ async function open(sid) {
   const r = s.resume;
   $("dbody").innerHTML =
     `<h2>${esc(n.topic || "(untitled)")}</h2><div class="note">${esc(n.sid)}</div>` +
+    (n.summary ? `<p class="summary">${esc(n.summary)}</p>` : "") +
     `<h3>Session</h3>` + kv([
       ["started", esc(`${n.date} ${n.time}`)], ["host", esc(n.host) + (n.host === G.host ? ' <span class="note">(this machine)</span>' : "")],
+      ["ran on", n.hosts.length > 1 ? esc(n.hosts.join(" → ")) + ' <span class="note">(handed off with /sjresume)</span>' : ""],
       ["folder", esc(n.cwd)], ["project", esc(n.project)],
       ["agent", `<span class="chip" style="--h: var(--${esc(n.harness)})">${esc(n.harness)}</span>`],
-      ...extra.filter(([k]) => k !== "harness"),
+      ...extra.filter(([k]) => !["harness", "summary", "resumed_from", "forked_from"].includes(k)),
       ["topic from", n.essence ? "written with /sjlog" : last.prompts ? `Haiku, over ${esc(last.prompts)} prompts` : "the first prompt"],
     ]) +
     `<h3>What it changed</h3>` + (s.artefacts?.length
@@ -459,6 +473,12 @@ async function open(sid) {
           "Unknown: the transcript is not in the archive on this machine."}</p>`) +
     `<h3>Connections</h3>` + kv([
       ["forked from", n.forked_from ? sidLink(n.forked_from) : '<span class="note">none recorded</span>'],
+      ["resumed from", (() => {
+        if (!n.resumed_from) return "";
+        const host = n.resumed_from.split(":")[0], carry = G.edges.find((e) => e.kind === "carry" && e.to === n.sid);
+        return carry ? `${sidLink(carry.from)} on ${esc(host)} <span class="note">(carried over from another agent)</span>`
+          : `${esc(host)} <span class="note">(this session, continued here)</span>`;
+      })()],
       ["forks of it", s.children.length ? s.children.map(sidLink).join("<br>") : '<span class="note">none</span>'],
     ]) +
     `<h3>Transcript</h3>` + (s.readable

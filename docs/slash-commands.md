@@ -40,8 +40,11 @@ read-only [`sjmcp` MCP tools](archive-mcp.md); **lifecycle** commands just run t
 
 `/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per
 session. A card shows the session id and topic, then where it ran (host and folder) and with which
-agent and model, then when, how long and how big. Each agent has its own colour: Claude's clay,
-opencode's grey, codex's green. Forks are arrows from the session they branched off. Sessions that
+agent and model, then its summary and when, how long and how big. Each agent has its own colour:
+Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off.
+A session handed off to another machine with `/sjresume` stays one card, showing both machines
+(`laptop → henpi`); one carried over to another agent is joined to its source by a dashed
+"carried over" line. Sessions that
 recorded nothing are hidden unless you tick **show empty**.
 
 Right of the timeline, under **where the work landed**, are the things the sessions changed, each a

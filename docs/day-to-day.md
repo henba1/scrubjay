@@ -33,9 +33,12 @@ Every session is logged by the `SessionEnd` hook to `scrubjay-data/logs/<host>.l
 (one line: `time | host | cwd | "topic" | session=id | harness=… | model=… | turns=… | size=…`)
 and pushed, so all machines' histories are searchable from any clone of the data repo. The
 `topic` is a short title Haiku writes from the session's prompts (`claude -p`, bounded, only when
-there are prompts it has not titled yet — `prompts=<n>` records how many). Without it (offline, no
-`claude`, `SCRUBJAY_AI_TOPIC=0`) the topic is the first real prompt, or the slash command the
-session ran if you typed nothing. A `/sjlog` essence wins over both. When a resumed session's topic
+there are prompts it has not titled yet — `prompts=<n>` records how many). The same call writes
+`summary=`, a sentence or two on what was done and where it was left, from the prompts and the
+agent's last reply. Without it (offline, no `claude`, `SCRUBJAY_AI_TOPIC=0`) the topic is the first
+real prompt, or the slash command the session ran if you typed nothing, and there is no summary. A
+`/sjlog` essence wins over both, and keeps the summary an earlier row had. A session that continued
+one from another machine, or carried one over from another agent, says so: `resumed_from=<host>:<sid>`. When a resumed session's topic
 changes, a new line is appended and the last one per session counts. The trailing `key=value`
 fields are additive, so older lines simply have fewer:
 

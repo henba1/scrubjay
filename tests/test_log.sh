@@ -127,6 +127,52 @@ assert_contains "the first prompt is the topic" "$(grep "session=$sidc" "$LOG")"
 rm -f "$HOME/.config/scrubjay/config"
 export SCRUBJAY_AI_TOPIC=0
 
+section "the same call writes a summary, kept while nothing new is said"
+stub_claude
+export SCRUBJAY_RUN_DIR="$SANDBOX/run"
+rsid="bbbbbbbb-2222-4333-8444-555555555555"; t="$SANDBOX/sum.jsonl"
+urec "fix the nftables syntax error in the firewall config" > "$t"
+arec() { jq -cn --arg t "$1" '{type:"assistant", message:{role:"assistant", content:[{type:"text", text:$t}]}}'; }
+arec "Fixed: the set was missing a comma. Reload is not tested yet." >> "$t"
+STUB_CLAUDE=$'TITLE: **Firewall syntax fix**\nSUMMARY: Fixed a missing comma in the nftables set | reload left untested.' row
+last="$(tail -1 "$rlog")"
+assert_contains "the title from TITLE:" "$last" '"Firewall syntax fix" | session='
+assert_contains "the summary is the last field, made safe for a row" "$last" \
+  "| summary=Fixed a missing comma in the nftables set / reload left untested."
+assert_contains "the model saw the agent's last reply" "$(cat "$SANDBOX/claude.in")" "Reload is not tested yet."
+c0="$(ncalls)"; arec "one more word" >> "$t"
+STUB_CLAUDE="TITLE: should not be asked" row
+assert_eq "no new prompt: no call" "$c0" "$(ncalls)"
+assert_contains "and the summary stays" "$(tail -1 "$rlog")" "| summary=Fixed a missing comma"
+row "Firewall fixed by hand"
+assert_contains "an essence keeps the summary" "$(tail -1 "$rlog")" "| summary=Fixed a missing comma"
+rsid="cccccccc-2222-4333-8444-555555555555"; urec "rename the backup job" > "$t"
+STUB_CLAUDE="Backup job rename" row
+case "$(tail -1 "$rlog")" in *summary=*) _no "a reply without the format: a title, no summary" "$(tail -1 "$rlog")" ;;
+  *) _ok "a reply without the format: a title, no summary" ;; esac
+assert_contains "and that title is its first line" "$(tail -1 "$rlog")" '"Backup job rename" | session='
+export SCRUBJAY_AI_TOPIC=0
+
+section "a hand-off says where the session came from (resumed_from=)"
+rsid="dddddddd-2222-4333-8444-555555555555"; urec "continue the backup work" > "$t"
+sj_resume_mark laptop "$rsid" native "$rsid"
+row
+assert_contains "native: the row names the other machine" "$(tail -1 "$rlog")" "| resumed_from=laptop:$rsid"
+assert_no_file "the mark is used up" "$SCRUBJAY_RUN_DIR/resumed/$rsid"
+urec "and add a test" >> "$t"; row
+assert_contains "later rows keep it" "$(tail -1 "$rlog")" "| resumed_from=laptop:$rsid"
+src="ses_0123456789abcdefGHIJKL"; rsid="eeeeeeee-2222-4333-8444-555555555555"; urec "go on from the opencode chat" > "$t"
+sj_resume_mark laptop "$src" context claude /w
+other="ffffffff-2222-4333-8444-555555555555"
+sj_log_row "$rlog" "$other" /elsewhere "$t" claude testhost "2026-01-01 00:00" "" refresh
+case "$(tail -1 "$rlog")" in *resumed_from=*) _no "another folder does not claim a carry-over" "$(tail -1 "$rlog")" ;;
+  *) _ok "another folder does not claim a carry-over" ;; esac
+row
+assert_contains "carry-over: the new session in that folder names its source" "$(tail -1 "$rlog")" "| resumed_from=laptop:$src"
+rsid="99999999-3333-4333-8444-555555555555"; urec "unrelated later work" > "$t"; row
+case "$(tail -1 "$rlog")" in *resumed_from=*) _no "a carry-over is claimed once" "$(tail -1 "$rlog")" ;;
+  *) _ok "a carry-over is claimed once" ;; esac
+
 section "the model's own child session fires no scrubjay hook"
 sid7="77777777-3333-4333-8444-555555555555"; cp "$FIXTURES/claude-session.jsonl" "$proj/$sid7.jsonl"
 SCRUBJAY_NO_HOOKS=1 SCRUBJAY_HARNESS=claude bash -c 'printf "%s" "$1" | bash "$0/hooks/log-session.sh" --detached' \
