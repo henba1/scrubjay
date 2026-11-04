@@ -141,6 +141,8 @@ editing needed:
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
 | `SCRUBJAY_VIEW_PORT=<n>` | the port `/sjview` listens on (default 7787; the next free one if taken) |
+| `SCRUBJAY_VIEW_NEXTCLOUD=<url>` | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below) |
+| `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;` |
 | `SCRUBJAY_VIEW_IDLE=<min>` | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never) |
 | `SCRUBJAY_AI_TOPIC=0` | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt |
 

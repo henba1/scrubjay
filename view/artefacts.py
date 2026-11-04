@@ -37,16 +37,27 @@ SCRATCH = re.compile(r"^(?:/tmp/|/private/tmp/|/var/folders/|/dev/)|/scratchpad/
 
 # ── the transcript as tool calls ─────────────────────────────────────────────────────────────
 
-def _fence(lines: list[str], i: int) -> tuple[str | None, int]:
+def _fence(lines: list[str], i: int, nest: bool = False) -> tuple[str | None, int]:
     """The fenced block starting at or after line i (blank lines skipped): its body, and the line
-    after it. The renderers close a fence with a bare ``` line, so the first one ends it."""
+    after it. The renderers open a fence with a language (```bash, ```text) and close it bare. A
+    command can carry fences of its own (a heredoc writing Markdown, even a transcript like this
+    one), so with `nest` a tagged opener inside the block nests and the bare ``` that ends it is
+    matched. Only for a command: it was written whole. An output is often cut off mid-block
+    (`head -40`), and an unclosed opener there would swallow the rest of the transcript."""
     j = i
     while j < len(lines) and not lines[j].strip():
         j += 1
     if j >= len(lines) or not lines[j].startswith("```"):
         return None, i
-    body, j = [], j + 1
-    while j < len(lines) and lines[j].rstrip() != "```":
+    body, j, depth = [], j + 1, 0
+    while j < len(lines):
+        ln = lines[j].rstrip()
+        if ln == "```":
+            if depth == 0:
+                break
+            depth -= 1
+        elif nest and re.match(r"^```[\w+-]+$", ln):
+            depth += 1
         body.append(lines[j])
         j += 1
     return "\n".join(body), j + 1
@@ -62,7 +73,7 @@ def calls(md: str) -> list[dict]:
     while i < len(lines):
         m = CALL.match(lines[i])
         if m:
-            body, i = _fence(lines, i + 1)
+            body, i = _fence(lines, i + 1, nest=True)
             c = {"name": m.group("name").strip(), "input": body or "", "output": "", "error": False}
             out.append(c)
             pending.append(c)
@@ -182,20 +193,24 @@ def _failed(c: dict) -> bool:
                                         r"denied|\brejected\b|could not", o, re.M | re.I))
 
 
+# Where a command can start: the beginning, after a separator, a pipe, `$(`, `then`/`do`, or a few
+# VAR=value assignments. `grep 'gh pr create' …` names the words without running them.
+_AT = r"(?:^|(?<=[;&|(\n])|(?<=\$\()|(?<=\bthen\b)|(?<=\bdo\b)|(?<=\bxargs\b))\s*(?:[A-Za-z_]\w*=\S*\s+)*"
+
 # `gh api` / `glab api` writing to a forge: how a session opens PRs/MRs or issues in bulk, or from
 # a helper. The endpoint names the repo (GitLab URL-encodes it: projects/group%2Fname).
-_API = re.compile(r"\b(?P<cli>gh|glab)\s+api\b(?P<args>[^\n;&|]*)")
+_API = re.compile(_AT + r"(?P<cli>gh|glab)\s+api\b(?P<args>[^\n;&|]*)", re.M)
 _ENDPOINT = re.compile(r"['\"]?/?(?:projects/(?P<gl>[^/\s'\"?]+)|repos/(?P<gh>[\w.-]+/[\w.-]+))"
                        r"/(?P<what>merge_requests|pulls|issues)(?:/(?P<n>\d+)(?:/(?P<sub>merge|notes|comments))?)?\b")
 
 
-def _api_events(cmd: str, c: dict) -> list[tuple[int, dict]]:
+def _api_events(cmd: str, mask: str, c: dict) -> list[tuple[int, dict]]:
     from urllib.parse import unquote
     ev: list[tuple[int, dict]] = []
     out = c["output"]
     if _failed(c):
         return ev
-    for m in _API.finditer(cmd):
+    for m in _each(_API.pattern, cmd, mask):
         args = m.group("args")
         meth = re.search(r"(?:-X|--method)[= ]\s*['\"]?([A-Z]+)", args)
         method = meth.group(1) if meth else ("POST" if re.search(r"\s-[fF]\s|--(?:raw-)?field\b|--input\b", args) else "GET")
@@ -229,18 +244,71 @@ def _api_events(cmd: str, c: dict) -> list[tuple[int, dict]]:
     return ev
 
 
-def _shell_events(cmd: str, c: dict) -> list[dict]:
+_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)(\w+)\2")
+
+
+def _code(cmd: str) -> str:
+    """The command without its heredoc bodies: text it writes somewhere (a file, a commit message, a
+    script handed to python) is not something it ran, even when that text spells `gh pr merge 42`."""
+    out, end = [], None
+    for line in cmd.split("\n"):
+        if end is not None:
+            if (line.strip() if end[0] else line) == end[1]:
+                end = None
+            continue
+        out.append(line)
+        m = _HEREDOC.search(line)
+        if m:
+            end = (m.group(1) == "-", m.group(3))
+    return "\n".join(out)
+
+
+def _mask(cmd: str) -> str:
+    """The command with every quoted span blanked (same length): a command never starts inside
+    quotes, and `grep 'gh pr create\\|git commit'` must not read as two of them."""
+    out, q, i = list(cmd), "", 0
+    while i < len(cmd):
+        ch = cmd[i]
+        if q:
+            if ch == "\\" and q == '"' and i + 1 < len(cmd):
+                out[i] = out[i + 1] = "_"
+                i += 2
+                continue
+            if ch == q:
+                q = ""
+            else:
+                out[i] = "_" if ch != "\n" else "\n"
+        elif ch in "'\"":
+            q = ch
+        i += 1
+    return "".join(out)
+
+
+def _each(rx: str, cmd: str, mask: str):
+    """Matches of rx found in the masked command, read back from the real one at the same place."""
+    pat = re.compile(rx, re.M)
+    for m in pat.finditer(mask):
+        yield pat.match(cmd, m.start()) or m
+
+
+def _first(rx: str, cmd: str, mask: str):
+    return next(_each(rx, cmd, mask), None)
+
+
+def _shell_events(full: str, c: dict) -> list[dict]:
     """The git milestones one command made, in the order it made them."""
     ev: list[tuple[int, dict]] = []
     out = c["output"]
-    m = re.search(r"\bgit\b(?:\s+-C\s+\S+)?\s+commit\b", cmd)
+    cmd = _code(full)
+    mask = _mask(cmd)
+    m = _first(_AT + r"git\b(?:\s+-C\s+\S+)?\s+commit\b", cmd, mask)
     if m and "nothing to commit" not in out and not c["error"]:
         shas = re.findall(r"^\[[^\]\s]+(?: \(root-commit\))? ([0-9a-f]{7,40})\] (.+)$", out, re.M)
         if shas:
             ev += [(m.start(), {"type": "commit", "sha": s, "title": t}) for s, t in shas]
         else:
-            ev.append((m.start(), {"type": "commit", "title": _msg(cmd)}))
-    for m in re.finditer(r"\bgit\b(?:\s+-C\s+\S+)?\s+push\b([^;&|\n]*)", cmd):
+            ev.append((m.start(), {"type": "commit", "title": _msg(full)}))
+    for m in _each(_AT + r"git\b(?:\s+-C\s+\S+)?\s+push\b([^;&|\n]*)", cmd, mask):
         if _failed(c):
             break
         # `git push [opts] [remote [refspec…]]`: options and redirections are not names.
@@ -254,12 +322,12 @@ def _shell_events(cmd: str, c: dict) -> list[dict]:
         if to and remote_id(to.group(1)):
             e["remote"] = remote_id(to.group(1))["id"]
         ev.append((m.start(), e))
-    for m in re.finditer(r"\bgit\b(?:\s+-C\s+\S+)?\s+(?:checkout\s+(?:-q\s+)?-b|switch\s+(?:-q\s+)?(?:-c|--create))\s+([^\s;&|]+)", cmd):
+    for m in _each(_AT + r"git\b(?:\s+-C\s+\S+)?\s+(?:checkout\s+(?:-q\s+)?-b|switch\s+(?:-q\s+)?(?:-c|--create))\s+([^\s;&|]+)", cmd, mask):
         ev.append((m.start(), {"type": "branch", "branch": m.group(1)}))
     for cli, noun, forge in (("gh", "pr", "github"), ("glab", "mr", "gitlab")):
         flag = _repo_flag(cmd, cli)
         tag = {"forge": forge, **({"remote": flag["id"]} if flag else {})}
-        m = re.search(rf"\b{cli} {noun} create\b", cmd)
+        m = _first(_AT + rf"{cli} {noun} create\b", cmd, mask)
         if m:
             # One command may open several (a helper called once per branch): every URL counts.
             urls = list(dict.fromkeys(u.group(0) for u in _PULL.finditer(out)))
@@ -268,13 +336,13 @@ def _shell_events(cmd: str, c: dict) -> list[dict]:
                 r = _repo_of(u)
                 ev.append((m.start(), {"type": "pr_open", "n": int(u.rsplit("/", 1)[1]), "url": u, "title": title,
                                        **tag, **({"remote": r["id"]} if r else {})}))
-        for m in re.finditer(rf"\b{cli} {noun} (merge|close|reopen)\b(?:\s+(\d+))?", cmd):
+        for m in _each(_AT + rf"{cli} {noun} (merge|close|reopen)\b(?:\s+(\d+))?", cmd, mask):
             if not _failed(c):
                 e = {"type": f"pr_{m.group(1)}", **tag}
                 if m.group(2):
                     e["n"] = int(m.group(2))
                 ev.append((m.start(), e))
-        m = re.search(rf"\b{cli} issue create\b", cmd)
+        m = _first(_AT + rf"{cli} issue create\b", cmd, mask)
         if m:
             urls = list(dict.fromkeys(u.group(0) for u in _ISSUE.finditer(out)))
             title = _title(cmd[m.start():]) if len(urls) == 1 else ""
@@ -282,11 +350,11 @@ def _shell_events(cmd: str, c: dict) -> list[dict]:
                 r = _repo_of(u)
                 ev.append((m.start(), {"type": "issue_open", "n": int(u.rsplit("/", 1)[1]), "url": u, "title": title,
                                        **tag, **({"remote": r["id"]} if r else {})}))
-        for m in re.finditer(rf"\b{cli} issue (close|comment|reopen)\s+(\d+)", cmd):
+        for m in _each(_AT + rf"{cli} issue (close|comment|reopen)\s+(\d+)", cmd, mask):
             if not _failed(c):
                 ev.append((m.start(), {"type": f"issue_{m.group(1)}", "n": int(m.group(2)), **tag}))
-    ev += _api_events(cmd, c)
-    m = re.search(r"\bgh release create\s+([^\s;&|]+)", cmd)
+    ev += _api_events(cmd, mask, c)
+    m = _first(_AT + r"gh release create\s+([^\s;&|]+)", cmd, mask)
     if m and not _failed(c):
         e = {"type": "release", "tag": _unq(m.group(1)), "forge": "github"}
         flag = _repo_flag(cmd, "gh")

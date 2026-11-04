@@ -73,6 +73,12 @@ viewer** button, or by itself after `SCRUBJAY_VIEW_IDLE` minutes without a reque
 SSH, forward the port it prints: `ssh -L 7787:127.0.0.1:7787 <host>`. A machine with no archive
 (`rsync-wg`) shows the map but cannot open transcripts.
 
+If the same folders are in a Nextcloud, set `SCRUBJAY_VIEW_NEXTCLOUD` to its address and
+`SCRUBJAY_VIEW_NEXTCLOUD_MAP` to which local folder it shows as which (`/mnt/nas=/NAS`) in
+`~/.config/scrubjay/config`. Every path under that folder then gets an **☁ open** link: a session's
+folder, its archived transcript, a local repo or folder, each file written. A folder opens in
+Nextcloud's Files app; a file opens its folder with the file picked out.
+
 ## What the commands show while they run
 
 `/sjlog` and `/sjsync` print a step report: one line per step, `✓` done, `✗` failed, `–` skipped

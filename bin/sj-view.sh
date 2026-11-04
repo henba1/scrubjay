@@ -95,7 +95,8 @@ detach=(nohup); command -v setsid >/dev/null 2>&1 && detach=(setsid nohup)
 for p in "$port" 0; do   # the usual port, else any free one
   rm -f "$STATE"
   SCRUBJAY_DATA="$data" SCRUBJAY_LOCAL_CHATS="$chats" SCRUBJAY_MEMORY="$(sj_memory)" \
-  SCRUBJAY_HOST="$(sj_host)" "${detach[@]}" python3 "$APP/view/sj_view.py" \
+  SCRUBJAY_HOST="$(sj_host)" SCRUBJAY_VIEW_NEXTCLOUD="${SCRUBJAY_VIEW_NEXTCLOUD:-}" \
+  SCRUBJAY_VIEW_NEXTCLOUD_MAP="${SCRUBJAY_VIEW_NEXTCLOUD_MAP:-}" "${detach[@]}" python3 "$APP/view/sj_view.py" \
     --port "$p" --idle "$idle" --state "$STATE" >"$LOGF" 2>&1 </dev/null &
   pid=$!
   for _ in $(seq 100); do

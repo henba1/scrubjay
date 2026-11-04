@@ -133,6 +133,40 @@ https://github.com/acme/widget-api/issues/43
 **→ Bash**
 
 ```bash
+cat > notes.md <<'EOF'
+**→ Bash**
+
+```bash
+git push origin quoted-not-run
+```
+
+**⎿ output:**
+
+```text
+```
+EOF
+```
+
+**⎿ output:**
+
+```text
+```
+
+**→ Bash**
+
+```bash
+grep -rn 'gh pr create\|git commit' ~/old-notes | head -1
+```
+
+**⎿ output:**
+
+```text
+notes.md:3: https://github.com/elsewhere/thing/pull/7
+```
+
+**→ Bash**
+
+```bash
 git push origin main
 ```
 
@@ -279,6 +313,8 @@ pev="$(jq -c --arg s "$P" '.sessions[] | select(.node.sid == $s) | .events' <<<"
 assert_eq "milestones in order" "branch commit push pr_open pr_merge issue_open" "$(jq -r 'map(.type) | join(" ")' <<<"$pev")"
 assert_eq "the commit message, from -qam" "fix: arm the retry timer once" "$(jq -r '.[] | select(.type == "commit") | .title' <<<"$pev")"
 assert_eq "the pushed branch, not the redirection" "fix/backoff" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$pev")"
+case "$pev" in *quoted-not-run*) _no "a tool call quoted inside a command is not a call" "$pev" ;;
+  *) _ok "a tool call quoted inside a command is not a call" ;; esac
 assert_eq "a rejected push is not a push" 1 "$(jq '[.[] | select(.type == "push")] | length' <<<"$pev")"
 assert_eq "the PR links to GitHub" "https://github.com/acme/widget-api/pull/42" "$(jq -r '.[] | select(.type == "pr_merge") | .url' <<<"$pev")"
 assert_eq "the PR's title" "Arm the retry timer once" "$(jq -r '.[] | select(.type == "pr_open") | .title' <<<"$pev")"
@@ -289,6 +325,8 @@ assert_eq "an unknown artefact: 404" 404 "$(curl -s -o /dev/null -w '%{http_code
 sumto() { jq -r --arg s "$1" --arg a "$2" '.edges[] | select(.from == $s and .to == $a) | .summary' <<<"$g"; }
 assert_eq "an MR opened through the API, by the !N it printed (not the listing)" "MR !12 opened" "$(sumto "$O" gitlab.com/team/greyk)"
 assert_eq "gh -R names the repo it commented on" "comment on #5" "$(sumto "$O" github.com/upstream/lib)"
+case "$(jq -r '[.artefacts[].id] | join(" ")' <<<"$g")" in *elsewhere/thing*) _no "words a grep searches for are not commands" "$ids" ;;
+  *) _ok "words a grep searches for are not commands" ;; esac
 case "$(jq -r '[.artefacts[].id] | join(" ")' <<<"$g")" in *someone/else*) _no "an unrelated URL in an output is no artefact" "$ids" ;;
   *) _ok "an unrelated URL in an output is no artefact" ;; esac
 mr="$(get "/api/artefact?id=gitlab.com/team/greyk" | jq -c '[.sessions[].events[] | {type, n, url, branch}]')"
@@ -314,6 +352,23 @@ python3 "$APP/view/sj_view.py" --port 0 --idle 0.03 --state "$STATE" >/dev/null 
 ipid=$!
 for _ in $(seq 100); do kill -0 "$ipid" 2>/dev/null || break; sleep 0.1; done
 check_fails "an unused viewer stops by itself" kill -0 "$ipid"
+
+section "Nextcloud links: the settings reach the page, the most specific folder first"
+R2="$SANDBOX/run2"
+SCRUBJAY_RUN_DIR="$R2" SCRUBJAY_VIEW_NEXTCLOUD="https://cloud.example/" \
+  SCRUBJAY_VIEW_NEXTCLOUD_MAP="/home/user=/Home; /home/user/notes=/Notes; nonsense; rel=/x" \
+  bash "$APP/bin/sj-view.sh" --no-open --port 0 >/dev/null 2>&1
+U2="$(jq -r .url "$R2/view.json")"
+c="$(curl -s -H "X-SJ-Token: ${U2#*t=}" "http://127.0.0.1:$(jq -r .port "$R2/view.json")/api/graph" | jq -c .cloud)"
+assert_eq "base without its slash, map longest first, junk dropped" \
+  '{"base":"https://cloud.example","map":[["/home/user/notes","/Notes"],["/home/user","/Home"]]}' "$c"
+SCRUBJAY_RUN_DIR="$R2" bash "$APP/bin/sj-view.sh" stop >/dev/null
+SCRUBJAY_RUN_DIR="$R2" SCRUBJAY_VIEW_NEXTCLOUD="javascript:alert(1)" SCRUBJAY_VIEW_NEXTCLOUD_MAP="/home/user=/Home" \
+  bash "$APP/bin/sj-view.sh" --no-open --port 0 >/dev/null 2>&1
+U2="$(jq -r .url "$R2/view.json")"
+assert_eq "an address that is not http(s) gives no links" null \
+  "$(curl -s -H "X-SJ-Token: ${U2#*t=}" "http://127.0.0.1:$(jq -r .port "$R2/view.json")/api/graph" | jq -c .cloud)"
+SCRUBJAY_RUN_DIR="$R2" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
