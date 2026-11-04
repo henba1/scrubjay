@@ -35,7 +35,10 @@ All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/
 In Claude Code, the optional **scrubjay-ui** mod draws the same in the native interface: a named row per archive call (`⏺ Recall("retry backoff") · scrubjay`) with a one-line result instead of raw JSON, the live steps of a publish or sync above the prompt, and a toast when a step fails — including the SessionStart sync, which otherwise fails unseen.
 
 ```
-/plugin install scrubjay-ui --marketplace henba1/scrubjay
+claude plugin marketplace add henba1/scrubjay
+claude plugin install scrubjay-ui@scrubjay
 ```
+
+`/sjsync` keeps a plugin installed this way: it rebuilds `~/.claude/settings.json` from the data repo but carries `enabledPlugins` and `extraKnownMarketplaces` over. To have the mod on every machine, add both keys to `settings/settings.base.json` in your data repo.
 
 Both draw scrubjay in one blue, so an `/sj*` command stands apart from an ordinary turn. The mod paints `/sj…` blue as you type it and draws the sent prompt in blue under a `◆ scrubjay` tag. opencode's TUI plugin API cannot restyle the transcript, so there `hooks/opencode/scrubjay-tui.tsx` (registered in `tui.json` by `/sjsync`) shows a blue `◆ scrubjay /sj…` badge beside the prompt while the command runs, and lists the session's `/sj*` commands in the sidebar.

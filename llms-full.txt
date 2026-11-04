@@ -648,16 +648,16 @@ claude --resume <sid>                              # …or /resume inside a sess
 
 Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-off) — no file editing needed:
 
-| Env var                           | Effect                                                                                        |
-| --------------------------------- | --------------------------------------------------------------------------------------------- |
-| `SCRUBJAY_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`)                             |
-| `SCRUBJAY_NOSYNC=1`               | skip the start-of-session pull + sync entirely                                                |
-| `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                                                      |
-| `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                                               |
-| `SCRUBJAY_TURN_PUBLISH=0`         | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
-| `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                                                  |
-| `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit                                      |
-| `SCRUBJAY_AI_TOPIC=0`             | don't ask Haiku for the session's topic; use its first prompt                                 |
+| Env var                           | Effect                                                                                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `SCRUBJAY_TRANSCRIPT_BACKEND=off` | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                        |
+| `SCRUBJAY_NOSYNC=1`               | skip the start-of-session pull + sync entirely                                                                                           |
+| `SCRUBJAY_SYNC_NOPULL=1`          | sync at start but don't `git pull` first                                                                                                 |
+| `SCRUBJAY_NOSHIP=1`               | end the session without shipping its transcript                                                                                          |
+| `SCRUBJAY_TURN_PUBLISH=0`         | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                            |
+| `SCRUBJAY_LOG_NOGIT=1`            | append the log line but don't commit/push it                                                                                             |
+| `SCRUBJAY_NORECONCILE=1`          | don't sweep for sessions that ended without a clean exit                                                                                 |
+| `SCRUBJAY_AI_TOPIC=0`             | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt |
 
 ## Re-home the scrubjay clones
 
@@ -817,8 +817,11 @@ All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/
 In Claude Code, the optional **scrubjay-ui** mod draws the same in the native interface: a named row per archive call (`⏺ Recall("retry backoff") · scrubjay`) with a one-line result instead of raw JSON, the live steps of a publish or sync above the prompt, and a toast when a step fails — including the SessionStart sync, which otherwise fails unseen.
 
 ```
-/plugin install scrubjay-ui --marketplace henba1/scrubjay
+claude plugin marketplace add henba1/scrubjay
+claude plugin install scrubjay-ui@scrubjay
 ```
+
+`/sjsync` keeps a plugin installed this way: it rebuilds `~/.claude/settings.json` from the data repo but carries `enabledPlugins` and `extraKnownMarketplaces` over. To have the mod on every machine, add both keys to `settings/settings.base.json` in your data repo.
 
 Both draw scrubjay in one blue, so an `/sj*` command stands apart from an ordinary turn. The mod paints `/sj…` blue as you type it and draws the sent prompt in blue under a `◆ scrubjay` tag. opencode's TUI plugin API cannot restyle the transcript, so there `hooks/opencode/scrubjay-tui.tsx` (registered in `tui.json` by `/sjsync`) shows a blue `◆ scrubjay /sj…` badge beside the prompt while the command runs, and lists the session's `/sj*` commands in the sidebar.
 

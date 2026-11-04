@@ -1050,8 +1050,12 @@ every harness.</p>
 row per archive call (<code>⏺ Recall("retry backoff") · scrubjay</code>) with a one-line result instead of raw
 JSON, the live steps of a publish or sync above the prompt, and a toast when a step fails —
 including the SessionStart sync, which otherwise fails unseen.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/plugin install scrubjay-ui --marketplace henba1/scrubjay
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>claude<span class="w"> </span>plugin<span class="w"> </span>marketplace<span class="w"> </span>add<span class="w"> </span>henba1/scrubjay
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>claude<span class="w"> </span>plugin<span class="w"> </span>install<span class="w"> </span>scrubjay-ui@scrubjay
 </code></pre></div>
+<p><code>/sjsync</code> keeps a plugin installed this way: it rebuilds <code>~/.claude/settings.json</code> from the data
+repo but carries <code>enabledPlugins</code> and <code>extraKnownMarketplaces</code> over. To have the mod on every
+machine, add both keys to <code>settings/settings.base.json</code> in your data repo.</p>
 <p>Both draw scrubjay in one blue, so an <code>/sj*</code> command stands apart from an ordinary turn. The mod
 paints <code>/sj…</code> blue as you type it and draws the sent prompt in blue under a <code>◆ scrubjay</code> tag.
 opencode's TUI plugin API cannot restyle the transcript, so there <code>hooks/opencode/scrubjay-tui.tsx</code>
