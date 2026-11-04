@@ -82,7 +82,7 @@ topic="$(sj_slugify "$topic" 50)"
 # Session backlink, best-effort: ask the harness adapter for the transcript of the session running
 # in this cwd right now. Absent (no harness, no session, backfill) the note simply carries no id.
 sid8=""
-if sid_path="$(sj_adapter_call "$(sj_harness)" sjh_find_live_transcript "$PWD" 2>/dev/null)" \
+if sid_path="$(sj_adapter_call "$(sj_harness)" sjh_find_live_transcript "$PWD" "$(sj_live_sid)" 2>/dev/null)" \
    && [ -n "$sid_path" ]; then
   sid="$(basename "$sid_path")"; sid="${sid%.*}"
   [ -n "$sid" ] && sid8="__$(sj_session_handle "$sid")"

@@ -18,7 +18,7 @@ command -v jq >/dev/null 2>&1 || { echo "publish-now: jq required" >&2; exit 0; 
 
 sj_load_adapter "$(sj_harness)" || exit 0
 cwd="$PWD"
-tpath="$(sjh_find_live_transcript "$cwd")"
+tpath="$(sjh_find_live_transcript "$cwd" "$(sj_live_sid)")"
 [ -n "$tpath" ] && [ -f "$tpath" ] || { echo "publish-now: no transcript found for $cwd" >&2; exit 0; }
 f="$(basename "$tpath")"; sid="${f%.*}"
 

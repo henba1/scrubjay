@@ -682,6 +682,16 @@ sj_log_row() {  # sj_log_row <log> <sid> <cwd> <transcript> <harness> <host> <ts
   return 0
 }
 
+# The id of the session a command runs in, when the harness says so: SCRUBJAY_SESSION_ID if set,
+# else Claude Code's CLAUDE_CODE_SESSION_ID (it exports it to every command it runs). Searching the
+# transcripts for the folder instead guesses, and a transcript that merely mentions a folder (one
+# that read another session's records) was taken for the session running there.
+sj_live_sid() {
+  if [ -n "${SCRUBJAY_SESSION_ID:-}" ]; then printf '%s' "$SCRUBJAY_SESSION_ID"
+  elif [ "$(sj_harness)" = claude ] && [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then printf '%s' "$CLAUDE_CODE_SESSION_ID"
+  else return 1; fi
+}
+
 # A row's summary (the last field, free prose), or nothing.
 sj_row_summary() { case "$1" in *' | summary='*) printf '%s' "${1##* | summary=}" ;; esac; }
 

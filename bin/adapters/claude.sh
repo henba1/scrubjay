@@ -181,12 +181,14 @@ sjh_find_live_transcript() {  # sjh_find_live_transcript <cwd> [sid]
   if [ -n "$sid" ]; then
     t="$(ls -t "$proj"/*/"$sid".jsonl 2>/dev/null | head -1)"
     [ -n "$t" ] && [ -f "$t" ] && { printf '%s' "$t"; return 0; }
+    return 1   # named, and not here: never stand another session in for it
   fi
   # Guard the empty case ourselves rather than with `xargs -r`: -r is a GNU extension, and without
   # it BSD xargs runs `ls -t` with no arguments on no matches — which lists $PWD and cheerfully
   # returns a file that is not a transcript at all.
   local hits; hits="$(grep -lF "\"cwd\":\"$cwd\"" "$proj"/*/*.jsonl 2>/dev/null)"
+  # Without an id this is a guess: the newest transcript that mentions the folder. There is no
+  # fallback to "the newest transcript anywhere": publishing the wrong session is worse than none.
   t=""; [ -n "$hits" ] && t="$(printf '%s\n' "$hits" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)"
-  [ -n "$t" ] || t="$(ls -t "$proj"/*/*.jsonl 2>/dev/null | head -1)"
   [ -n "$t" ] && [ -f "$t" ] && printf '%s' "$t"
 }
