@@ -97,4 +97,25 @@ assert_eq "codex model from turn_context" "gpt-5-codex" \
 assert_eq "codex turns count" "4" \
   "$(sj_adapter_call codex sjh_session_meta "$FIXTURES/codex-rollout.jsonl" | cut -f2)"
 
+section "the live session is the one the harness names, never a guess at another"
+. "$APP/bin/lib.sh"
+pj="$CLAUDE_CONFIG_DIR/projects"; mkdir -p "$pj/-w-a" "$pj/-w-b"
+mine="aaaaaaaa-0000-4000-8000-000000000001"; other="bbbbbbbb-0000-4000-8000-000000000002"
+printf '{"type":"user","cwd":"/w/a","sessionId":"%s"}\n' "$mine" > "$pj/-w-a/$mine.jsonl"
+sleep 1
+# Another session, newer, whose records mention the same folder (it read the first one's).
+printf '{"type":"user","cwd":"/w/b","note":{"cwd":"/w/a"}}\n' > "$pj/-w-b/$other.jsonl"
+live() { sj_adapter_call claude sjh_find_live_transcript "$@"; }
+assert_eq "without an id: the guess picks the newest mention (why the id matters)" "$pj/-w-b/$other.jsonl" "$(live /w/a)"
+assert_eq "with the id: its own transcript" "$pj/-w-a/$mine.jsonl" "$(live /w/a "$mine")"
+assert_eq "an id that is not here: nothing, not a stand-in" "" "$(live /w/a cccccccc-0000-4000-8000-000000000003)"
+assert_eq "no match and no id: nothing, not the newest transcript anywhere" "" "$(live /w/nowhere)"
+assert_eq "Claude Code's id is the live one" "$mine" "$(SCRUBJAY_HARNESS=claude CLAUDE_CODE_SESSION_ID="$mine" sj_live_sid)"
+assert_eq "an explicit SCRUBJAY_SESSION_ID wins" "$other" \
+  "$(SCRUBJAY_HARNESS=claude CLAUDE_CODE_SESSION_ID="$mine" SCRUBJAY_SESSION_ID="$other" sj_live_sid)"
+assert_eq "another harness does not borrow Claude's id" "" "$(SCRUBJAY_HARNESS=opencode CLAUDE_CODE_SESSION_ID="$mine" sj_live_sid)"
+out="$(cd /w 2>/dev/null; SCRUBJAY_HARNESS=claude CLAUDE_CODE_SESSION_ID="$mine" SCRUBJAY_NOSHIP=1 SCRUBJAY_LOG_NOGIT=1 \
+  SCRUBJAY_TOPIC="Mine" bash -c 'cd /tmp && bash "$1/hooks/publish-now.sh"' _ "$APP" 2>&1)"
+assert_contains "/sjlog publishes the session it runs in" "$out" "${mine:0:8}"
+
 finish
