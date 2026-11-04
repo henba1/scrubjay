@@ -98,7 +98,7 @@ class Artefacts:
     is up at once. The per-transcript facts are cached on disk, keyed by the transcript's size and
     mtime, so a later start reads only what changed."""
 
-    VERSION = 4   # bump with any change to what view/artefacts.py:facts() returns
+    VERSION = 8   # bump with any change to what view/artefacts.py:facts() returns
 
     def __init__(self, arch: Archive, cache: Path, host: str):
         self.arch, self.cache = arch, cache
@@ -184,6 +184,23 @@ def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
     }
 
 
+def cloud_links() -> dict | None:
+    """Where this machine's files can be opened in a browser: a Nextcloud (or any web file view)
+    holding the same folders. SCRUBJAY_VIEW_NEXTCLOUD is its address; SCRUBJAY_VIEW_NEXTCLOUD_MAP
+    pairs a local folder with the folder Nextcloud shows it as, `local=remote`, several split by `;`.
+    The page turns every path under a local folder into a link; nothing is fetched from here."""
+    base = os.environ.get("SCRUBJAY_VIEW_NEXTCLOUD", "").strip().rstrip("/")
+    if not base.startswith(("https://", "http://")):
+        return None
+    pairs = []
+    for item in os.environ.get("SCRUBJAY_VIEW_NEXTCLOUD_MAP", "").split(";"):
+        local, sep, remote = item.strip().partition("=")
+        if sep and local.startswith("/") and remote.startswith("/"):
+            pairs.append([local.rstrip("/") or "/", remote.rstrip("/") or "/"])
+    pairs.sort(key=lambda x: -len(x[0]))  # the most specific folder wins
+    return {"base": base, "map": pairs} if pairs else None
+
+
 def graph(st: "State") -> dict:
     rows = _rows(st.r)
     nodes = [_node(s, rs, st.arch) for s, rs in rows.items()]
@@ -213,7 +230,7 @@ def graph(st: "State") -> dict:
     for a in arts.values():
         a["prs"] = len(a["prs"])
     return {"host": os.environ.get("SCRUBJAY_HOST", ""), "nodes": nodes, "edges": edges,
-            "artefacts": list(arts.values()), "archive": bool(st.r.chats),
+            "artefacts": list(arts.values()), "archive": bool(st.r.chats), "cloud": cloud_links(),
             "indexing": None if st.arts.ready else {"done": st.arts.done, "total": st.arts.total}}
 
 
