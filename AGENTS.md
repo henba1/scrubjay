@@ -54,6 +54,9 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
   `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
   `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.
+- `view/` — the session map behind `/sjview`: `sj_view.py`, a stdlib-only local server built on
+  sjmcp's readers, and `index.html`, its one self-contained page. Started and stopped by
+  `bin/sj-view.sh`; never left running. Tests: `tests/test_view.sh`.
 - `commands/` — the generic `/dc*` slash commands shipped with the app.
 - `mods/scrubjay-ui/` — the optional Claude Code mod (TypeScript hooks module) that draws scrubjay
   in the native interface; listed by `.claude-plugin/marketplace.json`. Tests:
