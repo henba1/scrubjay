@@ -402,8 +402,26 @@ assert_eq "over SSH: the tunnel to open" "ssh -L $(jq -r .port <<<"$j"):127.0.0.
   "$(SSH_CONNECTION="10.0.0.1 1 10.0.0.2 22" SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" status --json | jq -r .ssh)"
 assert_eq "stop" '{"running":false}' "$(SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" stop --json)"
 
+section "a project, even misspelt, opens the map on its lane"
+echo "$today 16:00 | testhost | /home/user/Gadget_Firmware | \"Flash layout\" | session=eeeeeeee-5555-4555-8555-555555555555 | harness=claude | turns=2 | size=300" >> "$LOG"
+R4="$SANDBOX/run4"
+for q in widget-api WIDGET_API widgetapi widget gadget_firmwre; do
+  case "$q" in gadget*) exp=Gadget_Firmware ;; *) exp=widget-api ;; esac
+  assert_eq "\"$q\" is $exp" "$exp" "$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" "$q" --json --port 0 | jq -r .project)"
+done
+j="$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" widget --json)"
+assert_eq "the address opens that lane" "#project=widget-api" "#$(jq -r '.url | split("#")[1]' <<<"$j")"
+out="$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" widgit --no-open)"
+assert_contains "says what it matched" "$out" 'project: widget-api (for "widgit")'
+out="$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --no-open)"
+assert_contains "no likeness: all of them, and says so" "$out" 'no project like "zzqqxx"'
+assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --json | jq .project)"
+assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
+SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
+
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
 assert_contains "an unknown flag" "$(bash "$APP/bin/sj-view.sh" --bogus 2>&1)" "unknown argument: --bogus"
+assert_contains "two projects" "$(bash "$APP/bin/sj-view.sh" one two 2>&1)" "one project at a time"
 
 finish

@@ -845,9 +845,11 @@ $("stop").onclick = async () => {
   document.body.innerHTML = '<p id="empty">The viewer has stopped. Run <code>/sjview</code> to start it again.</p>';
 };
 // `#sid=<id>` opens a session's panel, `#read=<id>` its transcript, `#art=<id>` an artefact's
-// milestones: links you can keep.
+// milestones, `#project=<name>` that project's lane alone: links you can keep.
 load().then(async () => {
   const h = new URLSearchParams(location.hash.slice(1)), sid = h.get("sid") || h.get("read"), aid = h.get("art");
+  const proj = h.get("project");
+  if (proj && [...$("project").options].some((o) => o.value === proj)) { $("project").value = proj; draw(); }
   if (sid && bySid.has(sid)) { await open(sid); if (h.get("read")) read(bySid.get(sid)); }
   else if (aid) openArt(aid);
 }).catch(() => { $("empty").hidden = false; $("empty").textContent = "Could not reach the viewer — it may have stopped. Run /sjview again."; });
