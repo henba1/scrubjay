@@ -1097,6 +1097,11 @@ condensed or in full. A link ending in <code>#sid=&lt;id&gt;</code> opens that s
 <code>WIDGET_API</code> or <code>widgt-api</code> all find <code>widget-api</code>. Case and punctuation are ignored, part of a name
 is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and
 the others are listed. With no likely match, it shows every project and says so.</p>
+<p>To move around, drag the map (or hold Space and drag, which works over cards too). The wheel scrolls,
+and Shift+wheel scrolls sideways. Ctrl+wheel or a pinch zooms at the pointer. The arrow keys or WASD
+pan, <code>+</code> <code>−</code> <code>0</code> zoom, <code>F</code> fits everything on screen, and <code>/</code> jumps to the search box. The buttons at
+the bottom right do the same. Only the cards near the view are drawn, so a large catalogue stays
+quick.</p>
 <p>The viewer runs only while you use it. It listens on <code>127.0.0.1</code> alone and answers only requests
 carrying the token in the address it prints. It stops on <code>/sjview stop</code>, on the page's <strong>Stop
 viewer</strong> button, or by itself after <code>SCRUBJAY_VIEW_IDLE</code> minutes without a request (default 30;
