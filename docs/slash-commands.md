@@ -33,7 +33,7 @@ read-only [`sjmcp` MCP tools](archive-mcp.md); **lifecycle** commands just run t
 | `/sjmemory` | — | Enable/repair cross-machine memory on **this** machine (idempotent — runs `bin/onboard-memory.sh`). First-time memory setup, or when memory sync looks broken. |
 | `/sjnote [what to capture \| /path/to/file]` | — | **Keep a written artefact** — an analysis, a briefing, a design rationale (runs `bin/sj-note.sh`). Writes it to `<memory>/<project>/notes/` and publishes immediately, so it survives the session and reaches every machine. Invoke it *before* the work too: it stands for the rest of the session, so durable output goes there instead of the scratchpad. Notes are **not** loaded into future sessions — read them back with `/sjrecall` or `/sjbrowse note`. |
 | `/sjpaste [name]` | — | **Put the clipboard into this project's assets and read it.** For the thing a terminal can't do: a screenshot, a copied PDF, a diagram. Writes to `$SCRUBJAY_ASSETS/<project-slug>/` (machine-local, not synced) and hands the path straight to the session. Needs a clipboard on the machine running the session — over SSH use `cat <file> \| bin/sj-paste.sh -` instead. |
-| `/sjview [stop\|status]` | — | **See your sessions as a map** in the browser (runs `bin/sj-view.sh`). One lane per project, newest on the right, forks drawn as arrows; click a session for everything scrubjay holds on it, its transcript, and the command that continues it. Nothing runs until you ask: it starts a small local server and stops on `/sjview stop`, the page's Stop button, or after 30 minutes unused. See [The session map](#the-session-map). |
+| `/sjview [project\|stop\|status]` | — | **See your sessions as a map** in the browser (runs `bin/sj-view.sh`). One lane per project, newest on the right, forks drawn as arrows; click a session for everything scrubjay holds on it, its transcript, and the command that continues it. Nothing runs until you ask: it starts a small local server and stops on `/sjview stop`, the page's Stop button, or after 30 minutes unused. See [The session map](#the-session-map). |
 | `/sjdoctor [section…]` | — | **Check that this machine's sync actually works** (runs `bin/sj-doctor.sh`). With no argument it verifies everything: config, the data repo, the memory clone, relay reachability, adapters and the last recorded outcomes. Name sections — `config`, `data`, `memory`, `relay`, `harnesses`, `outcomes` — to check just those, which skips the slow network probes for the rest. Read-only and safe to run any time; reach for it when something *should* have synced and didn't. |
 
 ## The session map
@@ -65,6 +65,11 @@ moved), its forks, where its transcript is archived, and the command that contin
 harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from
 another machine ([hand-off](handoff.md)). **Read transcript** shows the archived conversation,
 condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
+
+`/sjview <project>` opens the map on one project's lane. The name need not be exact: `widget`,
+`WIDGET_API` or `widgt-api` all find `widget-api`. Case and punctuation are ignored, part of a name
+is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and
+the others are listed. With no likely match, it shows every project and says so.
 
 The viewer runs only while you use it. It listens on `127.0.0.1` alone and answers only requests
 carrying the token in the address it prints. It stops on `/sjview stop`, on the page's **Stop

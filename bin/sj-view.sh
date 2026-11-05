@@ -6,12 +6,15 @@
 # small local server (view/sj_view.py) in the background and opens it; it stops on `stop`, on the
 # page's Stop button, or by itself after SCRUBJAY_VIEW_IDLE minutes without a request.
 #
-#   usage: sj-view.sh [start] [--port N] [--idle MIN] [--no-open] [--json]
+#   usage: sj-view.sh [start] [PROJECT] [--port N] [--idle MIN] [--no-open] [--json]
 #          sj-view.sh stop | status [--json]
 #
+# PROJECT opens the map on that project alone. It need not be spelled right: it matches a
+# project folder's name ignoring case and punctuation, then as part of one, then by likeness;
+# the newest project wins a tie.
 # --json is for front-ends (an editor that opens the address itself): stdout is one JSON object,
-# {"running":true,"url":…,"port":…,"idle":…,"ssh":"ssh -L …"|null} or {"running":false}, and
-# start never opens a browser.
+# {"running":true,"url":…,"port":…,"idle":…,"ssh":"ssh -L …"|null,"project":…|null} or
+# {"running":false}, and start never opens a browser.
 #
 # Listens on 127.0.0.1 only, port SCRUBJAY_VIEW_PORT (default 7787, the next free one if taken).
 # On a machine you reach over SSH, forward it: ssh -L 7787:127.0.0.1:7787 <host>.
@@ -26,15 +29,17 @@ LOGF="$(sj_progress_dir)/view.log"
 
 cmd=start
 case "${1:-}" in start|stop|status) cmd="$1"; shift ;; esac
-port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0
+port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0 want="" project="" others=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) port="${2:-}"; shift 2 ;;
     --idle) idle="${2:-}"; shift 2 ;;
     --no-open) open=0; shift ;;
     --json) json=1; open=0; shift ;;
-    -h|--help) sed -n '9,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "sj-view: unknown argument: $1" >&2; exit 2 ;;
+    -h|--help) sed -n '9,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) echo "sj-view: unknown argument: $1" >&2; exit 2 ;;
+    *) [ -z "$want" ] || { echo "sj-view: one project at a time ($want, $1)" >&2; exit 2; }
+       want="$1"; shift ;;
   esac
 done
 case "$port" in ''|*[!0-9]*) echo "sj-view: --port needs a number" >&2; exit 2 ;; esac
@@ -47,7 +52,35 @@ running() {
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then return 0; fi
   rm -f "$STATE"; return 1
 }
-url() { jq -r '.url' "$STATE"; }
+# The address, opened on the matched project when one was asked for.
+url() { jq -r --arg p "$project" '.url + (if $p == "" then "" else "#project=" + ($p | @uri) end)' "$STATE"; }
+
+# The catalogued project (the last folder of a session's path, as the map's lanes name it) that
+# best fits what was typed: the same name ignoring case and punctuation, then one that contains it
+# (or is contained in it), then the likeliest by spelling. Prints the name, then on a second line
+# the runners-up; nothing when none fits.
+match_project() {
+  sj_log_catalogue 2>/dev/null | cut -f4 | python3 -c '
+import difflib, os, re, sys
+want = sys.argv[1]
+names = []
+for line in sys.stdin:  # newest first: the order a tie is broken in
+    n = os.path.basename(line.rstrip("\n").rstrip("/"))
+    if n and n not in names:
+        names.append(n)
+key = lambda s: re.sub(r"[^0-9a-z]", "", s.lower())
+w = key(want)
+if not w:
+    sys.exit()
+close = difflib.get_close_matches(w, [key(n) for n in names], n=4, cutoff=0.6)
+for tier in ([n for n in names if n.lower() == want.lower()],
+             [n for n in names if key(n) == w],
+             [n for n in names if key(n) and (w in key(n) or key(n) in w)],
+             [n for k in close for n in names if key(n) == k]):
+    if tier:
+        print(tier[0]); print(", ".join(tier[1:4])); break
+' "$want"
+}
 
 open_url() {
   [ "$open" = 1 ] || return 0
@@ -63,10 +96,17 @@ report() {
   local u p i; u="$(url)"; p="$(jq -r '.port' "$STATE")"; i="$(jq -r '.idle // 30 | floor' "$STATE")"
   if [ "$json" = 1 ]; then
     jq -c --arg ssh "$([ -n "${SSH_CONNECTION:-}" ] && echo "ssh -L $p:127.0.0.1:$p $(sj_host)")" \
-      '{running:true, url, port, idle: (.idle // 30 | floor), ssh: (if $ssh == "" then null else $ssh end)}' "$STATE"
+      --arg url "$u" --arg project "$project" \
+      '{running:true, url: $url, port, idle: (.idle // 30 | floor), ssh: (if $ssh == "" then null else $ssh end),
+        project: (if $project == "" then null else $project end)}' "$STATE"
     return 0
   fi
   echo "scrubjay view: $u"
+  if [ -n "$project" ]; then
+    echo "  project: $project$([ "$project" != "$want" ] && echo " (for \"$want\")")$([ -n "$others" ] && echo "; also like it: $others")"
+  elif [ -n "$want" ]; then
+    echo "  no project like \"$want\" in the catalogue; showing them all"
+  fi
   if [ "$i" = 0 ]; then echo "  runs until /sjview stop or the page's Stop button"
   else echo "  stops by itself after $i min unused; /sjview stop or the page's Stop button ends it now"; fi
   [ -n "${SSH_CONNECTION:-}" ] && echo "  over SSH: ssh -L $p:127.0.0.1:$p $(sj_host), then open the address above"
@@ -85,6 +125,10 @@ case "$cmd" in
     else [ "$json" = 1 ] && echo '{"running":false}' || echo "scrubjay view: not running"; fi
     exit 0 ;;
 esac
+
+if [ -n "$want" ] && [ "$cmd" = start ]; then
+  m="$(match_project)"; project="$(sed -n 1p <<<"$m")"; others="$(sed -n 2p <<<"$m")"
+fi
 
 if running; then report; open_url "$(url)"; exit 0; fi
 
