@@ -259,6 +259,9 @@ assert_eq "wrong token: 403" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H 'X
 assert_eq "a foreign Host (DNS rebinding): 403" 403 "$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Host: evil.example:$PORT" -H "X-SJ-Token: $TOK" "http://127.0.0.1:$PORT/api/graph")"
 assert_eq "the page with its token: 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$URL")"
+page="$(curl -s "$URL")"
+assert_contains "the page pans and zooms (drag, wheel, keys, the zoom bar)" "$page" 'id="zoombar"'
+assert_contains "and draws only the cards near the view" "$page" "function cull()"
 
 section "the map: every session once, forks as edges"
 g="$(get /api/graph)"

@@ -48,14 +48,32 @@ button:hover { border-color: var(--blue); }
 .sw.pill { width: 18px; border-radius: 6px; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border: 1.5px solid var(--c); }
 .sw.line { width: 22px; height: 0; border-radius: 0; border-top: 2px solid var(--c); background: none; vertical-align: middle; }
 .sw.dash { border-top-style: dashed; }
-#map { position: relative; overflow: auto; flex: 1; min-height: 0; }
-#canvas { position: relative; }
+/* The map is a viewport onto one layer that pans and zooms by its transform alone (no redraw). */
+#map { position: relative; overflow: hidden; flex: 1; min-height: 0; touch-action: none; }
+#map.grab { cursor: grab; }
+#map.panning, #map.panning * { cursor: grabbing !important; }
+#canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; user-select: none; }
+#canvas.moving { will-change: transform; }
+#zoombar { position: absolute; right: 16px; bottom: 16px; z-index: 6; display: flex; gap: 2px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+#zoombar button { border: 0; background: none; min-width: 30px; padding: 3px 8px; }
+#zoombar button:hover { background: var(--bg); }
+#zpct { font-variant-numeric: tabular-nums; min-width: 52px; color: var(--dim); }
+/* zoomed far out a card is its colour and its topic, large enough to read */
+#map.far .card .mid, #map.far .card .low { display: none; }
+#map.far .card .top { height: 100%; font-size: 24px; line-height: 1.25; -webkit-line-clamp: 5; border: 0; }
+#map.far .art .l2 { display: none; }
+#map.far .art .l1 { font-size: 22px; }
 svg#edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 1; }
-.lane { position: absolute; left: 0; background: var(--lane); border-bottom: 1px solid var(--line); }
-.lane-label { position: sticky; left: 0; display: inline-block; padding: 6px 10px; font-weight: 600;
+.lane { position: absolute; left: 0; background: var(--lane); border-bottom: 1px solid var(--line); overflow: hidden; }
+.lane-label { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: inline-block; padding: 6px 10px; font-weight: 600;
   color: var(--dim); background: var(--lane); z-index: 2; max-width: 220px; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
-.day { position: absolute; top: 0; height: 22px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+/* the dates: a strip along the top of the map, in screen space, so they read at any zoom */
+#days { position: absolute; left: 0; right: 0; top: 0; height: 24px; z-index: 4; overflow: hidden;
+  pointer-events: none; background: color-mix(in srgb, var(--bg) 90%, transparent); border-bottom: 1px solid var(--line); }
+.day { position: absolute; left: 0; top: 4px; font-size: 12px; color: var(--dim); white-space: nowrap; }
 .day.landed { color: var(--ink); font-weight: 600; }
 
 /* a session: three boxes, its agent's colour down the side and across the top */
@@ -192,7 +210,12 @@ a.cloud:hover { text-decoration: underline; }
   <span><i class="sw line dash" style="--c: var(--carry)"></i>carried over to another agent</span>
   <span><i class="sw line" style="--c: var(--dim)"></i>changed (hover a node for what)</span>
 </div>
-<div id="map"><div id="canvas"><svg id="edges"></svg></div><div id="empty" hidden></div></div>
+<div id="map" title=""><div id="canvas"><svg id="edges"></svg></div><div id="days"></div><div id="empty" hidden></div>
+  <div id="zoombar" title="drag (or Space+drag) to pan · wheel scrolls, Shift+wheel sideways · Ctrl+wheel or pinch zooms · arrows/WASD pan · + − 0 F zoom · / search">
+    <button data-z="out" title="zoom out (−)">−</button><button id="zpct" data-z="one" title="actual size (0)">100%</button>
+    <button data-z="in" title="zoom in (+)">+</button><button data-z="fit" title="fit everything (F)">fit</button>
+  </div>
+</div>
 <aside id="detail"><button class="x" id="close">✕</button><div id="dbody"></div></aside>
 <div id="reader">
   <div class="bar">
@@ -237,7 +260,7 @@ const cloudA = (path) => {
 
 let G = { nodes: [], edges: [], artefacts: [], host: "" }, bySid = new Map(), byArt = new Map();
 let selected = null; // {sid} or {aid}: kept highlighted while its panel is open
-const CARD_W = 250, CARD_H = 170, GAP_X = 46, GAP_Y = 12, TOP = 28, LANE_PAD = 34;
+const CARD_W = 250, CARD_H = 170, GAP_X = 46, GAP_Y = 12, TOP = 4, LANE_PAD = 34;
 const ART_W = 236, ART_H = 58, ART_GAP = 10, ART_COL_GAP = 120;
 
 function fillSelect(id, values) {
@@ -247,9 +270,18 @@ function fillSelect(id, values) {
   el.value = values.includes(keep) ? keep : "";
 }
 
-let first = true;
+let first = true, lastSig = "";
 async function load() {
   G = await api("/api/graph");
+  // While the artefact index fills, most polls bring nothing new but the progress count.
+  const sig = JSON.stringify([G.nodes, G.edges, G.artefacts]);
+  if (sig === lastSig) {
+    $("count").textContent = $("count").textContent.replace(/ · reading artefacts .*$/, "") +
+      (G.indexing ? ` · reading artefacts ${G.indexing.done}/${G.indexing.total}` : "");
+    if (G.indexing) setTimeout(load, 1500);
+    return;
+  }
+  lastSig = sig;
   bySid = new Map(G.nodes.map((n) => [n.sid, n]));
   byArt = new Map((G.artefacts || []).map((a) => [a.id, a]));
   const uniq = (k) => [...new Set(G.nodes.map((n) => n[k]).filter(Boolean))].sort();
@@ -257,7 +289,8 @@ async function load() {
   fillSelect("host", uniq("host"));
   fillSelect("harness", uniq("harness"));
   draw();
-  if (first) { first = false; const m = $("map"); m.scrollLeft = m.scrollWidth; }
+  // Open on the newest day: the right end of the timeline, at actual size.
+  if (first) { first = false; setView(Math.min(0, $("map").clientWidth - WORLD.w), STRIP, 1); }
   // The artefact index fills in the background on a cold start; redraw until it is done.
   if (G.indexing) setTimeout(load, 1500);
 }
@@ -275,9 +308,18 @@ function visible() {
     && (!q || hitArt.has(n.sid) || [n.topic, n.cwd, n.sid, n.host, n.model].join(" ").toLowerCase().includes(q)));
 }
 
+// The layout of the last draw: where every visible card and pill sits on the canvas. Cards are
+// made only when they come near the view (cull), so a map of a thousand sessions stays light.
+let LAYOUT = { nodes: [], pos: new Map(), apos: new Map() }, WORLD = { w: 0, h: 0 };
+let laneLabels = [], dayEls = [];
+const cardEl = new Map(), artEl = new Map();
+let lit = new Set(); // the cards and pills the hovered or selected node lights up
+
 function draw() {
   const canvas = $("canvas"), svg = $("edges");
-  canvas.querySelectorAll(".lane,.card,.day,.art").forEach((e) => e.remove());
+  canvas.querySelectorAll(".lane,.card,.art").forEach((e) => e.remove());
+  $("days").textContent = "";
+  cardEl.clear(); artEl.clear(); laneLabels = []; dayEls = [];
   svg.innerHTML = "";
   const nodes = visible().sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
   const shown = new Set(nodes.map((n) => n.sid));
@@ -322,8 +364,8 @@ function draw() {
   const width = (artLane.size ? artX + ART_W : 16 + days.length * (CARD_W + GAP_X)) + 40;
   const dayEl = (text, x, cls = "") => {
     const el = document.createElement("div");
-    el.className = "day " + cls; el.textContent = text; el.style.left = x + "px"; el.style.top = "6px";
-    canvas.appendChild(el);
+    el.className = "day " + cls; el.textContent = text; el.dataset.x = x;
+    $("days").appendChild(el); dayEls.push(el);
   };
   days.forEach((d, i) => dayEl(d, 16 + i * (CARD_W + GAP_X)));
   if (artLane.size) dayEl("where the work landed", artX, "landed");
@@ -340,48 +382,13 @@ function draw() {
     const h = LANE_PAD + Math.max(Math.max(...stack.values()) * (CARD_H + GAP_Y), arts.length * (ART_H + ART_GAP)) + 6;
     const lane = document.createElement("div");
     lane.className = "lane"; lane.style.top = y + "px"; lane.style.height = h + "px";
-    lane.style.width = Math.max(width, $("map").clientWidth) + "px";
+    lane.style.width = width + "px";
     lane.innerHTML = `<span class="lane-label" title="${esc(name)}">${esc(name)} · ${list.length}</span>`;
-    canvas.appendChild(lane);
+    canvas.appendChild(lane); laneLabels.push(lane.firstChild);
     y += h + 8;
   }
-  for (const n of nodes) {
-    const p = pos.get(n.sid), el = document.createElement("div");
-    el.className = `card h-${n.harness}`;
-    el.dataset.sid = n.sid;
-    el.style.left = p.x + "px"; el.style.top = p.y + "px"; el.style.height = CARD_H + "px";
-    const topic = n.topic || "(untitled)";
-    el.innerHTML =
-      `<div class="top" title="${esc(topic)}"><code>${esc(n.sid8)}</code> ${esc(topic)}</div>` +
-      `<div class="mid" title="${esc(n.hosts.join(" → ") + " · " + n.cwd)}">` +
-      (n.hosts.length > 1 ? `<span class="hop" title="continued on another machine">${esc(n.hosts.join(" → "))}</span>` : esc(n.host)) +
-      ` · ${esc(tail(n.cwd))}<br>` +
-      `<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
-      `<div class="low">${n.summary ? `<div class="sum" title="${esc(n.summary)}">${esc(n.summary)}</div>` : ""}` +
-      `<div class="meta">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
-      `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div></div>`;
-    el.onclick = () => open(n.sid);
-    el.onmouseenter = () => focus({ sid: n.sid });
-    el.onmouseleave = () => focus(selected);
-    canvas.appendChild(el);
-  }
-  for (const [aid, p] of apos) {
-    const a = byArt.get(aid), el = document.createElement("div");
-    el.className = `art k-${a.kind}`;
-    el.dataset.aid = aid;
-    el.style.left = p.x + "px"; el.style.top = p.y + "px";
-    const bits = [plural(a.sessions, "session")];
-    if (a.prs) bits.push(plural(a.prs, "PR"));
-    if (a.commits) bits.push(plural(a.commits, "commit"));
-    el.title = a.url || home(a.path || "");
-    el.innerHTML = `<div class="l1"><span class="kind">${esc(KIND[a.kind] || a.kind)}</span>${esc(a.label)}</div>` +
-      `<div class="l2">${esc(bits.join(" · "))}${a.kind === "folder" || a.kind === "repo" ? " · " + esc(a.host) : ""}</div>`;
-    el.onclick = () => openArt(aid);
-    el.onmouseenter = () => focus({ aid });
-    el.onmouseleave = () => focus(selected);
-    canvas.appendChild(el);
-  }
-  canvas.style.width = Math.max(width, $("map").clientWidth) + "px";
+  LAYOUT = { nodes, pos, apos }; WORLD = { w: width, h: y };
+  canvas.style.width = width + "px";
   canvas.style.height = y + "px";
   svg.setAttribute("width", width); svg.setAttribute("height", y);
 
@@ -414,32 +421,144 @@ function draw() {
   }
   svg.innerHTML = html;
   focus(selected);
+  setView(V.x, V.y, V.k); // re-clamp to the new extent; this also makes the cards in view
+}
+
+function makeCard(n, p) {
+  const el = document.createElement("div");
+  el.className = `card h-${n.harness}`;
+  el.dataset.sid = n.sid;
+  el.style.left = p.x + "px"; el.style.top = p.y + "px"; el.style.height = CARD_H + "px";
+  const topic = n.topic || "(untitled)";
+  el.innerHTML =
+    `<div class="top" title="${esc(topic)}"><code>${esc(n.sid8)}</code> ${esc(topic)}</div>` +
+    `<div class="mid" title="${esc(n.hosts.join(" → ") + " · " + n.cwd)}">` +
+    (n.hosts.length > 1 ? `<span class="hop" title="continued on another machine">${esc(n.hosts.join(" → "))}</span>` : esc(n.host)) +
+    ` · ${esc(tail(n.cwd))}<br>` +
+    `<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
+    `<div class="low">${n.summary ? `<div class="sum" title="${esc(n.summary)}">${esc(n.summary)}</div>` : ""}` +
+    `<div class="meta">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
+    `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div></div>`;
+  el.onclick = () => open(n.sid);
+  el.onmouseenter = () => focus({ sid: n.sid });
+  el.onmouseleave = () => focus(selected);
+  return el;
+}
+
+function makeArt(aid, p) {
+  const a = byArt.get(aid), el = document.createElement("div");
+  el.className = `art k-${a.kind}`;
+  el.dataset.aid = aid;
+  el.style.left = p.x + "px"; el.style.top = p.y + "px";
+  const bits = [plural(a.sessions, "session")];
+  if (a.prs) bits.push(plural(a.prs, "PR"));
+  if (a.commits) bits.push(plural(a.commits, "commit"));
+  el.title = a.url || home(a.path || "");
+  el.innerHTML = `<div class="l1"><span class="kind">${esc(KIND[a.kind] || a.kind)}</span>${esc(a.label)}</div>` +
+    `<div class="l2">${esc(bits.join(" · "))}${a.kind === "folder" || a.kind === "repo" ? " · " + esc(a.host) : ""}</div>`;
+  el.onclick = () => openArt(aid);
+  el.onmouseenter = () => focus({ aid });
+  el.onmouseleave = () => focus(selected);
+  return el;
+}
+
+// Attach the cards and pills within a screen's margin of the view, detach the rest.
+function cull() {
+  const m = $("map"), canvas = $("canvas"), M = 400;
+  const x0 = (-V.x - M) / V.k, y0 = (-V.y - M) / V.k;
+  const x1 = (m.clientWidth - V.x + M) / V.k, y1 = (m.clientHeight - V.y + M) / V.k;
+  const place = (cache, key, p, w, h, make) => {
+    let el = cache.get(key);
+    if (p.x < x1 && p.x + w > x0 && p.y < y1 && p.y + h > y0) {
+      if (!el) { el = make(); cache.set(key, el); }
+      if (!el.isConnected) {
+        el.classList.toggle("hl", lit.has(key));
+        el.classList.toggle("sel", !!selected && (selected.sid === key || selected.aid === key));
+        canvas.appendChild(el);
+      }
+    } else if (el?.isConnected) el.remove();
+  };
+  for (const n of LAYOUT.nodes) { const p = LAYOUT.pos.get(n.sid); place(cardEl, n.sid, p, CARD_W, CARD_H, () => makeCard(n, p)); }
+  for (const [aid, p] of LAYOUT.apos) place(artEl, aid, p, ART_W, ART_H, () => makeArt(aid, p));
+}
+
+// --- pan and zoom -------------------------------------------------------------------------------
+// V maps canvas to screen: screen = canvas * k + (x, y). Moving it rewrites one transform per
+// frame; lane names stay on the left edge and the day row along the top, wherever the view is.
+const V = { x: 0, y: 0, k: 1 }, ZMIN = 0.08, ZMAX = 2, PAD = 40, STRIP = 26; // STRIP: the date row
+let frame = 0, still = 0;
+function setView(x, y, k) {
+  const m = $("map"), W = m.clientWidth, H = m.clientHeight;
+  k = Math.min(ZMAX, Math.max(ZMIN, k));
+  const ww = WORLD.w * k, wh = WORLD.h * k;
+  const cx = (lo, hi, v) => Math.min(Math.max(v, Math.min(lo, hi)), Math.max(lo, hi));
+  V.k = k; V.x = cx(PAD, W - ww - PAD, x); V.y = cx(STRIP, H - wh - PAD, y);
+  if (!frame) frame = requestAnimationFrame(paint);
+}
+function paint() {
+  frame = 0;
+  const canvas = $("canvas");
+  canvas.classList.add("moving"); clearTimeout(still);
+  still = setTimeout(() => canvas.classList.remove("moving"), 160); // re-rasterise sharp once still
+  canvas.style.transform = `translate(${V.x}px,${V.y}px) scale(${V.k})`;
+  $("map").classList.toggle("far", V.k < 0.5);
+  // Names and dates keep their size on screen at any zoom; a lane clips its own name, and when
+  // the columns get narrow only every n-th date shows.
+  const lx = Math.max(0, -V.x / V.k), up = 1 / V.k;
+  for (const l of laneLabels) l.style.transform = `translateX(${lx}px) scale(${up})`;
+  const nth = Math.ceil(90 / ((CARD_W + GAP_X) * V.k));
+  const land = dayEls.find((d) => d.classList.contains("landed")), landX = land ? land.dataset.x * V.k + V.x : Infinity;
+  dayEls.forEach((d, i) => {
+    const x = d.dataset.x * V.k + V.x, isLand = d === land;
+    d.style.transform = `translateX(${x}px)`;
+    d.style.visibility = !isLand && (i % nth || landX - x < 90) ? "hidden" : "";
+  });
+  $("zpct").textContent = Math.round(V.k * 100) + "%";
+  cull();
+}
+const panBy = (dx, dy) => setView(V.x + dx, V.y + dy, V.k);
+// Zoom keeping the canvas point under (sx, sy) on the screen where it was.
+function zoomAt(sx, sy, k) {
+  k = Math.min(ZMAX, Math.max(ZMIN, k));
+  setView(sx - (sx - V.x) * k / V.k, sy - (sy - V.y) * k / V.k, k);
+}
+const mapCentre = () => { const m = $("map"); return [m.clientWidth / 2, m.clientHeight / 2]; };
+function fit() {
+  const m = $("map"), k = Math.min(1, (m.clientWidth - 2 * PAD) / WORLD.w, (m.clientHeight - STRIP - PAD) / WORLD.h);
+  setView(PAD, STRIP, k);
+}
+// Bring a node into view, centred in the part the side panel leaves free, unless it already shows.
+function reveal(p, w, h) {
+  const m = $("map"), side = $("detail").classList.contains("open") ? $("detail").offsetWidth : 0;
+  const W = m.clientWidth - side, H = m.clientHeight;
+  const sx = p.x * V.k + V.x, sy = p.y * V.k + V.y;
+  if (sx >= 0 && sy >= 0 && sx + w * V.k <= W && sy + h * V.k <= H) return;
+  setView(W / 2 - (p.x + w / 2) * V.k, H / 2 - (p.y + h / 2) * V.k, V.k);
 }
 
 // Hovering (or selecting) a node lights up its links and the nodes at their other end.
 function focus(f) {
   const svg = $("edges");
-  document.querySelectorAll(".card.hl,.art.hl").forEach((e) => e.classList.remove("hl"));
-  svg.querySelectorAll("g.ae").forEach((g) => g.classList.remove("hl", "hl-s", "hl-a"));
+  for (const k of lit) (cardEl.get(k) || artEl.get(k))?.classList.remove("hl");
+  lit = new Set();
+  svg.querySelectorAll("g.ae.hl").forEach((g) => g.classList.remove("hl", "hl-s", "hl-a"));
   svg.classList.toggle("focus", !!f);
   if (!f) return;
-  svg.querySelectorAll("g.ae").forEach((g) => {
-    if (f.sid && g.dataset.from === f.sid) {
-      g.classList.add("hl", "hl-s");
-      document.querySelector(`.art[data-aid="${CSS.escape(g.dataset.to)}"]`)?.classList.add("hl");
-    } else if (f.aid && g.dataset.to === f.aid) {
-      g.classList.add("hl", "hl-a");
-      document.querySelector(`.card[data-sid="${CSS.escape(g.dataset.from)}"]`)?.classList.add("hl");
-    }
+  const sel = f.sid ? `g.ae[data-from="${CSS.escape(f.sid)}"]` : `g.ae[data-to="${CSS.escape(f.aid)}"]`;
+  svg.querySelectorAll(sel).forEach((g) => {
+    g.classList.add("hl", f.sid ? "hl-s" : "hl-a");
+    const other = f.sid ? g.dataset.to : g.dataset.from;
+    lit.add(other);
+    (f.sid ? artEl : cardEl).get(other)?.classList.add("hl");
   });
 }
 
 function select(f) {
   selected = f;
   document.querySelectorAll(".card.sel,.art.sel").forEach((c) => c.classList.remove("sel"));
-  const el = f?.sid ? document.querySelector(`.card[data-sid="${CSS.escape(f.sid)}"]`)
-    : f?.aid ? document.querySelector(`.art[data-aid="${CSS.escape(f.aid)}"]`) : null;
-  if (el) { el.classList.add("sel"); el.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  (f?.sid ? cardEl.get(f.sid) : f?.aid ? artEl.get(f.aid) : null)?.classList.add("sel");
+  const p = f?.sid ? LAYOUT.pos.get(f.sid) : f?.aid ? LAYOUT.apos.get(f.aid) : null;
+  if (p) reveal(p, f.sid ? CARD_W : ART_W, f.sid ? CARD_H : ART_H);
   focus(f);
 }
 
@@ -461,8 +580,8 @@ function wire(root) {
 
 async function open(sid) {
   history.replaceState(null, "", location.search + "#sid=" + encodeURIComponent(sid));
-  select({ sid });
   $("detail").classList.add("open");
+  select({ sid });
   $("dbody").innerHTML = '<p class="note">loading…</p>';
   const s = await api("/api/session?sid=" + encodeURIComponent(sid));
   if (s.error) { $("dbody").innerHTML = `<p class="warn">${esc(s.error)}</p>`; return; }
@@ -553,8 +672,8 @@ function milestones(s, a, titles) {
 
 async function openArt(aid) {
   history.replaceState(null, "", location.search + "#art=" + encodeURIComponent(aid));
-  select({ aid });
   $("detail").classList.add("open");
+  select({ aid });
   $("dbody").innerHTML = '<p class="note">loading…</p>';
   const d = await api("/api/artefact?id=" + encodeURIComponent(aid));
   if (d.error) { $("dbody").innerHTML = `<p class="warn">${esc(d.error)}</p>`; return; }
@@ -633,7 +752,94 @@ document.addEventListener("keydown", (e) => {
   if ($("reader").classList.contains("open")) $("reader").classList.remove("open");
   else closePanel();
 });
-for (const id of ["q", "project", "host", "harness", "since", "arts", "empty-too"]) $(id).addEventListener("input", draw);
+for (const id of ["project", "host", "harness", "since", "arts", "empty-too"]) $(id).addEventListener("input", draw);
+let typing = 0; // the search redraws once typing pauses, not on every key
+$("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(draw, 140); });
+
+// Drag anywhere to pan (a card still opens on a click: a drag starts after a few pixels), or hold
+// Space and drag. Two fingers pinch. The wheel scrolls, Shift+wheel sideways, Ctrl+wheel (and a
+// trackpad pinch, which arrives as one) zooms at the pointer.
+{
+  const map = $("map"), pts = new Map();
+  let drag = null, pinch = null, moved = false, space = false;
+  const local = (e) => { const r = map.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  map.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("#zoombar") || (e.pointerType === "mouse" && e.button > 1)) return;
+    if (e.button === 1) e.preventDefault(); // no autoscroll on the middle button
+    pts.set(e.pointerId, local(e));
+    moved = false;
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), k: V.k }; drag = null;
+    } else drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, vx: V.x, vy: V.y, live: space || e.button === 1 };
+    if (drag?.live) { map.setPointerCapture(e.pointerId); map.classList.add("panning"); }
+  });
+  map.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, local(e));
+    if (pinch && pts.size === 2) {
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      zoomAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, pinch.k * d / pinch.d); moved = true; return;
+    }
+    if (!drag || drag.id !== e.pointerId) return;
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    if (!drag.live && Math.hypot(dx, dy) > 4) {
+      drag.live = true; map.setPointerCapture(e.pointerId); map.classList.add("panning");
+    }
+    if (drag.live) { moved = true; setView(drag.vx + dx, drag.vy + dy, V.k); }
+  });
+  const end = (e) => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (drag?.id === e.pointerId) { drag = null; map.classList.remove("panning"); }
+  };
+  map.addEventListener("pointerup", end);
+  map.addEventListener("pointercancel", end);
+  // A drag that ends over a card is not a click on it.
+  map.addEventListener("click", (e) => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+  map.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const line = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? map.clientHeight : 1;
+    let dx = e.deltaX * line, dy = e.deltaY * line;
+    if (e.ctrlKey || e.metaKey) { const [sx, sy] = local(e); zoomAt(sx, sy, V.k * Math.exp(-dy * 0.002)); return; }
+    if (e.shiftKey && !dx) { dx = dy; dy = 0; }
+    panBy(-dx, -dy);
+  }, { passive: false });
+
+  $("zoombar").addEventListener("pointerdown", (e) => e.preventDefault()); // keep focus (and Space) off it
+  $("zoombar").addEventListener("click", (e) => {
+    const z = e.target.closest("button")?.dataset.z, [cx, cy] = mapCentre();
+    if (z === "in") zoomAt(cx, cy, V.k * 1.25);
+    else if (z === "out") zoomAt(cx, cy, V.k / 1.25);
+    else if (z === "one") zoomAt(cx, cy, 1);
+    else if (z === "fit") fit();
+  });
+
+  const typingIn = (t) => t.closest?.("input, select, textarea, [contenteditable]");
+  document.addEventListener("keydown", (e) => {
+    if (typingIn(e.target) || $("reader").classList.contains("open") || e.ctrlKey || e.metaKey || e.altKey) return;
+    const step = e.shiftKey ? 480 : 120, [cx, cy] = mapCentre();
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const act = {
+      " ": () => { if (!space) { space = true; map.classList.add("grab"); } },
+      ArrowLeft: () => panBy(step, 0), a: () => panBy(step, 0),
+      ArrowRight: () => panBy(-step, 0), d: () => panBy(-step, 0),
+      ArrowUp: () => panBy(0, step), w: () => panBy(0, step),
+      ArrowDown: () => panBy(0, -step), s: () => panBy(0, -step),
+      "+": () => zoomAt(cx, cy, V.k * 1.25), "=": () => zoomAt(cx, cy, V.k * 1.25),
+      "-": () => zoomAt(cx, cy, V.k / 1.25), _: () => zoomAt(cx, cy, V.k / 1.25),
+      0: () => zoomAt(cx, cy, 1), f: () => fit(), "/": () => $("q").focus(),
+    }[k];
+    if (act) { e.preventDefault(); act(); }
+  });
+  document.addEventListener("keyup", (e) => {
+    if (e.key !== " ") return;
+    space = false; map.classList.remove("grab");
+    if (!typingIn(e.target)) e.preventDefault();
+  });
+  window.addEventListener("blur", () => { space = false; map.classList.remove("grab", "panning"); });
+  new ResizeObserver(() => setView(V.x, V.y, V.k)).observe(map);
+}
 $("stop").onclick = async () => {
   await api("/api/stop", { method: "POST" }).catch(() => {});
   document.body.innerHTML = '<p id="empty">The viewer has stopped. Run <code>/sjview</code> to start it again.</p>';
