@@ -66,6 +66,12 @@ harness's own resume command for a session from this machine, or `sj-resume.sh` 
 another machine ([hand-off](handoff.md)). **Read transcript** shows the archived conversation,
 condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
 
+To move around, drag the map (or hold Space and drag, which works over cards too). The wheel scrolls,
+and Shift+wheel scrolls sideways. Ctrl+wheel or a pinch zooms at the pointer. The arrow keys or WASD
+pan, `+` `−` `0` zoom, `F` fits everything on screen, and `/` jumps to the search box. The buttons at
+the bottom right do the same. Only the cards near the view are drawn, so a large catalogue stays
+quick.
+
 The viewer runs only while you use it. It listens on `127.0.0.1` alone and answers only requests
 carrying the token in the address it prints. It stops on `/sjview stop`, on the page's **Stop
 viewer** button, or by itself after `SCRUBJAY_VIEW_IDLE` minutes without a request (default 30;
