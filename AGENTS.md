@@ -54,6 +54,10 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `bin/sj-shell.sh` (sourced from the user's rc, installed by `bin/sj-shell-install.sh`) wraps the
   `claude` command so `claude resume <sid>` does that hand-off from a terminal, via
   `bin/sj-claude-resume.sh`.
+- `bin/sj-live.sh` — session leases: which sessions a harness process holds open. Marked from
+  lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
+  `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it
+  for a transcript. Tests: `tests/test_live.sh`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
   `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
   `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.

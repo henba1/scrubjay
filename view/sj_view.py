@@ -40,6 +40,9 @@ import artefacts as art  # noqa: E402
 
 PAGE = HERE / "index.html"
 TRANSCRIPT_MAX = 2_000_000  # chars; a page this big is already unreadable, past it we say so
+LIVE = APP / "bin" / "sj-live.sh"
+RECENT = 15 * 60          # seconds: how long a turn elsewhere counts as recent
+DIED_WITHIN = 7 * 86400   # seconds: a session that died is news for this long
 
 
 # ── the catalogue, every row kept ─────────────────────────────────────────────────────────────
@@ -185,6 +188,101 @@ def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
     }
 
 
+# ── which sessions are alive ──────────────────────────────────────────────────────────────────
+# Active means a harness process holds the session open. Only this machine's processes can be
+# asked, so elsewhere the best honest answer is "recent": a turn ended there a little while ago.
+
+def _procs() -> dict[str, str]:
+    """{pid: start time} of every process here."""
+    try:
+        out = subprocess.run(["ps", "-A", "-o", "pid=,lstart="], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    return {pid: rest.strip() for pid, _, rest in (ln.strip().partition(" ") for ln in out.splitlines())}
+
+
+def _leases(d: Path) -> list[dict]:
+    out = []
+    for f in d.glob("*.lease") if d.is_dir() else []:
+        try:
+            lease = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        if isinstance(lease, dict) and lease.get("sid"):
+            out.append(lease)
+    return out
+
+
+def _registries() -> list[tuple[str, str, str, int]]:
+    """(sid, pid, state, epoch) from each harness's own record of what it has open."""
+    try:
+        out = subprocess.run(["bash", str(LIVE), "sessions"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    rows = []
+    for line in out.splitlines():
+        f = line.split("\t")
+        if len(f) >= 5 and f[1] and f[4].isdigit():
+            rows.append((f[1], f[2], f[3], int(f[4])))
+    return rows
+
+
+def judge(leases: list[dict], registry: list[tuple[str, str, str, int]], procs: dict[str, str],
+          remote: list[dict], touched: dict[str, float], by8: dict[str, str], now: float) -> dict[str, dict]:
+    """{sid: {state, ts}}: working, waiting or idle (a process here holds it), died (its process went
+    mid-turn), recent (something moved lately, no process to ask). A session closed at rest has none."""
+    out: dict[str, dict] = {}
+    for w in leases:
+        pid, ts, state = str(w.get("pid") or ""), w.get("ts") or 0, w.get("state")
+        if state == "ended":
+            continue
+        if pid and pid in procs and procs[pid] == (w.get("start") or procs[pid]):
+            out[w["sid"]] = {"state": state, "ts": ts}
+        elif pid and state in ("working", "waiting") and now - ts < DIED_WITHIN:
+            out[w["sid"]] = {"state": "died", "ts": ts}
+        elif not pid and now - ts < RECENT:
+            out[w["sid"]] = {"state": "recent", "ts": ts}
+    for sid, pid, state, ts in registry:
+        if pid in procs:
+            out[sid] = {"state": state, "ts": ts}
+    ended = {w["sid"] for w in remote if w.get("state") == "ended"}
+    for w in remote:
+        if w["sid"] not in out and w["sid"] not in ended and now - (w.get("ts") or 0) < RECENT:
+            out[w["sid"]] = {"state": "recent", "ts": w["ts"]}
+    # A harness with no lease at all still writes its transcript.
+    known = {w["sid"] for w in leases + remote}
+    for s8, at in touched.items():
+        sid = by8.get(s8)
+        if sid and sid not in out and sid not in known and now - at < RECENT:
+            out[sid] = {"state": "recent", "ts": int(at)}
+    return out
+
+
+def live(st: "State") -> dict[str, dict]:
+    with st.live_lock:
+        if time.time() - st.live_at < 5:
+            return st.live_now
+        here, now = os.environ.get("SCRUBJAY_HOST", ""), time.time()
+        remote = []
+        if st.r.chats and st.r.chats.is_dir():
+            for d in st.r.chats.iterdir():
+                if d.name != here and d.is_dir():
+                    remote += _leases(d / "live")
+        # Transcript times only move once a turn, and each is a stat on the archive: once a minute.
+        if now - st.touched_at > 60:
+            st.touched = {}
+            for s8, path in st.arch.all().items():
+                try:
+                    st.touched[s8] = os.stat(path).st_mtime
+                except OSError:
+                    pass
+            st.touched_at = now
+        by8 = {sj._handle(s): s for s in _rows(st.r)}
+        st.live_now = judge(_leases(st.live_dir), _registries(), _procs(), remote, st.touched, by8, now)
+        st.live_at = time.time()
+        return st.live_now
+
+
 def cloud_links() -> dict | None:
     """Where this machine's files can be opened in a browser: a Nextcloud (or any web file view)
     holding the same folders. SCRUBJAY_VIEW_NEXTCLOUD is its address; SCRUBJAY_VIEW_NEXTCLOUD_MAP
@@ -269,7 +367,7 @@ def graph(st: "State") -> dict:
             edges.append({"from": n["sid"], "to": a["id"], "kind": "artefact", "summary": link["summary"]})
     for a in arts.values():
         a["prs"] = len(a["prs"])
-    return {"host": os.environ.get("SCRUBJAY_HOST", ""), "nodes": nodes, "edges": edges,
+    return {"host": os.environ.get("SCRUBJAY_HOST", ""), "nodes": nodes, "edges": edges, "live": live(st),
             "artefacts": list(arts.values()), "archive": bool(st.r.chats), "cloud": cloud_links(),
             "indexing": None if st.arts.ready else {"done": st.arts.done, "total": st.arts.total}}
 
@@ -351,6 +449,11 @@ class State:
         self.arts = Artefacts(self.arch, cache or Path(os.devnull), os.environ.get("SCRUBJAY_HOST", ""))
         self.last = time.time()
         self.server: ThreadingHTTPServer | None = None
+        self.live_dir = Path(os.environ.get("SCRUBJAY_RUN_DIR") or Path.home() / ".scrubjay" / "run") / "live"
+        self.live_lock = threading.Lock()
+        self.live_at = self.touched_at = 0.0
+        self.live_now: dict[str, dict] = {}
+        self.touched: dict[str, float] = {}
 
 
 def handler_for(st: State):
@@ -382,11 +485,14 @@ def handler_for(st: State):
             return secrets.compare_digest(tok, st.token)
 
         def _route(self, method: str):
-            st.last = time.time()
             u = urlparse(self.path)
             q = parse_qs(u.query)
             if not self._allowed(q):
                 return self._json({"error": "forbidden"}, 403)
+            # An open tab asks this every few seconds; that is not someone using the viewer.
+            if method == "GET" and u.path == "/api/live":
+                return self._json(live(st))
+            st.last = time.time()
             if method == "GET" and u.path == "/":
                 return self._send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
             if method == "GET" and u.path == "/api/graph":

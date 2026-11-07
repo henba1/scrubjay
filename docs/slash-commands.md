@@ -60,6 +60,13 @@ push's `To …`); failing that, on this machine, by the folder's `origin`. A for
 its parent's history, so a fork shows only what it did after branching. The map reads the archive in
 the background on start and caches the result, so a later start reads only new transcripts.
 
+A dot in a card's title says whether the session is alive. Active means a harness process holds it
+open, not that something happened lately: a filled green dot is working, orange is waiting on you, a
+hollow green ring is open and idle. A red square means its process went mid-turn. A dashed grey ring
+means recent: a turn ended within 15 minutes, with no process to confirm it. Only this machine's
+processes can be asked, so a session on another machine is at best recent. **Active** in the header
+shows only sessions open here, lanes with one come first, and dots refresh every 10 seconds.
+
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
 moved), its forks, where its transcript is archived, and the command that continues it. That is the
 harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from

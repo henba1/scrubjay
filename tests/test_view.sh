@@ -337,6 +337,33 @@ assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_reques
 assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
+section "liveness: a process holds a session open, and only this machine's can be asked"
+L="$SCRUBJAY_RUN_DIR/live"; mkdir -p "$L"
+now="$(date +%s)"; sleep 300 & holder=$!
+start="$(ps -o lstart= -p "$holder" | sed 's/^ *//; s/ *$//')"
+lease() { jq -nc --arg sid "$1" --arg state "$2" --arg pid "$3" --arg start "$4" --argjson ts "${5:-$now}" \
+  '{sid: $sid, state: $state, pid: $pid, start: $start, ts: $ts}'; }
+lease "$P" working "$holder" "$start" > "$L/$P.lease"
+lease "$C" working 999999 "" > "$L/$C.lease"
+lease "$X" idle 999999 "" > "$L/$X.lease"
+lease "$O" waiting "$holder" "not this process" > "$L/$O.lease"
+mkdir -p "$SCRUBJAY_LOCAL_CHATS/laptop/live"
+lease "$Y" idle 1 "" > "$SCRUBJAY_LOCAL_CHATS/laptop/live/$Y.lease"
+sleep 6   # past the short cache
+lv="$(get /api/live)"
+st() { jq -r --arg s "$1" '.[$s].state // "none"' <<<"$lv"; }
+assert_eq "its process is alive: what the lease says" working "$(st "$P")"
+assert_eq "its process went mid-turn: died" died "$(st "$C")"
+assert_eq "its process went at rest: closed, nothing to report" none "$(st "$X")"
+assert_eq "a reused process id is not the holder" died "$(st "$O")"
+assert_eq "another machine's turn: recent, never working" recent "$(st "$Y")"
+lease "$P" ended "$holder" "$start" > "$L/$P.lease"
+lease "$Y" idle 1 "" $((now - 3600)) > "$SCRUBJAY_LOCAL_CHATS/laptop/live/$Y.lease"
+sleep 6; lv="$(get /api/live)"
+assert_eq "ended is ended, whatever runs" none "$(st "$P")"
+assert_eq "another machine's old turn is not recent" none "$(st "$Y")"
+kill "$holder" 2>/dev/null; rm -rf "$L" "$SCRUBJAY_LOCAL_CHATS/laptop/live"
+
 section "stop: the command, the page's button, and idle"
 out="$(bash "$APP/bin/sj-view.sh" stop 2>&1)"
 assert_contains "stop says so" "$out" "stopped"
@@ -355,6 +382,12 @@ python3 "$APP/view/sj_view.py" --port 0 --idle 0.03 --state "$STATE" >/dev/null 
 ipid=$!
 for _ in $(seq 100); do kill -0 "$ipid" 2>/dev/null || break; sleep 0.1; done
 check_fails "an unused viewer stops by itself" kill -0 "$ipid"
+python3 "$APP/view/sj_view.py" --port 0 --idle 0.05 --state "$STATE" >/dev/null 2>&1 &
+ipid=$!
+for _ in $(seq 40); do [ -f "$STATE" ] && break; sleep 0.1; done
+PORT="$(jq -r .port "$STATE")"; URL="$(jq -r .url "$STATE")"; TOK="${URL#*t=}"
+for _ in $(seq 150); do kill -0 "$ipid" 2>/dev/null || break; get /api/live >/dev/null; sleep 0.1; done
+check_fails "an open tab's status poll does not keep it alive" kill -0 "$ipid"
 
 section "Nextcloud links: the settings reach the page, the most specific folder first"
 R2="$SANDBOX/run2"
