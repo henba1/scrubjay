@@ -845,6 +845,8 @@ Click a card for everything scrubjay holds on it: every catalogue row (so you se
 
 The menu beside **Stop viewer** sets the colours: your system's light or dark, or a preset (Light, Dark, Nord, Solarized, Gruvbox, High contrast, Colour-blind safe). This browser remembers the choice.
 
+**Loose ends** in the header lists work from the last 30 days that shows no sign of finishing: sessions that died mid-turn, PRs still open, branches pushed with no PR, commits not pushed, and files not committed. Each links to the session behind it. A transcript cannot see a PR merged later by hand, so GitHub candidates are checked with one read-only `gh pr list` per repo, and the last two come from this machine's repos. What could not be checked, including every GitLab candidate, is marked **not checked**.
+
 To move around, drag the map (or hold Space and drag, which works over cards too). The wheel scrolls, and Shift+wheel scrolls sideways. Ctrl+wheel or a pinch zooms at the pointer. The arrow keys or WASD pan, `+` `−` `0` zoom, `F` fits everything on screen, and `/` jumps to the search box. The buttons at the bottom right do the same. Only the cards near the view are drawn, so a large catalogue stays quick.
 
 The viewer runs only while you use it. It listens on `127.0.0.1` alone and answers only requests carrying the token in the address it prints. It stops on `/sjview stop`, on the page's **Stop viewer** button, or by itself after `SCRUBJAY_VIEW_IDLE` minutes without a request (default 30; `0` keeps it running). `/sjview status` says whether it runs, and where. On a machine you reach over SSH, forward the port it prints: `ssh -L 7787:127.0.0.1:7787 <host>`. A machine with no archive (`rsync-wg`) shows the map but cannot open transcripts.
