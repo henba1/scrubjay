@@ -40,6 +40,7 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_session_cwd <transcript>` | the working dir recorded inside the transcript |
 | `sjh_session_meta <transcript>` | catalogue metadata as TSV `<model>\t<turns>`, in one pass (fields empty when the transcript doesn't carry them) |
 | `sjh_session_parent <transcript>` | **optional.** The session id this one was forked/branched from, else empty; becomes the row's `forked_from=` field. Only Claude implements it. |
+| `sjh_live_sessions` | **optional.** Sessions this harness holds open now, TSV `<sid>\t<pid>\t<working\|waiting\|idle>\t<epoch>\t<cwd>`, from its own record of them. Only Claude implements it; see below. |
 | `sjh_render <transcript>` | the readable Markdown rendering, on stdout |
 | `sjh_extra_artifacts <transcript> <sid> <slug> <cwd>` | TSV of the session's *other* records to relay (below) |
 | `sjh_find_live_transcript <cwd>` | the in-progress session's transcript, for a publish-now with no hook payload (empty if the harness has none on disk) |
@@ -89,6 +90,15 @@ from the outside.
 Exclude anything that is an *artifact* of a session rather than a session: Claude's nested subagent
 transcripts (`projects/<slug>/<sid>/agent-*.jsonl`) are shipped as part of their parent and must
 never be listed, or reconcile invents sessions a user can neither resume nor recognize.
+
+### Liveness — leases, and how a new harness joins
+
+`/sjview` calls a session active when a harness process holds it open. Each harness reports that
+with a **lease** (`bin/sj-live.sh`): call `sj-live.sh mark <sid> <working|waiting|idle|ended> [cwd]`
+from its lifecycle events, setting `SCRUBJAY_LIVE_PID` if the caller knows the harness's process.
+Hooks shaped like Claude's get this from `hooks/live-session.sh` and `hooks/log-session.sh`. A harness
+with no events at all still shows as *recent*, from its transcript's time. `sjh_live_sessions` is
+optional detail on top: Claude's registry knows waiting from working without any hook.
 
 ### `sjh_extra_artifacts`
 

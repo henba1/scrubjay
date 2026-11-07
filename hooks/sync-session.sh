@@ -33,6 +33,7 @@ APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 DATA="$(sj_data 2>/dev/null || true)"
 sj_load_config   # in THIS shell: sj_data loads it only in its own subshell, so the backend check below saw the default
 sj_progress_begin sync
+printf '%s' "$input" | bash "$APP/bin/sj-live.sh" hook >/dev/null 2>&1
 
 # One repo's fast-forward pull, reported as a step (run in the background by the loop below).
 pull_step() {  # pull_step <step> <repo> <timeout-secs>
@@ -106,6 +107,12 @@ if [ "${SCRUBJAY_NORECONCILE:-0}" != "1" ]; then
   sj_step reconcile run
   "$APP/bin/sj-reconcile.sh" ${self_sid:+--exclude "$self_sid"} 2>/dev/null || true
   sj_step reconcile ok "orphaned sessions checked"
+fi
+
+# 2d) a resumed session's history may name paths that have moved since (bin/sj-moves.sh). The
+#     transcript stays as it was; stdout is the session's context, so the agent knows from turn one.
+if command -v jq >/dev/null 2>&1 && [ "$(printf '%s' "$input" | jq -r '.source // empty' 2>/dev/null)" = resume ]; then
+  "$APP/bin/sj-moves.sh" notes "$(sj_host)" "$(printf '%s' "$input" | jq -r '.transcript_path // empty')" 2>/dev/null || true
 fi
 
 # 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
