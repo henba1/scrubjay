@@ -24,9 +24,8 @@ sjh_resume_cmd()      { printf 'claude --resume %s' "$1"; }   # ($2 = staged fil
 # Cross-harness carry-over: the session came from a DIFFERENT agent, so there is no native session
 # to resume — hand the conversation over as context instead. See bin/adapters/ROADMAP.md for the
 # open issue on translating a session into this harness's own format.
-sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
-  printf 'claude "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
-    "$3" "$2" "$1"
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness> [prompt]
+  printf 'claude "%s"' "${4:-Continue the $3 session from $2. Read the full transcript at $1 first, then pick up where it left off.}"
 }
 
 # Claude Code stores a session at <root>/projects/<slug>/<sid>.jsonl, where <slug> is the session's

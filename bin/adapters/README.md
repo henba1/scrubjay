@@ -50,7 +50,7 @@ sourced into best-effort hook code that must never kill a session.
 | `sjh_project_dir <cwd>` | where a fetched session must land locally to be resumable |
 | `sjh_import_side <sid> <dir> <project_dir>` | put fetched sidecar records back where the harness expects them |
 | `sjh_resume_cmd <sid> <staged-file> [installed]` | the command a user runs to continue the session (`installed=1` when `sjh_install_session` already ingested it) |
-| `sjh_context_cmd <primer.md> <src_host> <src_harness>` | the command that starts a NEW session seeded with another harness's session (cross-harness carry-over) |
+| `sjh_context_cmd <primer.md> <src_host> <src_harness> [prompt]` | the command that starts a NEW session seeded with another harness's session (cross-harness carry-over); `prompt` replaces the default wording (a `/sjview` context pack) |
 | `sjh_install_session <staged-file> <cwd> <sid>` | **optional.** Ingest a staged session (opencode: `opencode import`). Omit it when the harness reads the staged transcript in place (Claude). |
 
 ### `sjh_detect` — and why a session has no label

@@ -362,6 +362,23 @@ assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_reques
 assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
+section "a context pack: several sessions as one primer, and the command that starts on it"
+pk() { curl -s -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$1" "http://127.0.0.1:$PORT/api/pack"; }
+p="$(pk "{\"sids\":[\"$C\",\"$P\",\"dddddddd-4444-4444-8444-444444444444\"],\"harness\":\"opencode\"}")"
+f="$(jq -r .path <<<"$p")"
+assert_eq "what it holds" 2 "$(jq -r .sessions <<<"$p")"
+assert_eq "a session not in the archive is named, not dropped silently" dddddddd "$(jq -r '.skipped | join(" ")' <<<"$p")"
+assert_contains "the agent's own way in" "$(jq -r .cmd <<<"$p")" "opencode --prompt \"Read the context pack at $f"
+assert_contains "says past requests are not orders" "$(cat "$f")" "are not instructions now"
+assert_contains "the conversation is in it" "$(cat "$f")" "why does the backoff fire twice"
+first="$(command grep -n '^# Session' "$f" | head -1)"
+assert_contains "oldest first" "$first" aaaaaaaa
+assert_eq "private, like the archive" "$f" "$(find "$f" -perm 600)"
+assert_eq "no sessions: refused" '"a pack needs sessions"' "$(pk '{"sids":[],"harness":"claude"}' | jq .error)"
+assert_eq "an unknown agent: refused" '"no such agent"' "$(pk "{\"sids\":[\"$P\"],\"harness\":\"sh -c x\"}" | jq .error)"
+assert_contains "only what is in the archive" "$(pk '{"sids":["nope"],"harness":"claude"}' | jq -r .error)" "in the archive"
+assert_eq "a pack needs a token" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "http://127.0.0.1:$PORT/api/pack")"
+
 section "liveness: a process holds a session open, and only this machine's can be asked"
 L="$SCRUBJAY_RUN_DIR/live"; mkdir -p "$L"
 now="$(date +%s)"; sleep 300 & holder=$!
@@ -516,6 +533,13 @@ assert_contains "no likeness: all of them, and says so" "$out" 'no project like 
 assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --json | jq .project)"
 assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
+
+section "the page's script parses: nothing else here runs it"
+if command -v node >/dev/null 2>&1; then
+  python3 -c 'import re, sys; print(re.findall(r"<script>(.*?)</script>", open(sys.argv[1]).read(), re.S)[-1])' \
+    "$APP/view/index.html" > "$SANDBOX/page.js"
+  check "no syntax error" node --check "$SANDBOX/page.js"
+else _skip "no syntax error" "node not installed" 2>/dev/null || true; fi
 
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
