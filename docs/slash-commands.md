@@ -71,6 +71,12 @@ condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
 is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and
 the others are listed. With no likely match, it shows every project and says so.
 
+**Loose ends** in the header lists work from the last 30 days that shows no sign of finishing: PRs
+still open, branches pushed with no PR, commits not pushed, and files not committed. Each links to
+the session behind it. A transcript cannot see a PR merged later by hand, so GitHub candidates are
+checked with one read-only `gh pr list` per repo, and the last two come from this machine's repos.
+What could not be checked, including every GitLab candidate, is marked **not checked**.
+
 To move around, drag the map (or hold Space and drag, which works over cards too). The wheel scrolls,
 and Shift+wheel scrolls sideways. Ctrl+wheel or a pinch zooms at the pointer. The arrow keys or WASD
 pan, `+` `−` `0` zoom, `F` fits everything on screen, and `/` jumps to the search box. The buttons at

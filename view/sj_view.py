@@ -40,6 +40,10 @@ import artefacts as art  # noqa: E402
 
 PAGE = HERE / "index.html"
 TRANSCRIPT_MAX = 2_000_000  # chars; a page this big is already unreadable, past it we say so
+LOOSE_DAYS = 30           # how far back Loose ends looks
+LOOSE_REPOS = 20          # most repos asked about, newest work first
+LOOSE_CACHE = 300         # seconds before the forge and the disk are asked again
+DEFAULT_BRANCHES = {"main", "master", "trunk", "develop"}
 
 
 # ── the catalogue, every row kept ─────────────────────────────────────────────────────────────
@@ -293,6 +297,103 @@ def artefact(st: "State", aid: str) -> dict | None:
     return {"artefact": found, "sessions": sessions}
 
 
+# ── loose ends ────────────────────────────────────────────────────────────────────────────────
+# Work a session started and nothing shows as finished. A transcript only knows what happened inside
+# it, and a PR is often merged by hand later, so every candidate is checked against the forge or the
+# disk first. What cannot be checked says so rather than passing for the truth.
+
+def forge_prs(repo: str) -> list[dict] | None:
+    """Every PR of a GitHub repo (`owner/name`) as the forge has it, or None when it cannot be asked."""
+    try:
+        r = subprocess.run(["gh", "pr", "list", "-R", repo, "--state", "all", "--limit", "300",
+                            "--json", "number,state,headRefName,title,url"],
+                           capture_output=True, text=True, timeout=15)
+        return json.loads(r.stdout) if r.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def disk_state(root: str) -> dict:
+    """{dirty: files changed, ahead: commits not pushed} of a repo on this machine."""
+    dirty = art._git(["-C", root, "status", "--porcelain"])
+    ahead = art._git(["-C", root, "rev-list", "--count", "@{u}..HEAD"])
+    return {"dirty": len(dirty.splitlines()), "ahead": int(ahead) if ahead.isdigit() else 0}
+
+
+def loose_items(work: list[dict], prs_of, disk_of) -> list[dict]:
+    """`work`, newest first, is [{node, artefact, events, root}] per session and repo. Each item is
+    {kind, repo, what, url?, sid, sid8, topic, date, checked}."""
+    repos: dict[str, dict] = {}
+    for w in work:
+        a = w["artefact"]
+        r = repos.setdefault(a["id"], {"artefact": a, "work": [], "root": ""})
+        r["work"].append(w)
+        r["root"] = r["root"] or w.get("root", "")
+    items: list[dict] = []
+
+    def item(kind: str, a: dict, what: str, n: dict, checked: bool, url: str = "") -> None:
+        items.append({"kind": kind, "repo": a["label"], "what": what, "url": url, "sid": n["sid"], "sid8": n["sid8"],
+                      "topic": n["topic"], "date": n["date"], "checked": checked})
+
+    for r in list(repos.values())[:LOOSE_REPOS]:
+        a = r["artefact"]
+        events = [(e, w["node"]) for w in r["work"] for e in w["events"]]
+        ended = {e["n"] for e, _ in events if e["type"] in ("pr_merge", "pr_close") and "n" in e}
+        opened, seen = {}, set()
+        for e, n in events:
+            if e["type"] == "pr_open" and "n" in e and e["n"] not in ended:
+                opened.setdefault(e["n"], (e, n))
+        branches: dict[str, dict] = {}
+        for e, n in events:
+            b = e.get("branch")
+            if e["type"] == "push" and b and b not in DEFAULT_BRANCHES and b not in branches:
+                branches[b] = n
+        prs = prs_of(a["label"]) if a["kind"] == "github" and (opened or branches) else None
+        word = "MR !" if a["kind"] == "gitlab" else "PR #"
+        by_n = {p["number"]: p for p in prs or []}
+        for num, (e, n) in opened.items():
+            p = by_n.get(num)
+            if prs is not None and (not p or p["state"] != "OPEN"):
+                continue
+            title = (p or e).get("title") or ""
+            item("pr", a, f"{word}{num} still open" + (f": {title}" if title else ""), n, prs is not None, (p or e).get("url", ""))
+        heads = {p["headRefName"] for p in prs or []}
+        for b, n in branches.items():
+            if b not in heads and b not in seen:
+                seen.add(b)
+                item("branch", a, f"branch {b} pushed, no PR", n, prs is not None)
+        if r["root"]:
+            d = disk_of(r["root"])
+            n = r["work"][0]["node"]
+            if d["ahead"]:
+                item("unpushed", a, f"{d['ahead']} commit{'s' if d['ahead'] != 1 else ''} not pushed", n, True)
+            if d["dirty"]:
+                item("dirty", a, f"{d['dirty']} file{'s' if d['dirty'] != 1 else ''} not committed", n, True)
+    return items
+
+
+def loose(st: "State") -> dict:
+    with st.loose_lock:
+        if time.time() - st.loose_at < LOOSE_CACHE and st.loose_now is not None:
+            return st.loose_now
+        here = os.environ.get("SCRUBJAY_HOST", "")
+        cut = time.strftime("%Y-%m-%d", time.localtime(time.time() - LOOSE_DAYS * 86400))
+        nodes = [_node(s, rs, st.arch) for s, rs in _rows(st.r).items()]
+        nodes = sorted((n for n in nodes if n["archived"] and n["date"] >= cut),
+                       key=lambda n: n["date"] + n["time"], reverse=True)
+        work = []
+        for n in nodes:
+            for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"]):
+                a = link["artefact"]
+                if a["kind"] in ("github", "gitlab", "git", "repo") and (link["events"] or link["files"]):
+                    root = st.arts.resolver.local(n["cwd"])[0] if n["host"] == here and os.path.isdir(n["cwd"]) else ""
+                    work.append({"node": n, "artefact": a, "events": link["events"], "root": root})
+        st.loose_now = {"items": loose_items(work, forge_prs, disk_state), "days": LOOSE_DAYS,
+                        "indexing": not st.arts.ready}
+        st.loose_at = time.time()
+        return st.loose_now
+
+
 def _resume_cmd(harness: str, sid: str) -> str:
     """The adapter's own resume command (bin/adapters/<harness>.sh: sjh_resume_cmd)."""
     try:
@@ -351,6 +452,9 @@ class State:
         self.arts = Artefacts(self.arch, cache or Path(os.devnull), os.environ.get("SCRUBJAY_HOST", ""))
         self.last = time.time()
         self.server: ThreadingHTTPServer | None = None
+        self.loose_lock = threading.Lock()
+        self.loose_at = 0.0
+        self.loose_now: dict | None = None
 
 
 def handler_for(st: State):
@@ -394,6 +498,8 @@ def handler_for(st: State):
             if method == "GET" and u.path == "/api/artefact":
                 a = artefact(st, (q.get("id") or [""])[0])
                 return self._json(a) if a else self._json({"error": "no such artefact"}, 404)
+            if method == "GET" and u.path == "/api/loose":
+                return self._json(loose(st))
             if method == "GET" and u.path == "/api/session":
                 s = session(st, (q.get("sid") or [""])[0])
                 return self._json(s) if s else self._json({"error": "no such session"}, 404)

@@ -191,6 +191,7 @@ a.cloud:hover { text-decoration: underline; }
   </select>
   <label title="sessions that recorded nothing: size 0, no topic"><input id="empty-too" type="checkbox"> show empty</label>
   <span id="count"></span>
+  <button id="loose" title="work that started and shows no sign of finishing">Loose ends</button>
   <button id="stop" title="Shut the viewer down; /sjview starts it again">Stop viewer</button>
 </header>
 <div id="legend">
@@ -634,6 +635,27 @@ async function open(sid) {
     catch { getSelection().selectAllChildren($("rcmd")); $("copy").textContent = "Selected — press Ctrl+C"; }
   };
 }
+
+// Work with no ending, across every repo. Asking the forge takes a moment, so only on request.
+async function openLoose() {
+  history.replaceState(null, "", location.search);
+  $("detail").classList.add("open");
+  select(null);
+  $("dbody").innerHTML = '<h2>Loose ends</h2><p class="note">asking your repos and the forge…</p>';
+  const d = await api("/api/loose");
+  const groups = [["pr", "PRs still open"], ["branch", "Pushed, no PR"], ["unpushed", "Commits not pushed"], ["dirty", "Not committed"]];
+  const row = (x) => `<li><b>${esc(x.repo)}</b> ${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.what)} ↗</a>` : esc(x.what)}` +
+    `${x.checked ? "" : ' <span class="warn" title="the forge could not be asked: this is only what the transcript saw">not checked</span>'}` +
+    `<div class="note">${esc(x.date)} · <a class="sid" data-sid="${esc(x.sid)}">${esc(x.sid8)}</a> ${esc(x.topic || "")}</div></li>`;
+  $("dbody").innerHTML = `<h2>Loose ends</h2><p class="note">From the last ${esc(d.days)} days of sessions, checked against the forge and this machine's repos.` +
+    `${d.indexing ? " Still reading the archive, so this may be short." : ""}</p>` +
+    (d.items.length ? groups.map(([k, title]) => {
+      const list = d.items.filter((x) => x.kind === k);
+      return list.length ? `<h3>${esc(title)} (${list.length})</h3><ul class="alist">${list.map(row).join("")}</ul>` : "";
+    }).join("") : '<p class="note">Nothing found.</p>');
+  wire($("dbody"));
+}
+$("loose").onclick = openLoose;
 
 // What one session did to one artefact, most telling first: PRs, issues and releases as their own
 // lines; commits, pushes, branches and files folded beneath.
