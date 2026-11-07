@@ -178,7 +178,6 @@ sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file> [installed]
 
 # Cross-harness carry-over: hand the conversation over as context, since there is no native session
 # to resume. See bin/adapters/ROADMAP.md for the open issue on true translation.
-sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
-  printf 'codex "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
-    "$3" "$2" "$1"
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness> [prompt]
+  printf 'codex "%s"' "${4:-Continue the $3 session from $2. Read the full transcript at $1 first, then pick up where it left off.}"
 }

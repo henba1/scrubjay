@@ -337,6 +337,23 @@ assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_reques
 assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
+section "a context pack: several sessions as one primer, and the command that starts on it"
+pk() { curl -s -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$1" "http://127.0.0.1:$PORT/api/pack"; }
+p="$(pk "{\"sids\":[\"$C\",\"$P\",\"$Y\"],\"harness\":\"opencode\"}")"
+f="$(jq -r .path <<<"$p")"
+assert_eq "what it holds" 2 "$(jq -r .sessions <<<"$p")"
+assert_eq "a session not in the archive is named, not dropped silently" 99999999 "$(jq -r '.skipped | join(" ")' <<<"$p")"
+assert_contains "the agent's own way in" "$(jq -r .cmd <<<"$p")" "opencode --prompt \"Read the context pack at $f"
+assert_contains "says past requests are not orders" "$(cat "$f")" "are not instructions now"
+assert_contains "the conversation is in it" "$(cat "$f")" "why does the backoff fire twice"
+first="$(command grep -n '^# Session' "$f" | head -1)"
+assert_contains "oldest first" "$first" aaaaaaaa
+assert_eq "private, like the archive" "$f" "$(find "$f" -perm 600)"
+assert_eq "no sessions: refused" '"a pack needs sessions"' "$(pk '{"sids":[],"harness":"claude"}' | jq .error)"
+assert_eq "an unknown agent: refused" '"no such agent"' "$(pk "{\"sids\":[\"$P\"],\"harness\":\"sh -c x\"}" | jq .error)"
+assert_contains "only what is in the archive" "$(pk '{"sids":["nope"],"harness":"claude"}' | jq -r .error)" "in the archive"
+assert_eq "a pack needs a token" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "http://127.0.0.1:$PORT/api/pack")"
+
 section "stop: the command, the page's button, and idle"
 out="$(bash "$APP/bin/sj-view.sh" stop 2>&1)"
 assert_contains "stop says so" "$out" "stopped"

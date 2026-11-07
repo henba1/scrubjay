@@ -60,6 +60,12 @@ push's `To …`); failing that, on this machine, by the folder's `origin`. A for
 its parent's history, so a fork shows only what it did after branching. The map reads the archive in
 the background on start and caches the result, so a later start reads only new transcripts.
 
+**Context packs.** Shift+click cards, or use **Add to context pack** in a panel, to gather up to 12
+archived sessions from any machine or agent. **Build** writes them into one primer, oldest first and
+condensed, and gives you the command that starts a new session on it, in the agent you choose. It
+holds about 240K characters shared between the sessions; a long one loses its middle and is named.
+Packs stay in `~/.scrubjay/run/packs` for 7 days, readable only by you.
+
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
 moved), its forks, where its transcript is archived, and the command that continues it. That is the
 harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from

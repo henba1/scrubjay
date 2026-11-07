@@ -112,6 +112,17 @@ aside .summary { font-size: 14px; margin: 8px 0 0; padding: 8px 10px; background
 .art .l1 .kind { color: var(--c); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-right: 5px; }
 .art .l2 { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* a context pack: the sessions picked so far, and what starts a new session on them */
+#pack { position: absolute; left: 16px; bottom: 16px; z-index: 6; width: min(460px, calc(100% - 32px)); padding: 8px 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.12); font-size: 13px; }
+#pack .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#pack ul { margin: 6px 0; padding: 0; list-style: none; max-height: 130px; overflow: auto; }
+#pack li { display: flex; gap: 6px; justify-content: space-between; color: var(--dim); font-size: 12px; }
+#pack li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pack li button { border: 0; background: none; padding: 0 4px; }
+#pack pre { margin: 6px 0 4px; max-height: 110px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.card.inpack { outline: 2px solid var(--blue); outline-offset: 2px; }
+
 /* edges */
 .fork { stroke: var(--blue); }
 .edge-label { font: 11px var(--mono); fill: var(--blue); }
@@ -211,6 +222,7 @@ a.cloud:hover { text-decoration: underline; }
   <span><i class="sw line" style="--c: var(--dim)"></i>changed (hover a node for what)</span>
 </div>
 <div id="map" title=""><div id="canvas"><svg id="edges"></svg></div><div id="days"></div><div id="empty" hidden></div>
+  <div id="pack" hidden></div>
   <div id="zoombar" title="drag (or Space+drag) to pan · wheel scrolls, Shift+wheel sideways · Ctrl+wheel or pinch zooms · arrows/WASD pan · + − 0 F zoom · / search">
     <button data-z="out" title="zoom out (−)">−</button><button id="zpct" data-z="one" title="actual size (0)">100%</button>
     <button data-z="in" title="zoom in (+)">+</button><button data-z="fit" title="fit everything (F)">fit</button>
@@ -231,7 +243,7 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 history.replaceState(null, "", "/?t=" + encodeURIComponent(TOKEN) + location.hash);
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
-  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN } });
+  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN, ...opts.headers } });
   return r.json();
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -424,6 +436,42 @@ function draw() {
   setView(V.x, V.y, V.k); // re-clamp to the new extent; this also makes the cards in view
 }
 
+// A context pack: pick sessions (Shift+click, or the panel's button), then start a new one on them.
+const PACK = new Set(), PACK_MAX = 12;
+let packBuilt = null;
+function togglePack(sid) {
+  if (PACK.has(sid)) PACK.delete(sid); else if (PACK.size < PACK_MAX) PACK.add(sid);
+  packBuilt = null;
+  cardEl.get(sid)?.classList.toggle("inpack", PACK.has(sid));
+  drawPack();
+  if ($("packc")) $("packc").textContent = PACK.has(sid) ? "− Remove from context pack" : "+ Add to context pack";
+}
+function drawPack() {
+  const box = $("pack");
+  box.hidden = PACK.size === 0;
+  if (box.hidden) return;
+  const keep = box.querySelector("select")?.value || "claude", b = packBuilt;
+  box.innerHTML = `<div class="row"><b>Context pack</b> <span class="note">${plural(PACK.size, "session")}${PACK.size === PACK_MAX ? " (the most it holds)" : ""}</span></div>` +
+    `<ul>${[...PACK].map((s) => `<li><span>${esc(bySid.get(s)?.sid8 || s.slice(0, 8))} ${esc(bySid.get(s)?.topic || "")}</span><button data-out="${esc(s)}" title="remove">✕</button></li>`).join("")}</ul>` +
+    `<div class="row"><label class="note">for <select>${["claude", "opencode", "codex"].map((h) => `<option${h === keep ? " selected" : ""}>${h}</option>`).join("")}</select></label>` +
+    `<button id="packgo">Build</button><button id="packclear">Clear</button></div>` +
+    (b?.error ? `<p class="warn">${esc(b.error)}</p>` : "") +
+    (b?.cmd ? `<pre class="cmd" id="packcmd">${esc(b.cmd)}</pre><button id="packcopy">Copy</button> ` +
+      `<span class="note">run it in the folder to work in · ${Math.round(b.chars / 1000)}K characters` +
+      `${b.cut.length ? ` · shortened: ${esc(b.cut.join(" "))}` : ""}${b.skipped.length ? ` · not in the archive, left out: ${esc(b.skipped.join(" "))}` : ""}</span>` : "");
+  box.querySelectorAll("[data-out]").forEach((x) => x.onclick = () => togglePack(x.dataset.out));
+  $("packclear").onclick = () => { for (const s of [...PACK]) togglePack(s); };
+  $("packgo").onclick = async () => {
+    packBuilt = await api("/api/pack", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sids: [...PACK], harness: box.querySelector("select").value }) });
+    drawPack();
+  };
+  if ($("packcopy")) $("packcopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(b.cmd); $("packcopy").textContent = "Copied"; }
+    catch { getSelection().selectAllChildren($("packcmd")); $("packcopy").textContent = "Selected — press Ctrl+C"; }
+  };
+}
+
 function makeCard(n, p) {
   const el = document.createElement("div");
   el.className = `card h-${n.harness}`;
@@ -439,7 +487,8 @@ function makeCard(n, p) {
     `<div class="low">${n.summary ? `<div class="sum" title="${esc(n.summary)}">${esc(n.summary)}</div>` : ""}` +
     `<div class="meta">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
     `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div></div>`;
-  el.onclick = () => open(n.sid);
+  el.classList.toggle("inpack", PACK.has(n.sid));
+  el.onclick = (e) => e.shiftKey ? togglePack(n.sid) : open(n.sid);
   el.onmouseenter = () => focus({ sid: n.sid });
   el.onmouseleave = () => focus(selected);
   return el;
@@ -617,7 +666,7 @@ async function open(sid) {
     ]) +
     `<h3>Transcript</h3>` + (s.readable
       ? kv([["readable", esc(s.readable) + cloudA(s.readable)], ["raw", s.raw ? esc(s.raw) + cloudA(s.raw) : ""]]) +
-        `<p><button id="readc">Read transcript</button></p>`
+        `<p><button id="readc">Read transcript</button> <button id="packc">${PACK.has(n.sid) ? "− Remove from" : "+ Add to"} context pack</button></p>`
       : `<p class="note">Not in the archive on this machine${G.archive ? "" : " (this machine has no archive mounted)"}.` +
         ` Recall it on ${esc(n.host)}.</p>`) +
     `<h3>Continue it</h3>` + (r.cmd
@@ -629,6 +678,7 @@ async function open(sid) {
       (w.prompts ? ` <span class="note">· ${esc(w.prompts)} prompts</span>` : "")]));
   wire($("dbody"));
   if ($("readc")) $("readc").onclick = () => read(n);
+  if ($("packc")) $("packc").onclick = () => togglePack(n.sid);
   if ($("copy")) $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(r.cmd); $("copy").textContent = "Copied"; }
     catch { getSelection().selectAllChildren($("rcmd")); $("copy").textContent = "Selected — press Ctrl+C"; }
