@@ -14,7 +14,7 @@
   /* artefacts: each kind its own colour */
   --k-github: #8957e5; --k-gitlab: #d6336c; --k-git: #1098ad; --k-repo: #5c7cfa;
   --k-folder: #c99a06; --k-record: #4f8ff7;
-  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a; --carry: #0c8599; --wait: #e8590c;
+  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a; --carry: #0c8599; --wait: #e8590c; --ref: #7048e8;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
@@ -22,7 +22,7 @@
     --bg: #12151b; --panel: #1b1f27; --ink: #e4e8ef; --dim: #98a1b3; --line: #2c323d;
     --lane: #171b22; --blue-soft: #1d2a42; --warn: #e0a24a;
     --claude: #d97757; --opencode: #a7adb6; --k-github: #a371f7; --k-folder: #e3b341;
-    --ok: #51cf66; --merged: #a371f7; --closed: #ff6b6b; --wait: #ff922b;
+    --ok: #51cf66; --merged: #a371f7; --closed: #ff6b6b; --wait: #ff922b; --ref: #b197fc;
   }
 }
 * { box-sizing: border-box; }
@@ -48,6 +48,7 @@ button:hover { border-color: var(--blue); }
 .sw.pill { width: 18px; border-radius: 6px; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border: 1.5px solid var(--c); }
 .sw.line { width: 22px; height: 0; border-radius: 0; border-top: 2px solid var(--c); background: none; vertical-align: middle; }
 .sw.dash { border-top-style: dashed; }
+.sw.dot { border-top-style: dotted; }
 /* The map is a viewport onto one layer that pans and zooms by its transform alone (no redraw). */
 #map { position: relative; overflow: hidden; flex: 1; min-height: 0; touch-action: none; }
 #map.grab { cursor: grab; }
@@ -126,10 +127,19 @@ aside .summary { font-size: 14px; margin: 8px 0 0; padding: 8px 10px; background
 /* edges */
 .fork { stroke: var(--blue); }
 .edge-label { font: 11px var(--mono); fill: var(--blue); }
+/* a reference says nothing about the work's shape, so it stays out of sight until asked for */
+g.re { display: none; }
+g.re.hl { display: block; }
+g.re path { fill: none; stroke: var(--ref); stroke-width: 1.8; stroke-dasharray: 1 5; stroke-linecap: round; }
 g.ae path { fill: none; stroke: var(--c); stroke-width: 1.4; opacity: .3; }
 g.ae.soft path { stroke-dasharray: 5 4; }
 #edges.focus g.ae path { opacity: .06; }
-#edges.focus .fork, #edges.focus .edge-label { opacity: .25; }
+#edges.focus g.le { opacity: .25; }
+#edges.focus g.le.hl { opacity: 1; }
+/* a selected session: its relatives stay, each saying how it is related, and the rest steps back */
+#canvas.kin .card:not(.kin):not(.sel), #canvas.kin .art:not(.hl) { opacity: .28; }
+.card.kin::after { content: attr(data-rel); position: absolute; bottom: 6px; right: 8px; padding: 0 6px; border-radius: 8px;
+  font: 10px/16px var(--mono); color: var(--panel); background: var(--relc, var(--blue)); }
 g.ae.hl path, #edges.focus g.ae.hl path { opacity: 1; stroke-width: 2.6; }
 g.ae text { display: none; font: 11px system-ui, sans-serif; fill: var(--ink); paint-order: stroke;
   stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
@@ -150,6 +160,11 @@ pre.cmd { font: 12px var(--mono); background: var(--bg); border: 1px solid var(-
 .note { color: var(--dim); font-size: 12px; }
 .warn { color: var(--warn); }
 a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
+button.mv { font-size: 11px; padding: 0 5px; margin-left: 4px; color: var(--dim); }
+button.mv.gone { color: var(--warn); border-color: var(--warn); }
+.mvform { display: grid; gap: 4px; margin: 6px 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; word-break: normal; }
+.mvform label { display: grid; grid-template-columns: 3em 1fr; gap: 6px; align-items: center; color: var(--dim); font-size: 12px; }
+.mvform input { font: 12px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; min-width: 0; }
 a.cloud { font-size: 12px; white-space: nowrap; text-decoration: none; margin-left: 6px; }
 a.cloud:hover { text-decoration: underline; }
 .alist { list-style: none; padding: 0; margin: 0; }
@@ -224,8 +239,9 @@ a.cloud:hover { text-decoration: underline; }
   <span><i class="dot s-recent"></i>recent, no proof it is open</span>
   <span><i class="dot s-died"></i>died mid-turn</span>
   <b>links</b>
-  <span><i class="sw line" style="--c: var(--blue)"></i>fork</span>
+  <span><i class="sw line" style="--c: var(--blue)"></i>fork (same day: indented under its parent)</span>
   <span><i class="sw line dash" style="--c: var(--carry)"></i>carried over to another agent</span>
+  <span><i class="sw line dot" style="--c: var(--ref)"></i>referenced (hover or select a session)</span>
   <span><i class="sw line" style="--c: var(--dim)"></i>changed (hover a node for what)</span>
 </div>
 <div id="map" title=""><div id="canvas"><svg id="edges"></svg></div><div id="days"></div><div id="empty" hidden></div>
@@ -249,7 +265,7 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 history.replaceState(null, "", "/?t=" + encodeURIComponent(TOKEN) + location.hash);
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
-  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN } });
+  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN, ...opts.headers } });
   return r.json();
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -276,10 +292,43 @@ const cloudA = (path) => {
   return u ? `<a class="cloud" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="open in Nextcloud">☁ open</a>` : "";
 };
 
+// A path that moved after a session recorded it: an edit goes to the ledger, never the transcript.
+const wasMoved = (m) => m ? ` <span class="note">was ${esc(m.old)}</span> <button class="mv" data-undo="${esc(m.old)}">undo</button>` : "";
+const moveBtn = (host, path, gone) => path && host
+  ? ` <button class="mv${gone ? " gone" : ""}" data-mv="${esc(path)}" data-host="${esc(host)}" title="this path changed: record where it went">${gone ? "⚠ gone: where did it go?" : "✎ moved?"}</button>` : "";
+function moveForm(btn, done) {
+  const host = btn.dataset.host, box = document.createElement("form");
+  box.className = "mvform";
+  box.innerHTML = `<label>from <input name="old" value="${esc(btn.dataset.mv)}"></label>` +
+    `<label>to <input name="new" list="mvs" placeholder="/where/it/is/now" autocomplete="off"></label>` +
+    `<datalist id="mvs"></datalist><div id="mvsug" class="note"></div>` +
+    `<button type="submit">Save</button> <button type="button" class="cancel">Cancel</button>` +
+    `<span class="warn" id="mverr"></span>` +
+    `<div class="note">Applies to everything under it on ${esc(host)}, in every session. Transcripts stay as they are; a resumed agent is told.</div>`;
+  btn.replaceWith(box);
+  box.elements.new.focus();
+  box.querySelector(".cancel").onclick = done;
+  if (host === G.host) api("/api/suggest?path=" + encodeURIComponent(btn.dataset.mv)).then((s) => {
+    const paths = s.paths || [];
+    box.querySelector("#mvs").innerHTML = paths.map((p) => `<option value="${esc(p)}">`).join("");
+    const sug = box.querySelector("#mvsug");
+    sug.innerHTML = paths.map((p) => `<a href="#" data-p="${esc(p)}">${esc(p)}</a>`).join("<br>");
+    sug.querySelectorAll("a").forEach((a) => a.onclick = (e) => { e.preventDefault(); box.elements.new.value = a.dataset.p; });
+  });
+  box.onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await postMove({ host, old: box.elements.old.value.trim(), new: box.elements.new.value.trim() });
+    if (r.error) box.querySelector("#mverr").textContent = " " + r.error; else done();
+  };
+}
+const postMove = (m) => api("/api/move", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(m) });
+
 let G = { nodes: [], edges: [], artefacts: [], host: "" }, bySid = new Map(), byArt = new Map();
 let selected = null; // {sid} or {aid}: kept highlighted while its panel is open
 let LIVE_NOW = {};    // sid -> {state, ts}
+let kin = new Map();  // the selected session's relatives: sid -> {rel, c}
 const CARD_W = 250, CARD_H = 170, GAP_X = 46, GAP_Y = 12, TOP = 4, LANE_PAD = 34;
+const INDENT = 18; // a fork made the same day sits under its parent, this far in
 const ART_W = 236, ART_H = 58, ART_GAP = 10, ART_COL_GAP = 120;
 
 function fillSelect(id, values) {
@@ -384,6 +433,7 @@ function draw() {
     (b[1].at(-1).date + b[1].at(-1).time).localeCompare(a[1].at(-1).date + a[1].at(-1).time));
 
   const pos = new Map(), apos = new Map();
+  const parentOf = new Map(G.edges.filter((e) => e.kind === "fork").map((e) => [e.to, e.from]));
   const artX = 16 + days.length * (CARD_W + GAP_X) - GAP_X + ART_COL_GAP;
   const width = (artLane.size ? artX + ART_W : 16 + days.length * (CARD_W + GAP_X)) + 40;
   const dayEl = (text, x, cls = "") => {
@@ -395,12 +445,19 @@ function draw() {
   if (artLane.size) dayEl("where the work landed", artX, "landed");
   let y = TOP;
   for (const [name, list] of order) {
-    const stack = new Map();
-    for (const n of list) {
-      const c = col.get(n.date), s = stack.get(c) || 0;
-      stack.set(c, s + 1);
-      pos.set(n.sid, { x: 16 + c * (CARD_W + GAP_X), y: y + LANE_PAD + s * (CARD_H + GAP_Y) });
-    }
+    // Within a day a fork follows its parent; on a later day it starts level with it, so a branch
+    // reads across the lane instead of jumping about.
+    const stack = new Map(), rowOf = new Map(), kids = new Map(), inLane = new Set(list.map((n) => n.sid));
+    const sameDay = (n) => { const p = bySid.get(parentOf.get(n.sid)); return p && inLane.has(p.sid) && p.date === n.date ? p : null; };
+    for (const n of list) { const p = sameDay(n); if (p) { if (!kids.has(p.sid)) kids.set(p.sid, []); kids.get(p.sid).push(n); } }
+    const place = (n, depth) => {
+      const c = col.get(n.date), p = parentOf.get(n.sid);
+      const s = Math.max(stack.get(c) || 0, !depth && rowOf.has(p) ? rowOf.get(p) : 0);
+      stack.set(c, s + 1); rowOf.set(n.sid, s);
+      pos.set(n.sid, { x: 16 + c * (CARD_W + GAP_X) + (depth ? INDENT : 0), y: y + LANE_PAD + s * (CARD_H + GAP_Y) });
+      for (const k of kids.get(n.sid) || []) place(k, depth + 1);
+    };
+    for (const n of list) if (!sameDay(n)) place(n, 0);
     const arts = artsIn.get(name) || [];
     arts.forEach((aid, i) => apos.set(aid, { x: artX, y: y + LANE_PAD + i * (ART_H + ART_GAP) }));
     const h = LANE_PAD + Math.max(Math.max(...stack.values()) * (CARD_H + GAP_Y), arts.length * (ART_H + ART_GAP)) + 6;
@@ -417,7 +474,9 @@ function draw() {
   svg.setAttribute("width", width); svg.setAttribute("height", y);
 
   let html = `<defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">` +
-    `<path d="M0,0 L8,4 L0,8 z" fill="var(--blue)"/></marker></defs>`;
+    `<path d="M0,0 L8,4 L0,8 z" fill="var(--blue)"/></marker>` +
+    `<marker id="arrow-c" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">` +
+    `<path d="M0,0 L8,4 L0,8 z" fill="var(--carry)"/></marker></defs>`;
   // Session → artefact: from the card's right edge to the pill's left; faint until a node is hovered.
   for (const e of aedges) {
     const a = pos.get(e.from), b = apos.get(e.to);
@@ -429,19 +488,31 @@ function draw() {
       `<text class="at-a" x="${x2 - 8}" y="${y2 - 6}" text-anchor="end">${esc(e.summary)}</text>` +
       `<text class="at-s" x="${x1 + 8}" y="${y1 - 6}">${esc(e.summary)}</text></g>`;
   }
-  // Forks: parent's right edge to child's left edge; a parent filtered out of view draws no line.
+  // Lineage: parent's right edge to child's left edge; one filtered out of view draws no line.
+  // A fork the same day drops from its parent to the card indented under it.
+  const route = (a, b) => {
+    const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2, x2 = b.x, y2 = b.y + CARD_H / 2;
+    if (x2 > x1) return { d: `M${x1},${y1} C${x1 + GAP_X},${y1} ${x2 - GAP_X},${y2} ${x2},${y2}`, x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 4, anchor: "middle" };
+    const r = b.x + CARD_W; // same day: round the right side
+    return { d: `M${x1},${y1} C${x1 + 40},${y1} ${r + 40},${y2} ${r},${y2}`, x: Math.max(x1, r) + 34, y: (y1 + y2) / 2 - 4, anchor: "start" };
+  };
   for (const e of G.edges) {
-    if (e.kind !== "fork" && e.kind !== "carry") continue;
+    if (e.kind !== "fork" && e.kind !== "carry" && e.kind !== "ref") continue;
     const a = pos.get(e.from), b = pos.get(e.to);
     if (!a || !b) continue;
-    const cls = e.kind === "carry" ? "carry" : "fork", label = e.kind === "carry" ? e.label : "fork";
-    const x1 = a.x + CARD_W, y1 = a.y + CARD_H / 2, x2 = b.x, y2 = b.y + CARD_H / 2;
-    const back = x2 <= x1; // same day: route around the right side
-    const d = back
-      ? `M${x1},${y1} C${x1 + 40},${y1} ${x1 + 40},${y2} ${b.x + CARD_W},${y2}`
-      : `M${x1},${y1} C${x1 + GAP_X},${y1} ${x2 - GAP_X},${y2} ${x2},${y2}`;
-    html += `<path class="${cls}" d="${d}" fill="none" stroke-width="2"${cls === "fork" ? ' marker-end="url(#arrow)"' : ""}/>` +
-      `<text class="${cls === "fork" ? "edge-label" : "carry-label"}" x="${(x1 + (back ? b.x + CARD_W : x2)) / 2 + (back ? 30 : 0)}" y="${(y1 + y2) / 2 - 4}">${esc(label)}</text>`;
+    const ends = `data-from="${esc(e.from)}" data-to="${esc(e.to)}"`;
+    if (e.kind === "ref") {
+      const r = route(a, b);
+      html += `<g class="re" ${ends}><path d="${r.d}"/></g>`;
+    } else if (e.kind === "fork" && b.x > a.x && b.x < a.x + CARD_W) {
+      const x = a.x + INDENT / 2;
+      html += `<g class="le" ${ends}><path class="fork" d="M${x},${a.y + CARD_H} V${b.y + CARD_H / 2} H${b.x}" fill="none" stroke-width="2" marker-end="url(#arrow)"/></g>`;
+    } else {
+      const r = route(a, b), fork = e.kind === "fork";
+      const label = fork ? "fork" : `→ ${bySid.get(e.to)?.harness || ""}`;
+      html += `<g class="le" ${ends}><path class="${e.kind}" d="${r.d}" fill="none" stroke-width="2" marker-end="url(#arrow${fork ? "" : "-c"})"/>` +
+        `<text class="${fork ? "edge-label" : "carry-label"}" x="${r.x}" y="${r.y}" text-anchor="${r.anchor}">${esc(label)}</text></g>`;
+    }
   }
   svg.innerHTML = html;
   focus(selected);
@@ -494,7 +565,7 @@ function makeCard(n, p) {
     `<div class="mid" title="${esc(n.hosts.join(" → ") + " · " + n.cwd)}">` +
     (n.hosts.length > 1 ? `<span class="hop" title="continued on another machine">${esc(n.hosts.join(" → "))}</span>` : esc(n.host)) +
     ` · ${esc(tail(n.cwd))}<br>` +
-    `<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
+    `${n.gone ? '<span class="warn" title="this folder is not on this machine any more">⚠ gone</span> ' : ""}<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
     `<div class="low">${n.summary ? `<div class="sum" title="${esc(n.summary)}">${esc(n.summary)}</div>` : ""}` +
     `<div class="meta">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
     `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div></div>`;
@@ -534,6 +605,7 @@ function cull() {
       if (!el.isConnected) {
         el.classList.toggle("hl", lit.has(key));
         el.classList.toggle("sel", !!selected && (selected.sid === key || selected.aid === key));
+        if (cache === cardEl) markKin(el, key);
         canvas.appendChild(el);
       }
     } else if (el?.isConnected) el.remove();
@@ -601,9 +673,22 @@ function focus(f) {
   const svg = $("edges");
   for (const k of lit) (cardEl.get(k) || artEl.get(k))?.classList.remove("hl");
   lit = new Set();
-  svg.querySelectorAll("g.ae.hl").forEach((g) => g.classList.remove("hl", "hl-s", "hl-a"));
+  svg.querySelectorAll("g.ae.hl,g.le.hl,g.re.hl").forEach((g) => g.classList.remove("hl", "hl-s", "hl-a"));
   svg.classList.toggle("focus", !!f);
   if (!f) return;
+  if (f.sid) {
+    const me = CSS.escape(f.sid);
+    svg.querySelectorAll(`g.le[data-from="${me}"],g.le[data-to="${me}"],g.re[data-from="${me}"],g.re[data-to="${me}"]`).forEach((g) => {
+      g.classList.add("hl");
+      const other = g.dataset.from === f.sid ? g.dataset.to : g.dataset.from;
+      lit.add(other); cardEl.get(other)?.classList.add("hl");
+    });
+    // A selected session's whole line, not just the steps touching it.
+    if (selected?.sid === f.sid) svg.querySelectorAll("g.le").forEach((g) => {
+      const on = (s) => s === f.sid || kin.has(s);
+      if (on(g.dataset.from) && on(g.dataset.to)) g.classList.add("hl");
+    });
+  }
   const sel = f.sid ? `g.ae[data-from="${CSS.escape(f.sid)}"]` : `g.ae[data-to="${CSS.escape(f.aid)}"]`;
   svg.querySelectorAll(sel).forEach((g) => {
     g.classList.add("hl", f.sid ? "hl-s" : "hl-a");
@@ -613,8 +698,36 @@ function focus(f) {
   });
 }
 
+// Everyone a session is related to, by how: its lineage all the way along, and who it names or is
+// named by. A shared artefact is not kinship; its lines already show that.
+function relatives(sid) {
+  const out = new Map(), said = { fork: ["fork", "forked from"], carry: ["carried on", "carried from"] };
+  const walk = (s) => {
+    for (const e of G.edges) {
+      if (!said[e.kind] || (e.from !== s && e.to !== s)) continue;
+      const other = e.from === s ? e.to : e.from;
+      if (other !== sid && !out.has(other)) { out.set(other, { rel: said[e.kind][e.from === s ? 0 : 1], c: e.kind === "carry" ? "var(--carry)" : "var(--blue)" }); walk(other); }
+    }
+  };
+  walk(sid);
+  for (const e of G.edges) {
+    if (e.kind !== "ref" || (e.from !== sid && e.to !== sid)) continue;
+    const other = e.from === sid ? e.to : e.from;
+    if (!out.has(other)) out.set(other, { rel: e.from === sid ? "cites this" : "cited by this", c: "var(--ref)" });
+  }
+  return out;
+}
+function markKin(el, sid) {
+  const k = kin.get(sid);
+  el.classList.toggle("kin", !!k);
+  if (k) { el.dataset.rel = k.rel; el.style.setProperty("--relc", k.c); }
+}
+
 function select(f) {
   selected = f;
+  kin = f?.sid ? relatives(f.sid) : new Map();
+  $("canvas").classList.toggle("kin", kin.size > 0);
+  for (const [sid, el] of cardEl) markKin(el, sid);
   document.querySelectorAll(".card.sel,.art.sel").forEach((c) => c.classList.remove("sel"));
   (f?.sid ? cardEl.get(f.sid) : f?.aid ? artEl.get(f.aid) : null)?.classList.add("sel");
   const p = f?.sid ? LAYOUT.pos.get(f.sid) : f?.aid ? LAYOUT.apos.get(f.aid) : null;
@@ -631,11 +744,19 @@ const sidLink = (sid) => {
   return `<a class="sid" data-sid="${esc(sid)}">${esc(n ? n.sid8 : sid.slice(0, 8))}</a>` +
     (n ? ` ${esc(n.topic || "")}` : ' <span class="note">(not in the catalogue)</span>');
 };
+const refList = (sid, mine, theirs) => G.edges.filter((e) => e.kind === "ref" && e[mine] === sid)
+  .map((e) => `${sidLink(e[theirs])} <span class="note">(${e.how === "typed" ? "you named it" : "pulled from the archive"})</span>`).join("<br>");
 const artName = (a) => `<i class="sw pill" style="--c: var(--k-${esc(a.kind)})"></i><b>${esc(a.label)}</b>` +
   ` <span class="note">${esc(KIND[a.kind] || a.kind)}</span>`;
-function wire(root) {
+function wire(root, again, host) {
   root.querySelectorAll("a.sid").forEach((a) => a.onclick = () => open(a.dataset.sid));
   root.querySelectorAll("[data-aid]").forEach((a) => a.onclick = () => openArt(a.dataset.aid));
+  // A move can change what the panel shows, an artefact's id included: redraw, then look again.
+  const after = async () => { await load(); again(); };
+  root.querySelectorAll("[data-mv]").forEach((b) => b.onclick = () => moveForm(b, after));
+  root.querySelectorAll("[data-undo]").forEach((b) => b.onclick = async () => {
+    await postMove({ host, old: b.dataset.undo, new: "" }); after();
+  });
 }
 
 async function open(sid) {
@@ -656,7 +777,7 @@ async function open(sid) {
       ["status", LIVE_NOW[n.sid] ? `<i class="dot s-${esc(LIVE_NOW[n.sid].state)}"></i>${esc(LIVE_WORD[LIVE_NOW[n.sid].state])} <span class="note">· ${esc(ago(LIVE_NOW[n.sid].ts))}</span>` : ""],
       ["started", esc(`${n.date} ${n.time}`)], ["host", esc(n.host) + (n.host === G.host ? ' <span class="note">(this machine)</span>' : "")],
       ["ran on", n.hosts.length > 1 ? esc(n.hosts.join(" → ")) + ' <span class="note">(handed off with /sjresume)</span>' : ""],
-      ["folder", esc(n.cwd) + cloudA(n.cwd)], ["project", esc(n.project)],
+      ["folder", esc(n.cwd) + cloudA(n.cwd) + wasMoved(n.moved) + moveBtn(n.host, n.cwd, bySid.get(n.sid)?.gone)], ["project", esc(n.project)],
       ["agent", `<span class="chip" style="--h: var(--${esc(n.harness)})">${esc(n.harness)}</span>`],
       ...extra.filter(([k]) => !["harness", "summary", "resumed_from", "forked_from"].includes(k)),
       ["topic from", n.essence ? "written with /sjlog" : last.prompts ? `Haiku, over ${esc(last.prompts)} prompts` : "the first prompt"],
@@ -675,6 +796,9 @@ async function open(sid) {
           : `${esc(host)} <span class="note">(this session, continued here)</span>`;
       })()],
       ["forks of it", s.children.length ? s.children.map(sidLink).join("<br>") : '<span class="note">none</span>'],
+      ["carried on as", G.edges.filter((e) => e.kind === "carry" && e.from === n.sid).map((e) => sidLink(e.to)).join("<br>")],
+      ["it cites", refList(n.sid, "to", "from")],
+      ["cited by", refList(n.sid, "from", "to")],
     ]) +
     `<h3>Transcript</h3>` + (s.readable
       ? kv([["readable", esc(s.readable) + cloudA(s.readable)], ["raw", s.raw ? esc(s.raw) + cloudA(s.raw) : ""]]) +
@@ -688,7 +812,7 @@ async function open(sid) {
     `<h3>Topic history (${s.rows.length} rows)</h3>` +
     kv(s.rows.map((w) => [`${w.date} ${w.time}`, esc(w.topic || "(untitled)") +
       (w.prompts ? ` <span class="note">· ${esc(w.prompts)} prompts</span>` : "")]));
-  wire($("dbody"));
+  wire($("dbody"), () => open(sid), n.host);
   if ($("readc")) $("readc").onclick = () => read(n);
   if ($("copy")) $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(r.cmd); $("copy").textContent = "Copied"; }
@@ -748,7 +872,8 @@ async function openArt(aid) {
   $("dbody").innerHTML =
     `<h2>${artName(a)}</h2>` +
     (a.url ? `<div><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)} ↗</a></div>` : "") +
-    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}${cloudA(a.path)}</div>` : "") +
+    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}${cloudA(a.path)}` +
+      `${wasMoved(a.moved)}${moveBtn(a.host, a.path, byArt.get(aid)?.gone)}</div>` : "") +
     `<div class="stats">` +
       `<span class="stat">${plural(d.sessions.length, "session")}</span>` +
       (merged.length ? `<span class="stat">merged ${merged.map((n) => "#" + n).join(" ")}</span>` : "") +
@@ -759,7 +884,8 @@ async function openArt(aid) {
       (span ? `<span class="stat">${esc(span)}</span>` : "") +
     `</div>` +
     `<h3>Milestones, newest first</h3>` + d.sessions.map((s) => milestones(s, a, titles)).join("");
-  wire($("dbody"));
+  // Moving a folder gives its artefact a new id, so there may be nothing left to show under this one.
+  wire($("dbody"), () => byArt.has(aid) ? openArt(aid) : closePanel(), a.host);
 }
 
 // The archive's readable Markdown, drawn as turns. Everything is escaped first; only the few
