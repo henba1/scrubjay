@@ -108,6 +108,12 @@ if [ "${SCRUBJAY_NORECONCILE:-0}" != "1" ]; then
   sj_step reconcile ok "orphaned sessions checked"
 fi
 
+# 2d) a resumed session's history may name paths that have moved since (bin/sj-moves.sh). The
+#     transcript stays as it was; stdout is the session's context, so the agent knows from turn one.
+if command -v jq >/dev/null 2>&1 && [ "$(printf '%s' "$input" | jq -r '.source // empty' 2>/dev/null)" = resume ]; then
+  "$APP/bin/sj-moves.sh" notes "$(sj_host)" "$(printf '%s' "$input" | jq -r '.transcript_path // empty')" 2>/dev/null || true
+fi
+
 # 3) surface a prior transcript-relay failure. ship-transcript.sh drops a breadcrumb when the
 #    primary push fails; the relay swallows its own errors (best-effort, must never block a
 #    session), so without this a dead/unauthorized relay key eats transcripts unnoticed. Printing

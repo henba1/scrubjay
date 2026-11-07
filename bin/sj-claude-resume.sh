@@ -83,8 +83,16 @@ if [ -n "$full" ]; then
       cd "$rec_cwd" || exit 1
       run_claude --resume "$full" "$@"
     fi
-    say "${full:0:8} is on this machine ($(sj_pretty_path "$local_copy")), but its folder"
-    say "'${rec_cwd:-?}' does not exist here — staging the archived copy into $(sj_pretty_path "$PWD") instead."
+    # Its folder moved and the ledger knows where: that is where it continues, wherever you stand.
+    moved="$( [ -n "$rec_cwd" ] && bash "$APP/bin/sj-moves.sh" resolve "$(sj_host)" "$rec_cwd")"
+    if [ -n "$moved" ] && [ "$moved" != "$rec_cwd" ] && [ -d "$moved" ]; then
+      say "${full:0:8} was in '$rec_cwd', which moved to $(sj_pretty_path "$moved") — continuing it there."
+      cd "$moved" || exit 1
+      [ -f "$(sjh_project_dir "$PWD")/$full.jsonl" ] && run_claude --resume "$full" "$@"
+    else
+      say "${full:0:8} is on this machine ($(sj_pretty_path "$local_copy")), but its folder"
+      say "'${rec_cwd:-?}' does not exist here — staging the archived copy into $(sj_pretty_path "$PWD") instead."
+    fi
   fi
 fi
 
