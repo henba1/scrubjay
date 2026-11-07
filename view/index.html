@@ -200,7 +200,7 @@ a.cloud:hover { text-decoration: underline; }
   <select id="arts" title="which artefacts to draw">
     <option value="all">all artefacts</option><option value="git">repos only</option><option value="none">no artefacts</option>
   </select>
-  <label title="sessions a harness holds open on this machine"><input id="active-only" type="checkbox"> active<span id="active-n"></span></label>
+  <select id="status" title="filter by what a session is doing now"><option value="">any status</option></select>
   <label title="sessions that recorded nothing: size 0, no topic"><input id="empty-too" type="checkbox"> show empty</label>
   <span id="count"></span>
   <button id="stop" title="Shut the viewer down; /sjview starts it again">Stop viewer</button>
@@ -318,14 +318,15 @@ async function load() {
 
 function visible() {
   const q = $("q").value.trim().toLowerCase(), p = $("project").value, h = $("host").value,
-    a = $("harness").value, days = Number($("since").value), all = $("empty-too").checked, act = $("active-only").checked;
+    a = $("harness").value, days = Number($("since").value), all = $("empty-too").checked, want = $("status").value;
   const cut = days ? new Date(Date.now() - days * 864e5).toISOString().slice(0, 10) : "";
   const hitArt = new Set();
   if (q) for (const e of G.edges) if (e.kind === "artefact") {
     const x = byArt.get(e.to); if (x && (x.label + " " + (x.url || "") + " " + (x.path || "")).toLowerCase().includes(q)) hitArt.add(e.from);
   }
-  return G.nodes.filter((n) => (!act || isActive(n.sid)) && (all || n.size !== "0" || n.topic) && (!p || n.project === p) && (!h || n.host === h) && (!a || n.harness === a)
-    && (!cut || n.date >= cut)
+  // A status filter looks past the date and "empty" filters: a live session is never hidden by its age.
+  return G.nodes.filter((n) => (!want || hasStatus(n.sid, want)) && (want || all || n.size !== "0" || n.topic) && (!p || n.project === p) && (!h || n.host === h) && (!a || n.harness === a)
+    && (want || !cut || n.date >= cut)
     && (!q || hitArt.has(n.sid) || [n.topic, n.cwd, n.sid, n.host, n.model].join(" ").toLowerCase().includes(q)));
 }
 
@@ -468,12 +469,18 @@ async function pollLive() {
   try { LIVE_NOW = await api("/api/live"); } catch { return; }
   for (const [sid, el] of cardEl) paintLive(el, sid);
   countLive();
-  if ($("active-only").checked && !sameKeys()) draw();
+  if ($("status").value) {
+    const shown = new Set(LAYOUT.nodes.map((n) => n.sid)), now = visible();
+    if (now.length !== shown.size || now.some((n) => !shown.has(n.sid))) draw();
+  }
 }
-const sameKeys = () => LAYOUT.nodes.every((n) => isActive(n.sid)) && G.nodes.filter((n) => isActive(n.sid)).length === LAYOUT.nodes.length;
+const hasStatus = (sid, want) => want === "active" ? isActive(sid) : LIVE_NOW[sid]?.state === want;
+// The status menu, each state with how many sessions are in it now.
 function countLive() {
-  const n = G.nodes.filter((x) => isActive(x.sid)).length;
-  $("active-n").textContent = n ? ` (${n})` : "";
+  const sel = $("status"), keep = sel.value, count = (s) => G.nodes.filter((n) => hasStatus(n.sid, s)).length;
+  sel.length = 1;
+  for (const [v, word] of [["active", "active (open here)"], ...Object.entries(LIVE_WORD)]) sel.add(new Option(`${word} (${count(v)})`, v));
+  sel.value = keep;
 }
 
 function makeCard(n, p) {
@@ -806,7 +813,7 @@ document.addEventListener("keydown", (e) => {
   if ($("reader").classList.contains("open")) $("reader").classList.remove("open");
   else closePanel();
 });
-for (const id of ["project", "host", "harness", "since", "arts", "empty-too", "active-only"]) $(id).addEventListener("input", draw);
+for (const id of ["project", "host", "harness", "since", "arts", "empty-too", "status"]) $(id).addEventListener("input", draw);
 let typing = 0; // the search redraws once typing pauses, not on every key
 $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(draw, 140); });
 

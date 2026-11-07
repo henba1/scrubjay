@@ -363,6 +363,7 @@ sleep 6; lv="$(get /api/live)"
 assert_eq "ended is ended, whatever runs" none "$(st "$P")"
 assert_eq "another machine's old turn is not recent" none "$(st "$Y")"
 kill "$holder" 2>/dev/null; rm -rf "$L" "$SCRUBJAY_LOCAL_CHATS/laptop/live"
+assert_contains "the page filters by status" "$(cat "$APP/view/index.html")" '<select id="status"'
 
 section "stop: the command, the page's button, and idle"
 out="$(bash "$APP/bin/sj-view.sh" stop 2>&1)"
