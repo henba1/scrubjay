@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../favicon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -1093,6 +1093,15 @@ moved), its forks, where its transcript is archived, and the command that contin
 harness's own resume command for a session from this machine, or <code>sj-resume.sh</code> first for one from
 another machine (<a href="../handoff/">hand-off</a>). <strong>Read transcript</strong> shows the archived conversation,
 condensed or in full. A link ending in <code>#sid=&lt;id&gt;</code> opens that session's panel.</p>
+<p><strong>A path that moved.</strong> A folder that no longer exists on this machine shows <strong>⚠ gone</strong> on its card.
+In a session's or an artefact's panel, <strong>✎ moved?</strong> records where it went, offering folders from the
+catalogue with the same name or the same git remote. The move covers everything under the path, on
+that machine, in every session: cards, lanes and artefacts show the new place, and <strong>undo</strong> takes it
+back. Transcripts are never edited. A resumed session is told instead, in its first context, of each
+move its history touches; a session whose own folder moved is staged there on resume, because the
+harness files sessions by folder. Moves live in <code>moves/</code> in your data repo, so they reach every
+machine; <code>bin/sj-moves.sh</code> does the same from a terminal. Claude Code gets the note; opencode does
+not yet, and Codex only if its SessionStart payload says <code>source: resume</code>.</p>
 <p><code>/sjview &lt;project&gt;</code> opens the map on one project's lane. The name need not be exact: <code>widget</code>,
 <code>WIDGET_API</code> or <code>widgt-api</code> all find <code>widget-api</code>. Case and punctuation are ignored, part of a name
 is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and
@@ -1197,7 +1206,7 @@ the command runs, and lists the session's <code>/sj*</code> commands in the side
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "navigation.sections", "content.code.copy", "toc.follow", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>

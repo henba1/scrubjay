@@ -31,6 +31,8 @@ It finds the session, stages it here exactly as `/sjresume` would, and then runs
 1. **Already here?** Then it is simply resumed. A session that belongs to another folder on this machine is resumed *from that folder* (Claude Code only looks in the current folder's project dir), as long as the folder still exists.
 1. **Otherwise it is handed off** with `bin/sj-resume.sh` into the folder you are standing in — the other host's paths rewritten to it, the source host and folder printed — with `--no-clobber`: a local transcript is never replaced by a different one, not even with a backup. If the folder it was recorded in exists here too and you're somewhere else, it says so: `cd` there and re-run if that's where you meant to continue.
 
+If the session's folder has moved and the [moves ledger](https://henba1.github.io/scrubjay/slash-commands/#the-session-map) knows where, it continues there, wherever you are standing. A hand-off on the machine that recorded the session also rewrites any other moved path it finds.
+
 A session from a different agent (opencode, codex) can't be resumed by `claude`; you get the same carry-over command `/sjresume` prints instead.
 
 **What gets intercepted, and what doesn't.** The integration is a `claude` shell function (bash and zsh) in `bin/sj-shell.sh`. It intercepts only `resume <id>` as the *first* word, or `--resume` / `-r` / `--resume=` followed by something that looks like a session id (8–36 hex digits and dashes). Everything else — `claude`, `claude -p "resume the build"`, `claude --resume` (the picker), `claude --resume <search words>` — goes straight to the binary after one pattern match on the arguments, so there is no startup cost.
