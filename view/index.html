@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>scrubjay sessions</title>
+<script>
+// Before the first paint, so a chosen preset never flashes the default. Storage may be refused.
+try { const t = localStorage.getItem("sj-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+</script>
 <style>
 :root {
   --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --dim: #5d6678; --line: #d9dee7;
@@ -14,7 +18,7 @@
   /* artefacts: each kind its own colour */
   --k-github: #8957e5; --k-gitlab: #d6336c; --k-git: #1098ad; --k-repo: #5c7cfa;
   --k-folder: #c99a06; --k-record: #4f8ff7;
-  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a; --carry: #0c8599; --wait: #e8590c; --ref: #7048e8;
+  --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a; --carry: #0c8599; --ref: #7048e8; --wait: #e8590c; --issue: #e8590c; --on: #fff;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
@@ -25,6 +29,16 @@
     --ok: #51cf66; --merged: #a371f7; --closed: #ff6b6b; --wait: #ff922b; --ref: #b197fc;
   }
 }
+/* Presets (the menu by Stop viewer). Every one is checked against WCAG: text 4.5:1 or better, and 3:1
+   for lines and marks on a card. Each sets all its colours, so none leans on the system's light or dark. */
+:root[data-theme="light"] { color-scheme: light; --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --dim: #5d6678; --line: #d9dee7; --lane: #eef1f6; --blue: #2f6fdb; --blue-soft: #e3edfe; --warn: #a35c08; --claude: #c2552f; --opencode: #6b737c; --codex: #0a7f61; --k-github: #8957e5; --k-gitlab: #d6336c; --k-git: #0c7c8c; --k-repo: #4c6ef5; --k-folder: #967205; --k-record: #2f6fdb; --ok: #27803a; --merged: #8957e5; --closed: #c92a2a; --carry: #0b7a8c; --ref: #7048e8; --wait: #c9420c; --issue: #c9420c; --on: #ffffff; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #12151b; --panel: #1b1f27; --ink: #e4e8ef; --dim: #98a1b3; --line: #2c323d; --lane: #171b22; --blue: #6ea3f8; --blue-soft: #1d2a42; --warn: #e0a24a; --claude: #d97757; --opencode: #a7adb6; --codex: #2fbf9b; --k-github: #a371f7; --k-gitlab: #f06595; --k-git: #3bc9db; --k-repo: #91a7ff; --k-folder: #e3b341; --k-record: #6ea3f8; --ok: #51cf66; --merged: #a371f7; --closed: #ff6b6b; --carry: #22b8cf; --ref: #b197fc; --wait: #ff922b; --issue: #ff922b; --on: #12151b; }
+:root[data-theme="nord"] { color-scheme: dark; --bg: #2e3440; --panel: #3b4252; --ink: #eceff4; --dim: #c5ccd9; --line: #4c566a; --lane: #333a47; --blue: #88c0d0; --blue-soft: #434c5e; --warn: #ebcb8b; --claude: #dc9a85; --opencode: #d8dee9; --codex: #a3be8c; --k-github: #c09bbb; --k-gitlab: #e39aa5; --k-git: #8fbcbb; --k-repo: #81a1c1; --k-folder: #ebcb8b; --k-record: #88c0d0; --ok: #a3be8c; --merged: #c09bbb; --closed: #e8949b; --carry: #8fbcbb; --ref: #c2a6d6; --wait: #e5a67f; --issue: #e5a67f; --on: #2e3440; }
+:root[data-theme="solarized-light"] { color-scheme: light; --bg: #fdf6e3; --panel: #fffbf0; --ink: #073642; --dim: #4f6169; --line: #e4dcc4; --lane: #f3ecd6; --blue: #1f6fb2; --blue-soft: #e5ecdd; --warn: #8a6100; --claude: #b8400f; --opencode: #55686f; --codex: #2a7d2a; --k-github: #6c71c4; --k-gitlab: #c22a72; --k-git: #1f8179; --k-repo: #3f6fc4; --k-folder: #8a6d00; --k-record: #1f6fb2; --ok: #4d7300; --merged: #5b60b8; --closed: #c22522; --carry: #1f8179; --ref: #5b60b8; --wait: #b8400f; --issue: #b8400f; --on: #fffbf0; }
+:root[data-theme="solarized-dark"] { color-scheme: dark; --bg: #002b36; --panel: #073642; --ink: #eee8d5; --dim: #a8b5b5; --line: #1d4a55; --lane: #04303b; --blue: #4fa8e8; --blue-soft: #0d4552; --warn: #d9a800; --claude: #e8743f; --opencode: #b4c0c0; --codex: #8fb800; --k-github: #a4a8e8; --k-gitlab: #ef6fa8; --k-git: #4cc2b8; --k-repo: #7aa5e8; --k-folder: #d9a800; --k-record: #4fa8e8; --ok: #8fb800; --merged: #a4a8e8; --closed: #f26d6a; --carry: #4cc2b8; --ref: #b5b8ef; --wait: #ef8a55; --issue: #ef8a55; --on: #002b36; }
+:root[data-theme="gruvbox"] { color-scheme: dark; --bg: #282828; --panel: #32302f; --ink: #ebdbb2; --dim: #bdae93; --line: #504945; --lane: #2c2a29; --blue: #83a598; --blue-soft: #3c3836; --warn: #fabd2f; --claude: #fe8019; --opencode: #d5c4a1; --codex: #b8bb26; --k-github: #d3869b; --k-gitlab: #fb7a6c; --k-git: #8ec07c; --k-repo: #83a598; --k-folder: #fabd2f; --k-record: #83a598; --ok: #b8bb26; --merged: #d3869b; --closed: #fb5d4c; --carry: #8ec07c; --ref: #d3a6c3; --wait: #fe8019; --issue: #fe8019; --on: #282828; }
+:root[data-theme="contrast"] { color-scheme: dark; --bg: #000000; --panel: #0a0a0a; --ink: #ffffff; --dim: #e0e0e0; --line: #8a8a8a; --lane: #111111; --blue: #66b3ff; --blue-soft: #0f2a47; --warn: #ffd24d; --claude: #ff9966; --opencode: #e6e6e6; --codex: #4dffc3; --k-github: #d0a6ff; --k-gitlab: #ff8fc0; --k-git: #66e0ff; --k-repo: #a6b8ff; --k-folder: #ffe066; --k-record: #66b3ff; --ok: #66ff8a; --merged: #d0a6ff; --closed: #ff8080; --carry: #66e0ff; --ref: #d0a6ff; --wait: #ffb347; --issue: #ffb347; --on: #000000; }
+:root[data-theme="colourblind"] { color-scheme: light; --bg: #f7f7f7; --panel: #ffffff; --ink: #111111; --dim: #4d4d4d; --line: #d0d0d0; --lane: #ececec; --blue: #0065b3; --blue-soft: #dcebf7; --warn: #8a5a00; --claude: #b34700; --opencode: #4d4d4d; --codex: #00735c; --k-github: #8c3d87; --k-gitlab: #a8326b; --k-git: #00708f; --k-repo: #0065b3; --k-folder: #8a6d00; --k-record: #0065b3; --ok: #00735c; --merged: #8c3d87; --closed: #b34700; --carry: #00708f; --ref: #8c3d87; --wait: #b34700; --issue: #b34700; --on: #ffffff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -41,7 +55,7 @@ header input[type=search] { min-width: 200px; flex: 1 1 200px; max-width: 360px;
 button { cursor: pointer; }
 button:hover { border-color: var(--blue); }
 #count { color: var(--dim); white-space: nowrap; }
-#stop { margin-left: auto; }
+#theme { margin-left: auto; }
 #legend { display: flex; gap: 6px 16px; padding: 6px 16px; color: var(--dim); font-size: 12px; flex-wrap: wrap; align-items: center; }
 #legend b { font-weight: 600; color: var(--ink); }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; background: var(--c); }
@@ -88,10 +102,11 @@ svg#edges { position: absolute; left: 0; top: 0; pointer-events: none; overflow:
   -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 47px;
   background: color-mix(in srgb, var(--h) 12%, var(--panel)); }
 .card .top code { color: var(--h); font-weight: 600; filter: brightness(.9); }
+:root[data-theme] .card .top code { filter: none; }
 .card .mid { font-size: 12px; color: var(--dim); border-bottom: 1px solid var(--line);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip { display: inline-block; padding: 0 6px; border-radius: 9px; font-size: 11px; font-weight: 600;
-  color: #fff; background: var(--h, var(--c)); line-height: 16px; }
+  color: var(--on); background: var(--h, var(--c)); line-height: 16px; }
 .card .low { font-size: 12px; color: var(--dim); }
 .card .low .sum { color: var(--ink); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden; margin-bottom: 2px; }
@@ -188,9 +203,9 @@ a.cloud:hover { text-decoration: underline; }
 .ms .who { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
 .ms .who b { color: var(--ink); }
 .ev { font-size: 13px; margin: 3px 0; display: flex; gap: 6px; align-items: baseline; }
-.ev .tag { flex: none; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 8px; color: #fff; background: var(--t, var(--dim)); }
+.ev .tag { flex: none; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 8px; color: var(--on); background: var(--t, var(--dim)); }
 .ev.merged { --t: var(--merged); } .ev.opened { --t: var(--ok); } .ev.closed { --t: var(--closed); }
-.ev.issue { --t: #e8590c; } .ev.release { --t: #1098ad; }
+.ev.issue { --t: var(--issue); } .ev.release { --t: var(--k-git); }
 .ms details { font-size: 13px; margin-top: 4px; }
 .ms details summary { cursor: pointer; color: var(--dim); }
 .ms details li { margin: 2px 0; word-break: break-word; }
@@ -228,6 +243,7 @@ a.cloud:hover { text-decoration: underline; }
   <select id="status" title="filter by what a session is doing now"><option value="">any status</option></select>
   <label title="sessions that recorded nothing: size 0, no topic"><input id="empty-too" type="checkbox"> show empty</label>
   <span id="count"></span>
+  <select id="theme" title="colours"><option value="">System colours</option><option value="light">Light</option><option value="dark">Dark</option><option value="nord">Nord</option><option value="solarized-light">Solarized light</option><option value="solarized-dark">Solarized dark</option><option value="gruvbox">Gruvbox</option><option value="contrast">High contrast</option><option value="colourblind">Colour-blind safe</option></select>
   <button id="stop" title="Shut the viewer down; /sjview starts it again">Stop viewer</button>
 </header>
 <div id="legend">
@@ -341,6 +357,13 @@ let kin = new Map();  // the selected session's relatives: sid -> {rel, c}
 const CARD_W = 250, CARD_H = 170, GAP_X = 46, GAP_Y = 12, TOP = 4, LANE_PAD = 34;
 const INDENT = 18; // a fork made the same day sits under its parent, this far in
 const ART_W = 236, ART_H = 58, ART_GAP = 10, ART_COL_GAP = 120;
+
+$("theme").value = document.documentElement.dataset.theme || "";
+$("theme").oninput = (e) => {
+  const t = e.target.value;
+  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  try { if (t) localStorage.setItem("sj-theme", t); else localStorage.removeItem("sj-theme"); } catch {}
+};
 
 function fillSelect(id, values) {
   const el = $(id), keep = el.value;

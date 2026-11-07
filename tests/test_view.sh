@@ -534,12 +534,21 @@ assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$A
 assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
+section "colour presets: each one in the menu has its colours, and sets all of them"
+page="$APP/view/index.html"
+names="$(sed -n 's/.*<select id="theme".*/&/p' "$page" | command grep -o 'option value="[a-z-]\+"' | sed 's/.*"\(.*\)"/\1/')"
+assert_eq "eight presets" 8 "$(printf '%s\n' "$names" | wc -l | tr -d ' ')"
+for t in $names; do
+  rule="$(command grep -F ":root[data-theme=\"$t\"]" "$page")"
+  assert_eq "$t sets every colour" 26 "$(printf '%s' "$rule" | command grep -o -- '--[a-z-]*:' | wc -l | tr -d ' ')"
+done
+
 section "the page's script parses: nothing else here runs it"
 if command -v node >/dev/null 2>&1; then
   python3 -c 'import re, sys; print(re.findall(r"<script>(.*?)</script>", open(sys.argv[1]).read(), re.S)[-1])' \
     "$APP/view/index.html" > "$SANDBOX/page.js"
   check "no syntax error" node --check "$SANDBOX/page.js"
-else _skip "no syntax error" "node not installed" 2>/dev/null || true; fi
+else skip "no syntax error" "node not installed"; fi
 
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
