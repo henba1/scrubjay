@@ -236,6 +236,31 @@ https://github.com/someone/else/releases/tag/v1
 https://github.com/upstream/lib/issues/5#issuecomment-1
 ```
 MD
+# A session that names others on purpose: one typed, one pulled, and one only seen in an output.
+ref_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_laptop__99999999.md"
+mkdir -p "$(dirname "$ref_md")"
+cat > "$ref_md" <<'MD'
+# Refs
+
+## User
+
+carry on from aaaaaaaa, and deadbeef is no session at all
+
+## Assistant
+
+**→ mcp__sjmcp__sj_get**
+
+```json
+{"id":"cccccccc"}
+```
+
+**⎿ output:**
+
+```text
+see bbbbbbbb
+```
+MD
+
 # The fork's transcript starts with all of that, then does one thing of its own.
 fork_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_jitter__bbbbbbbb.md"
 { cat "$read_md"; printf '\n**→ Bash**\n\n```bash\ngit commit -qm "try jitter"\n```\n\n**⎿ output:**\n\n```text\n```\n'; } > "$fork_md"
@@ -336,6 +361,14 @@ mr="$(get "/api/artefact?id=gitlab.com/team/greyk" | jq -c '[.sessions[].events[
 assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_requests/12" "$(jq -r '.[] | select(.type == "pr_open") | .url' <<<"$mr")"
 assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
+
+section "references: sessions named on purpose, not every id in a transcript"
+rg="$(get /api/graph)"
+ref() { jq -r --arg y "$Y" --arg s "$1" '.edges[] | select(.kind == "ref" and .to == $y and .from == $s) | .how' <<<"$rg"; }
+assert_eq "an id you typed" typed "$(ref "$P")"
+assert_eq "an id the agent pulled from the archive" pulled "$(ref "$X")"
+assert_eq "an id in a tool's output is not one" "" "$(ref "$C")"
+assert_eq "a fork does not cite what its parent cited" 0 "$(jq --arg c "$C" '[.edges[] | select(.kind == "ref" and .to == $c)] | length' <<<"$rg")"
 
 section "a path that moved: recorded beside the transcript, applied everywhere"
 post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:$PORT$1"; }
