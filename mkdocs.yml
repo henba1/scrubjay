@@ -67,6 +67,7 @@ plugins:
         Archive & recall:
           - archive-mcp.md
           - slash-commands.md
+          - session-viewer.md
           - handoff.md
         Transcript relay:
           - transports.md
@@ -85,6 +86,7 @@ nav:
   - Query the archive (MCP): archive-mcp.md
   - Session hand-off: handoff.md
   - Slash commands: slash-commands.md
+  - Session viewer: session-viewer.md
   - "Transcripts: relay + NAS": transports.md
   - Reference: reference.md
   - Licensing: licensing.md
