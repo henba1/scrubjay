@@ -71,6 +71,9 @@ condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
 is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and
 the others are listed. With no likely match, it shows every project and says so.
 
+The menu beside **Stop viewer** sets the colours: your system's light or dark, or a preset (Light,
+Dark, Nord, Solarized, Gruvbox, High contrast, Colour-blind safe). This browser remembers the choice.
+
 To move around, drag the map (or hold Space and drag, which works over cards too). The wheel scrolls,
 and Shift+wheel scrolls sideways. Ctrl+wheel or a pinch zooms at the pointer. The arrow keys or WASD
 pan, `+` `−` `0` zoom, `F` fits everything on screen, and `/` jumps to the search box. The buttons at

@@ -419,6 +419,15 @@ assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$A
 assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
+section "colour presets: each one in the menu has its colours, and sets all of them"
+page="$APP/view/index.html"
+names="$(sed -n 's/.*<select id="theme".*/&/p' "$page" | command grep -o 'option value="[a-z-]\+"' | sed 's/.*"\(.*\)"/\1/')"
+assert_eq "eight presets" 8 "$(printf '%s\n' "$names" | wc -l | tr -d ' ')"
+for t in $names; do
+  rule="$(command grep -F ":root[data-theme=\"$t\"]" "$page")"
+  assert_eq "$t sets every colour" 26 "$(printf '%s' "$rule" | command grep -o -- '--[a-z-]*:' | wc -l | tr -d ' ')"
+done
+
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
 assert_contains "an unknown flag" "$(bash "$APP/bin/sj-view.sh" --bogus 2>&1)" "unknown argument: --bogus"
