@@ -60,6 +60,12 @@ push's `To …`); failing that, on this machine, by the folder's `origin`. A for
 its parent's history, so a fork shows only what it did after branching. The map reads the archive in
 the background on start and caches the result, so a later start reads only new transcripts.
 
+Each relation has its own look. A fork is a solid arrow: made the same day, it sits indented under
+its parent; made later, it starts level with it. A carry-over to another agent is a dashed arrow
+naming that agent. A reference, a session you named by id or the agent pulled from the archive, is a
+dotted line shown only on hover or selection. Selecting a session fades everything unrelated and tags
+each relative with how it is related.
+
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
 moved), its forks, where its transcript is archived, and the command that continues it. That is the
 harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from

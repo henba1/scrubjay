@@ -99,7 +99,7 @@ class Artefacts:
     is up at once. The per-transcript facts are cached on disk, keyed by the transcript's size and
     mtime, so a later start reads only what changed."""
 
-    VERSION = 8   # bump with any change to what view/artefacts.py:facts() returns
+    VERSION = 9   # bump with any change to what view/artefacts.py:facts() returns
 
     def __init__(self, arch: Archive, cache: Path, host: str):
         self.arch, self.cache = arch, cache
@@ -145,6 +145,15 @@ class Artefacts:
             tmp.replace(self.cache)
         except OSError:
             pass
+
+    def refs(self, sid8: str, parent: str = "") -> dict[str, str]:
+        """The sessions this one named on purpose; a fork's inherited ones are its parent's."""
+        with self.lock:
+            f = self.facts.get(sid8)
+            pf = self.facts.get(sj._handle(parent)) if parent else None
+        if not f:
+            return {}
+        return (art.minus(f, pf) if pf else f).get("refs", {})
 
     def links(self, sid8: str, host: str, cwd: str, parent: str = "") -> list[dict]:
         with self.lock:
@@ -256,6 +265,13 @@ def graph(st: "State") -> dict:
         if src and src != n["sid"]:
             edges.append({"from": src, "to": n["sid"], "kind": "carry",
                           "label": f"carried over · {n['resumed_from'].partition(':')[0]}"})
+    # A session that named another on purpose. Lineage already says more, so it wins for a pair.
+    kin = {frozenset((e["from"], e["to"])) for e in edges}
+    for n in nodes:
+        for h, how in st.arts.refs(n["sid8"], n["forked_from"]).items():
+            src = by8.get(h, "")
+            if src and src != n["sid"] and frozenset((src, n["sid"])) not in kin:
+                edges.append({"from": src, "to": n["sid"], "kind": "ref", "how": how})
     # Artefacts: one node each, and an edge per session that changed it, labelled with what it did.
     arts: dict[str, dict] = {}
     for n in nodes:
