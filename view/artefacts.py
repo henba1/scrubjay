@@ -35,6 +35,12 @@ PATCH_FILE = re.compile(r"\*\*\* (?:Add|Update|Delete) File: ([^\n\\]+)")
 SCRATCH = re.compile(r"^(?:/tmp/|/private/tmp/|/var/folders/|/dev/)|/scratchpad/")
 
 
+# Another session, named on purpose: an id you typed, or one the agent pulled from the archive. Only
+# these count. An id anywhere else in a transcript is mostly a listing or a tool's output.
+SESSION_ID = re.compile(r"(?<![\w-])(?:ses_[0-9A-Za-z]{8,}|[0-9a-f]{8})(?![0-9A-Za-z_])")
+PULL_TOOLS = re.compile(r"sj_get|sj_search_within")
+
+
 # ── the transcript as tool calls ─────────────────────────────────────────────────────────────
 
 def _fence(lines: list[str], i: int, nest: bool = False) -> tuple[str | None, int]:
@@ -370,10 +376,26 @@ def _shell_events(full: str, c: dict) -> list[dict]:
     return [e for _, e in sorted(ev, key=lambda x: x[0])]
 
 
+def _handles(text: str) -> set[str]:
+    """Every id in the text as its 8-char handle (sjh_session_handle)."""
+    return {m.removeprefix("ses_")[:8].lower() for m in SESSION_ID.findall(text)}
+
+
+def refs(md: str, tool_calls: list[dict]) -> dict[str, str]:
+    """{handle: "typed" | "pulled"}: the sessions this one named on purpose. Most are no session at
+    all (a commit hash, a colour); the catalogue decides later."""
+    out = {h: "pulled" for c in tool_calls if PULL_TOOLS.search(c["name"]) for h in _handles(c["input"])}
+    for block in re.split(r"^## ", md, flags=re.M):
+        if block.startswith("User\n"):
+            out.update({h: "typed" for h in _handles(block)})
+    return out
+
+
 def facts(md: str, cwd: str) -> dict:
     """The transcript alone → {files: {path: n}, events: [...], remotes: {dir: [remote…]},
-    names: {dir: {remote-name: remote}}, repos: {id: remote}}. Every event carries the directory it
-    ran in and, where its own command or output said, its repo; the rest is resolved later."""
+    names: {dir: {remote-name: remote}}, repos: {id: remote}, refs: {handle: how}}. Every event
+    carries the directory it ran in and, where its own command or output said, its repo; the rest is
+    resolved later."""
     home_m = _HOME.match(cwd or "")
     home = home_m.group(1) if home_m else ""
     here = cwd or ""
@@ -383,7 +405,8 @@ def facts(md: str, cwd: str) -> dict:
     names: dict[str, dict[str, dict]] = {}
     repos: dict[str, dict] = {}
 
-    for c in calls(md):
+    tool_calls = calls(md)
+    for c in tool_calls:
         name = c["name"].lower()
         if name in WRITE_TOOLS and not c["error"]:
             paths: list[str] = []
@@ -433,7 +456,8 @@ def facts(md: str, cwd: str) -> dict:
                 events.append(e)
         reset = _RESET.search(c["output"])
         here = reset.group(1) if reset else start
-    return {"files": files, "events": events, "remotes": remotes, "names": names, "repos": repos}
+    return {"files": files, "events": events, "remotes": remotes, "names": names, "repos": repos,
+            "refs": refs(md, tool_calls)}
 
 
 # ── facts → artefacts ────────────────────────────────────────────────────────────────────────
@@ -576,7 +600,32 @@ def minus(child: dict, parent: dict) -> dict:
             events.append(e)
     pf = parent.get("files", {})
     files = {p: n - pf.get(p, 0) for p, n in child.get("files", {}).items() if n > pf.get(p, 0)}
-    return {**child, "events": events, "files": files}
+    inherited = parent.get("refs", {})
+    return {**child, "events": events, "files": files,
+            "refs": {h: how for h, how in child.get("refs", {}).items() if h not in inherited}}
+
+
+def moved(path: str, pairs: list[tuple[str, str]]) -> str:
+    """Where a path is now, by the moves of its machine (longest old path first)."""
+    for old, new in pairs:
+        if path == old or path.startswith(old + "/"):
+            return new + path[len(old):]
+    return path
+
+
+def relocate(f: dict, pairs: list[tuple[str, str]]) -> dict:
+    """Facts with their paths where they are now, so a moved repo still resolves, and old sessions
+    meet new ones on one artefact. The facts themselves stay as the transcript has them."""
+    if not pairs:
+        return f
+    files: dict[str, int] = {}
+    for p, n in f.get("files", {}).items():
+        q = moved(p, pairs)
+        files[q] = files.get(q, 0) + n
+    return {**f, "files": files,
+            "events": [{**e, "dir": moved(e["dir"], pairs)} if e.get("dir") else e for e in f.get("events", [])],
+            "remotes": {moved(d, pairs): v for d, v in f.get("remotes", {}).items()},
+            "names": {moved(d, pairs): v for d, v in f.get("names", {}).items()}}
 
 
 def _record(path: str, host: str, cwd: str = "") -> dict | None:

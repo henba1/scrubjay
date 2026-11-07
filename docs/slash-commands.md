@@ -60,11 +60,42 @@ push's `To …`); failing that, on this machine, by the folder's `origin`. A for
 its parent's history, so a fork shows only what it did after branching. The map reads the archive in
 the background on start and caches the result, so a later start reads only new transcripts.
 
+**Context packs.** Shift+click cards, or use **Add to context pack** in a panel, to gather up to 12
+archived sessions from any machine or agent. **Build** writes them into one primer, oldest first and
+condensed, and gives you the command that starts a new session on it, in the agent you choose. It
+holds about 240K characters shared between the sessions; a long one loses its middle and is named.
+Packs stay in `~/.scrubjay/run/packs` for 7 days, readable only by you.
+
+A dot in a card's title says whether the session is alive. Active means a harness process holds it
+open, not that something happened lately: a filled green dot is working, orange is waiting on you, a
+hollow green ring is open and idle. A red square means its process went mid-turn. A dashed grey ring
+means recent: a turn ended within 15 minutes, with no process to confirm it. Only this machine's
+processes can be asked, so a session on another machine is at best recent. The status menu in the
+header filters by any of these, or by all sessions open here, and counts each. It looks past the
+date and empty filters, so a live session is never hidden by its age. Lanes with an open session come
+first, and dots and counts refresh every 10 seconds.
+
+Each relation has its own look. A fork is a solid arrow: made the same day, it sits indented under
+its parent; made later, it starts level with it. A carry-over to another agent is a dashed arrow
+naming that agent. A reference, a session you named by id or the agent pulled from the archive, is a
+dotted line shown only on hover or selection. Selecting a session fades everything unrelated and tags
+each relative with how it is related.
+
 Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic
 moved), its forks, where its transcript is archived, and the command that continues it. That is the
 harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from
 another machine ([hand-off](handoff.md)). **Read transcript** shows the archived conversation,
 condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
+
+**A path that moved.** A folder that no longer exists on this machine shows **⚠ gone** on its card.
+In a session's or an artefact's panel, **✎ moved?** records where it went, offering folders from the
+catalogue with the same name or the same git remote. The move covers everything under the path, on
+that machine, in every session: cards, lanes and artefacts show the new place, and **undo** takes it
+back. Transcripts are never edited. A resumed session is told instead, in its first context, of each
+move its history touches; a session whose own folder moved is staged there on resume, because the
+harness files sessions by folder. Moves live in `moves/` in your data repo, so they reach every
+machine; `bin/sj-moves.sh` does the same from a terminal. Claude Code gets the note; opencode does
+not yet, and Codex only if its SessionStart payload says `source: resume`.
 
 `/sjview <project>` opens the map on one project's lane. The name need not be exact: `widget`,
 `WIDGET_API` or `widgt-api` all find `widget-api`. Case and punctuation are ignored, part of a name

@@ -301,6 +301,11 @@ jq -n --argjson keep "$KEEPJSON" --argjson base "$(cat "$BASE")" --argjson host 
   | if $turn != "1" or ([.hooks.Stop[]?.hooks[]?.command] | map(test("log-session")) | any) then .
     else .hooks.Stop = ((.hooks.Stop // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/log-session.sh\""}]}])
     end
+  # A turn beginning, on the session lease (bin/sj-live.sh): what tells a session killed mid-turn
+  # from one closed at rest. Async, so it never holds a prompt up.
+  | if ([.hooks.UserPromptSubmit[]?.hooks[]?.command] | map(test("live-session")) | any) then .
+    else .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/live-session.sh\"", async: true}]}])
+    end
 ' > "$tmp"
 if [ -f "$OUT" ] && [ ! -L "$OUT" ] && ! cmp -s "$tmp" "$OUT"; then
   cp "$OUT" "$OUT.bak.$(date +%s)"; echo "  bak   $(sj_pretty_path "$OUT")"

@@ -239,6 +239,14 @@ if [ "$rewrite" -eq 1 ] && [ -n "$old_cwd" ]; then
     done <<< "$SCRUBJAY_PATH_MAP"
   fi
 
+  # A move recorded for this machine (bin/sj-moves.sh) names paths outside the session's folder too.
+  # Another machine's moves say where things went THERE, which is no better a path here.
+  if [ "$src_host" = "$(sj_host)" ]; then
+    while IFS=$'\t' read -r mhost mfrom mto; do
+      [ "$mhost" = "$src_host" ] && maps="$maps$mfrom$D$mto"$'\n'
+    done < <("$APP/bin/sj-moves.sh" list 2>/dev/null)
+  fi
+
   cp "$raw" "$tmp/rewritten"
   while IFS="$D" read -r from to; do
     [ -n "$from" ] && [ "$from" != "$to" ] || continue

@@ -142,12 +142,13 @@ sjh_apply_config() {
 
   sync_cmd="SCRUBJAY_HARNESS=codex bash \"$app/hooks/sync-session.sh\""
   log_cmd="SCRUBJAY_HARNESS=codex bash \"$app/hooks/log-session.sh\""
+  live_cmd="SCRUBJAY_HARNESS=codex bash \"$app/hooks/live-session.sh\""
 
   tmp="$(mktemp)" || return 1
   # Drop any previous scrubjay entry before re-adding, so the registration follows the app when the
   # clone moves, and never accumulates duplicates. Other people's hooks are matched on neither
   # script name, so they survive untouched.
-  jq --arg sync "$sync_cmd" --arg log "$log_cmd" '
+  jq --arg sync "$sync_cmd" --arg log "$log_cmd" --arg live "$live_cmd" '
       def strip($needle):
         map(select(((.hooks // []) | map(.command // "") | join(" ") | contains($needle)) | not));
       .hooks = (.hooks // {})
@@ -157,9 +158,15 @@ sjh_apply_config() {
       | .hooks.Stop =
           ((.hooks.Stop // []) | strip("hooks/log-session.sh")
            + [{hooks: [{type: "command", command: $log, timeout: 120, async: true}]}])
+      | .hooks.UserPromptSubmit =
+          ((.hooks.UserPromptSubmit // []) | strip("hooks/live-session.sh")
+           + [{hooks: [{type: "command", command: $live, timeout: 10, async: true}]}])
+      | .hooks.PermissionRequest =
+          ((.hooks.PermissionRequest // []) | strip("hooks/live-session.sh")
+           + [{hooks: [{type: "command", command: $live, timeout: 10, async: true}]}])
     ' "$hooks" > "$tmp" || { rm -f "$tmp"; return 1; }
 
-  if cmp -s "$tmp" "$hooks"; then echo "  ok    hooks registered (SessionStart, Stop)"; rm -f "$tmp"
+  if cmp -s "$tmp" "$hooks"; then echo "  ok    hooks registered (SessionStart, Stop, UserPromptSubmit, PermissionRequest)"; rm -f "$tmp"
   else mv "$tmp" "$hooks"; echo "  wrote $hooks  (SessionStart -> sync, Stop -> publish)"; fi
 
   echo "  note  sjmcp + /sj* commands not registered for codex yet (TOML config — ROADMAP P3)"
@@ -178,7 +185,6 @@ sjh_resume_cmd()  {  # sjh_resume_cmd <sid> <staged-file> [installed]
 
 # Cross-harness carry-over: hand the conversation over as context, since there is no native session
 # to resume. See bin/adapters/ROADMAP.md for the open issue on true translation.
-sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
-  printf 'codex "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
-    "$3" "$2" "$1"
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness> [prompt]
+  printf 'codex "%s"' "${4:-Continue the $3 session from $2. Read the full transcript at $1 first, then pick up where it left off.}"
 }

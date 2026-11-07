@@ -11,6 +11,7 @@
  *
  *   plugin load    -> hooks/sync-session.sh    (SessionStart: pull config + memory, apply)
  *   session.idle   -> hooks/opencode/publish.sh (export the session, then the shared SessionEnd hook)
+ *   session.status, permission.*, session.deleted -> bin/sj-live.sh (the session's lease)
  *
  * WHY session.idle: opencode never announces that a session ENDED — a killed TUI sends nothing. idle
  * fires whenever the agent goes quiet, i.e. after every turn, so we publish repeatedly and
@@ -33,6 +34,7 @@ import { fileURLToPath } from "url"
 const APP = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 const HOOK_SYNC = join(APP, "hooks", "sync-session.sh")
 const HOOK_PUBLISH = join(APP, "hooks", "opencode", "publish.sh")
+const LIVE = join(APP, "bin", "sj-live.sh")
 
 // publish.sh shells out to `opencode export`, and opencode is not necessarily on PATH — its
 // installer puts it in ~/.opencode/bin, which a desktop launcher or non-login shell may never have
@@ -41,7 +43,8 @@ const HOOK_PUBLISH = join(APP, "hooks", "opencode", "publish.sh")
 const OPENCODE = /opencode/.test(process.execPath || "") ? process.execPath : "opencode"
 
 const ScrubjayPlugin = async ({ directory }) => {
-  const env = { ...process.env, SCRUBJAY_HARNESS: "opencode", SCRUBJAY_OPENCODE_BIN: OPENCODE }
+  const env = { ...process.env, SCRUBJAY_HARNESS: "opencode", SCRUBJAY_OPENCODE_BIN: OPENCODE,
+    SCRUBJAY_LIVE_PID: String(process.pid) }
 
   // Launch and forget. `unref` + ignored stdio so opencode never waits on us, and never dies on our
   // account either — publish.sh re-launches itself detached anyway.
@@ -58,9 +61,14 @@ const ScrubjayPlugin = async ({ directory }) => {
 
   return {
     event: async ({ event }) => {
+      const p = event?.properties
+      const mark = (id, state) => id && launch(["bash", LIVE, "mark", id, state, directory])
+      if (event?.type === "session.status") mark(p?.sessionID, p?.status?.type === "idle" ? "idle" : "working")
+      else if (event?.type === "permission.asked") mark(p?.sessionID, "waiting")
+      else if (event?.type === "permission.replied") mark(p?.sessionID, "working")
+      else if (event?.type === "session.deleted") mark(p?.info?.id, "ended")
       if (event?.type !== "session.idle") return
-      const sessionID = event.properties?.sessionID
-      if (sessionID) launch(["bash", HOOK_PUBLISH, sessionID, directory])
+      if (p?.sessionID) launch(["bash", HOOK_PUBLISH, p.sessionID, directory])
     },
   }
 }

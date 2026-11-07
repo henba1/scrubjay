@@ -54,13 +54,21 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `bin/sj-shell.sh` (sourced from the user's rc, installed by `bin/sj-shell-install.sh`) wraps the
   `claude` command so `claude resume <sid>` does that hand-off from a terminal, via
   `bin/sj-claude-resume.sh`.
+- `bin/sj-live.sh` — session leases: which sessions a harness process holds open. Marked from
+  lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
+  `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it
+  for a transcript. Tests: `tests/test_live.sh`.
+- `bin/sj-moves.sh` — the moves ledger (`<data>/moves/<host>.tsv`): where a path went after a session
+  recorded it. Applied at read time by the viewer, told to a resumed agent by `hooks/sync-session.sh`,
+  and fed to `bin/sj-resume.sh`'s rewrite map. Transcripts are a record and are not edited. Tests:
+  `tests/test_moves.sh`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
   `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
   `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.
 - `view/` — the session map behind `/sjview`: `sj_view.py`, a stdlib-only local server built on
   sjmcp's readers; `artefacts.py`, which reads what a session changed (files, repos, PRs, commits)
   from its readable transcript; and `index.html`, its one self-contained page. Started and stopped by
-  `bin/sj-view.sh`; never left running. Tests: `tests/test_view.sh`.
+  `bin/sj-view.sh`; never left running. Its one write is a line in the moves ledger. Tests: `tests/test_view.sh`.
 - `commands/` — the generic `/dc*` slash commands shipped with the app.
 - `mods/scrubjay-ui/` — the optional Claude Code mod (TypeScript hooks module) that draws scrubjay
   in the native interface; listed by `.claude-plugin/marketplace.json`. Tests:
