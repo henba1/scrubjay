@@ -60,6 +60,15 @@ push's `To …`); failing that, on this machine, by the folder's `origin`. A for
 its parent's history, so a fork shows only what it did after branching. The map reads the archive in
 the background on start and caches the result, so a later start reads only new transcripts.
 
+A dot in a card's title says whether the session is alive. Active means a harness process holds it
+open, not that something happened lately: a filled green dot is working, orange is waiting on you, a
+hollow green ring is open and idle. A red square means its process went mid-turn. A dashed grey ring
+means recent: a turn ended within 15 minutes, with no process to confirm it. Only this machine's
+processes can be asked, so a session on another machine is at best recent. The status menu in the
+header filters by any of these, or by all sessions open here, and counts each. It looks past the
+date and empty filters, so a live session is never hidden by its age. Lanes with an open session come
+first, and dots and counts refresh every 10 seconds.
+
 Each relation has its own look. A fork is a solid arrow: made the same day, it sits indented under
 its parent; made later, it starts level with it. A carry-over to another agent is a dashed arrow
 naming that agent. A reference, a session you named by id or the agent pulled from the archive, is a

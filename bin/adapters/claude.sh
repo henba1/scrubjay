@@ -94,6 +94,19 @@ sjh_session_parent() {  # sjh_session_parent <transcript.jsonl>
   jq -rn 'first(inputs | .forkedFrom.sessionId? // empty | strings)' "$1" 2>/dev/null
 }
 
+# Sessions Claude Code holds open, from its own per-process registry: truer than any hook, it knows
+# working from waiting from idle. The format is internal (seen in 2.1.x), so a change here costs
+# only the detail: the lease still stands. `spare` is a process kept warm, with no session yet.
+sjh_live_sessions() {  # TSV <sid> <pid> <state> <epoch> <cwd>
+  local f
+  for f in "$(sjh_config_dir)/sessions"/*.json; do
+    [ -f "$f" ] || continue
+    jq -r 'select((.sessionId // "") != "" and .pid and (.spare | not))
+      | [.sessionId, .pid, ({busy: "working", waiting: "waiting", idle: "idle"}[.status // ""] // "idle"),
+         (((.statusUpdatedAt // .updatedAt // 0) / 1000) | floor), (.cwd // "")] | @tsv' "$f" 2>/dev/null
+  done
+}
+
 # Is <file> a Claude Code transcript? JSONL whose records carry Claude's own `sessionId` (which
 # neither a codex rollout — it nests session_id under .payload — nor an opencode export has at the
 # top level). Only the head is read: a transcript can be tens of MB.

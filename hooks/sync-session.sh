@@ -33,6 +33,7 @@ APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)" || exit 0
 DATA="$(sj_data 2>/dev/null || true)"
 sj_load_config   # in THIS shell: sj_data loads it only in its own subshell, so the backend check below saw the default
 sj_progress_begin sync
+printf '%s' "$input" | bash "$APP/bin/sj-live.sh" hook >/dev/null 2>&1
 
 # One repo's fast-forward pull, reported as a step (run in the background by the loop below).
 pull_step() {  # pull_step <step> <repo> <timeout-secs>
