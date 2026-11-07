@@ -7,10 +7,11 @@
 Started and stopped by bin/sj-view.sh (/sjview); not a daemon. It exits on its own after
 --idle minutes without a request, on POST /api/stop (the page's Stop button), or on SIGTERM.
 
-Read-only, like sjmcp, and built on sjmcp's own readers (mcp/sjmcp_server.py imports nothing
-beyond the standard library until it builds the MCP server), so the catalogue and the archive are
-parsed one way only. Same environment as sjmcp: SCRUBJAY_DATA, SCRUBJAY_LOCAL_CHATS,
-SCRUBJAY_MEMORY; SCRUBJAY_HOST names this machine.
+Built on sjmcp's own readers (mcp/sjmcp_server.py imports nothing beyond the standard library until
+it builds the MCP server), so the catalogue and the archive are parsed one way only. It reads the
+archive and never changes it; its one write is a line in the moves ledger (bin/sj-moves.sh). Same
+environment as sjmcp: SCRUBJAY_DATA, SCRUBJAY_LOCAL_CHATS, SCRUBJAY_MEMORY; SCRUBJAY_HOST names this
+machine.
 
 Safety: binds 127.0.0.1 only; every request needs the per-run token (in the URL the wrapper
 prints, then a header), and a Host header naming this loopback port, so another page in the
@@ -40,6 +41,8 @@ import artefacts as art  # noqa: E402
 
 PAGE = HERE / "index.html"
 TRANSCRIPT_MAX = 2_000_000  # chars; a page this big is already unreadable, past it we say so
+MOVES = APP / "bin" / "sj-moves.sh"
+BODY_MAX = 16_384  # bytes of a POST: two paths and a host
 
 
 # ── the catalogue, every row kept ─────────────────────────────────────────────────────────────
@@ -146,6 +149,21 @@ class Artefacts:
         except OSError:
             pass
 
+    def remotes_under(self, path: str) -> list[dict]:
+        """Every remote a session saw in this folder or below it."""
+        with self.lock:
+            all_facts = list(self.facts.values())
+        out: dict[str, dict] = {}
+        inside = lambda d: d == path or d.startswith(path.rstrip("/") + "/")  # noqa: E731
+        for f in all_facts:
+            for d, rs in f.get("remotes", {}).items():
+                if inside(d):
+                    out.update({r["id"]: r for r in rs})
+            for d, by_name in f.get("names", {}).items():
+                if inside(d):
+                    out.update({r["id"]: r for r in by_name.values()})
+        return list(out.values())
+
     def refs(self, sid8: str, parent: str = "") -> dict[str, str]:
         """The sessions this one named on purpose; a fork's inherited ones are its parent's."""
         with self.lock:
@@ -155,7 +173,9 @@ class Artefacts:
             return {}
         return (art.minus(f, pf) if pf else f).get("refs", {})
 
-    def links(self, sid8: str, host: str, cwd: str, parent: str = "") -> list[dict]:
+    def links(self, sid8: str, host: str, cwd: str, parent: str = "",
+              pairs: list[tuple[str, str]] | None = None) -> list[dict]:
+        pairs = pairs or []
         with self.lock:
             f = self.facts.get(sid8)
             pf = self.facts.get(sj._handle(parent)) if parent else None
@@ -163,9 +183,14 @@ class Artefacts:
             return []
         if pf:
             f = art.minus(f, pf)
-        out = self.resolver.links(f, host, cwd)
+        out = self.resolver.links(art.relocate(f, pairs), host, cwd)
         for link in out:
             link["summary"] = art.summary(link)
+            a = link["artefact"]
+            for old, new in pairs:
+                if a.get("path") and (a["path"] == new or a["path"].startswith(new + "/")):
+                    a["moved"] = {"old": old, "new": new}
+                    break
         return out
 
 
@@ -174,12 +199,32 @@ def _hops(hosts: list[str]) -> list[str]:
     return [h for i, h in enumerate(hosts) if i == 0 or h != hosts[i - 1]]
 
 
-def _node(sid: str, rows: list[dict], arch: Archive) -> dict:
+def moves() -> dict[str, list[tuple[str, str]]]:
+    """The moves in force, per machine, longest old path first."""
+    try:
+        out = subprocess.run(["bash", str(MOVES), "list"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    table: dict[str, list[tuple[str, str]]] = {}
+    for line in out.splitlines():
+        host, old, new = (line.split("\t") + ["", ""])[:3]
+        if host and old and new:
+            table.setdefault(host, []).append((old, new))
+    for pairs in table.values():
+        pairs.sort(key=lambda p: -len(p[0]))
+    return table
+
+
+def _node(sid: str, rows: list[dict], arch: Archive, mv: dict | None = None) -> dict:
     last, first = rows[-1], rows[0]
     sid8 = sj._handle(sid)
+    pairs = (mv or {}).get(last["host"], [])
+    cwd = art.moved(last["cwd"], pairs)
+    hit = next(((o, n) for o, n in pairs if cwd != last["cwd"] and art.moved(last["cwd"], [(o, n)]) == cwd), None)
     return {
         "sid": sid, "sid8": sid8, "topic": last["topic"], "host": last["host"],
-        "cwd": last["cwd"], "project": Path(last["cwd"]).name if last["cwd"] else "",
+        "cwd": cwd, "project": Path(cwd).name if cwd else "",
+        "recorded_cwd": last["cwd"], "moved": {"old": hit[0], "new": hit[1]} if hit else None,
         "date": first["date"], "time": first["time"],
         # Rows from before the harness field are Claude's; an opencode id says so on its own.
         "harness": last.get("harness") or ("opencode" if sid.startswith("ses_") else "claude"),
@@ -252,7 +297,9 @@ _HEADER_SAFE = re.compile(r"[\x21-\x7e]+")
 
 def graph(st: "State") -> dict:
     rows = _rows(st.r)
-    nodes = [_node(s, rs, st.arch) for s, rs in rows.items()]
+    mv = moves()
+    here = os.environ.get("SCRUBJAY_HOST", "")
+    nodes = [_node(s, rs, st.arch, mv) for s, rs in rows.items()]
     known = {n["sid"] for n in nodes}
     edges = [{"from": n["forked_from"], "to": n["sid"], "kind": "fork"}
              for n in nodes if n["forked_from"] and n["forked_from"] in known]
@@ -277,14 +324,27 @@ def graph(st: "State") -> dict:
     for n in nodes:
         if not n["archived"]:
             continue
-        for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"]):
+        for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"], mv.get(n["host"])):
             a = arts.setdefault(link["artefact"]["id"], {**link["artefact"], "sessions": 0, "prs": set(), "commits": 0})
             a["sessions"] += 1
             a["prs"] |= {x["n"] for x in link["events"] if x["type"] in ("pr_open", "pr_merge") and "n" in x}
             a["commits"] += sum(1 for x in link["events"] if x["type"] == "commit")
             edges.append({"from": n["sid"], "to": a["id"], "kind": "artefact", "summary": link["summary"]})
+    gone: dict[str, bool] = {}
+
+    def is_gone(host: str, path: str) -> bool:
+        """Only this machine's disk can say; each path is asked once."""
+        if host != here or not path.startswith("/"):
+            return False
+        if path not in gone:
+            gone[path] = not os.path.exists(path)
+        return gone[path]
+
+    for n in nodes:
+        n["gone"] = is_gone(n["host"], n["cwd"])
     for a in arts.values():
         a["prs"] = len(a["prs"])
+        a["gone"] = is_gone(a.get("host", ""), a.get("path", ""))
     return {"host": os.environ.get("SCRUBJAY_HOST", ""), "nodes": nodes, "edges": edges,
             "artefacts": list(arts.values()), "archive": bool(st.r.chats), "cloud": cloud_links(),
             "indexing": None if st.arts.ready else {"done": st.arts.done, "total": st.arts.total}}
@@ -293,12 +353,13 @@ def graph(st: "State") -> dict:
 def artefact(st: "State", aid: str) -> dict | None:
     """One artefact and, per session that changed it, what it did there: the milestones."""
     rows = _rows(st.r)
+    mv = moves()
     found, sessions = None, []
     for sid, rs in rows.items():
-        n = _node(sid, rs, st.arch)
+        n = _node(sid, rs, st.arch, mv)
         if not n["archived"]:
             continue
-        for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"]):
+        for link in st.arts.links(n["sid8"], n["host"], n["cwd"], n["forked_from"], mv.get(n["host"])):
             if link["artefact"]["id"] == aid:
                 found = link["artefact"]
                 sessions.append({"node": n, "events": link["events"], "files": link["files"],
@@ -327,12 +388,18 @@ def session(st: "State", sid: str) -> dict | None:
     rows = all_rows.get(sid)
     if not rows:
         return None
-    node = _node(sid, rows, arch)
+    mv = moves()
+    node = _node(sid, rows, arch, mv)
     readable = arch.readable(node["sid8"])
     raw = sj._jsonl_for(Path(readable), r) if readable else None
     here = os.environ.get("SCRUBJAY_HOST", "")
     native = _resume_cmd(node["harness"], sid)
-    if node["host"] == here:
+    if node["host"] == here and node["moved"]:
+        # The harness files a session under its folder, so one that moved has to be staged there.
+        resume = {"where": "moved", "cmd": f"{_q(str(APP / 'bin' / 'sj-resume.sh'))} {node['sid8']} --into {_q(node['cwd'])}",
+                  "then": f"cd {_q(node['cwd'])} && {native}" if native else "",
+                  "note": "its folder moved, so this stages it there first; then continue it"}
+    elif node["host"] == here:
         resume = {"where": "here", "cmd": f"cd {_q(node['cwd'])} && {native}" if native else ""}
     else:
         resume = {"where": node["host"],
@@ -341,9 +408,42 @@ def session(st: "State", sid: str) -> dict | None:
                   "note": f"run it from this project's folder here; it copies the session over "
                           f"from {node['host']} and prints how to continue it"}
     children = [s for s, rs in all_rows.items() if rs[-1].get("forked_from") == sid]
-    links = st.arts.links(node["sid8"], node["host"], node["cwd"], node["forked_from"]) if readable else []
+    links = st.arts.links(node["sid8"], node["host"], node["cwd"], node["forked_from"], mv.get(node["host"])) if readable else []
     return {"node": node, "rows": rows, "children": children, "readable": readable,
             "raw": str(raw) if raw else "", "resume": resume, "artefacts": links}
+
+
+def record_move(host: str, old: str, new: str) -> str:
+    """A move into the ledger, or an undo when `new` is empty. "" when done, else what is wrong."""
+    if not (isinstance(host, str) and isinstance(old, str) and isinstance(new, str)) or not host or not old:
+        return "a move needs a host and a path"
+    # On this machine the target must exist; the ledger checks, so no path from a request is opened here.
+    here = host == os.environ.get("SCRUBJAY_HOST", "")
+    args = (["add", *(["--must-exist"] if here else []), host, old, new]) if new else ["undo", host, old]
+    try:
+        r = subprocess.run(["bash", str(MOVES), *args], capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return "could not reach the ledger"
+    return "" if r.returncode == 0 else (r.stderr.strip().removeprefix("sj-moves: ") or "could not record the move")
+
+
+def suggest(st: "State", path: str) -> list[str]:
+    """Where a folder that is gone may have gone: this machine's catalogued folders that exist and
+    carry its name, or the remote the sessions saw there."""
+    here = os.environ.get("SCRUBJAY_HOST", "")
+    mv = moves().get(here, [])
+    seen = {art.moved(rs[-1]["cwd"], mv) for rs in _rows(st.r).values() if rs[-1]["host"] == here and rs[-1]["cwd"]}
+    want = {r["id"] for r in st.arts.remotes_under(path)}
+    name = os.path.basename(path.rstrip("/")).lower()
+    named, same_remote = [], []
+    for d in sorted(seen):
+        if d == path or not os.path.isdir(d):
+            continue
+        if os.path.basename(d).lower() == name:
+            named.append(d)
+        elif want and want & {r["id"] for r in st.arts.resolver.local(d)[1].values()}:
+            same_remote.append(d)
+    return (same_remote + named)[:8]
 
 
 def _q(s: str) -> str:
@@ -431,6 +531,18 @@ def handler_for(st: State):
             if method == "GET" and u.path == "/api/transcript":
                 return self._json(transcript(st.r, st.arch, (q.get("sid8") or [""])[0],
                                              (q.get("format") or ["readable"])[0]))
+            if method == "GET" and u.path == "/api/suggest":
+                return self._json({"paths": suggest(st, (q.get("path") or [""])[0])})
+            if method == "POST" and u.path == "/api/move":
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    body = json.loads(self.rfile.read(n)) if 0 < n <= BODY_MAX else None
+                except ValueError:
+                    body = None
+                if not isinstance(body, dict):
+                    return self._json({"error": "not a move"}, 400)
+                err = record_move(body.get("host"), body.get("old"), body.get("new", ""))
+                return self._json({"error": err}, 400) if err else self._json({"ok": True})
             if method == "POST" and u.path == "/api/stop":
                 self._json({"stopped": True})
                 threading.Thread(target=st.server.shutdown, daemon=True).start()

@@ -149,6 +149,11 @@ pre.cmd { font: 12px var(--mono); background: var(--bg); border: 1px solid var(-
 .note { color: var(--dim); font-size: 12px; }
 .warn { color: var(--warn); }
 a.sid { color: var(--blue); cursor: pointer; font-family: var(--mono); }
+button.mv { font-size: 11px; padding: 0 5px; margin-left: 4px; color: var(--dim); }
+button.mv.gone { color: var(--warn); border-color: var(--warn); }
+.mvform { display: grid; gap: 4px; margin: 6px 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; word-break: normal; }
+.mvform label { display: grid; grid-template-columns: 3em 1fr; gap: 6px; align-items: center; color: var(--dim); font-size: 12px; }
+.mvform input { font: 12px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; min-width: 0; }
 a.cloud { font-size: 12px; white-space: nowrap; text-decoration: none; margin-left: 6px; }
 a.cloud:hover { text-decoration: underline; }
 .alist { list-style: none; padding: 0; margin: 0; }
@@ -242,7 +247,7 @@ const TOKEN = new URLSearchParams(location.search).get("t") || "";
 history.replaceState(null, "", "/?t=" + encodeURIComponent(TOKEN) + location.hash);
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
-  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN } });
+  const r = await fetch(path, { ...opts, headers: { "X-SJ-Token": TOKEN, ...opts.headers } });
   return r.json();
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -268,6 +273,37 @@ const cloudA = (path) => {
   const u = cloud(path);
   return u ? `<a class="cloud" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="open in Nextcloud">☁ open</a>` : "";
 };
+
+// A path that moved after a session recorded it: an edit goes to the ledger, never the transcript.
+const wasMoved = (m) => m ? ` <span class="note">was ${esc(m.old)}</span> <button class="mv" data-undo="${esc(m.old)}">undo</button>` : "";
+const moveBtn = (host, path, gone) => path && host
+  ? ` <button class="mv${gone ? " gone" : ""}" data-mv="${esc(path)}" data-host="${esc(host)}" title="this path changed: record where it went">${gone ? "⚠ gone: where did it go?" : "✎ moved?"}</button>` : "";
+function moveForm(btn, done) {
+  const host = btn.dataset.host, box = document.createElement("form");
+  box.className = "mvform";
+  box.innerHTML = `<label>from <input name="old" value="${esc(btn.dataset.mv)}"></label>` +
+    `<label>to <input name="new" list="mvs" placeholder="/where/it/is/now" autocomplete="off"></label>` +
+    `<datalist id="mvs"></datalist><div id="mvsug" class="note"></div>` +
+    `<button type="submit">Save</button> <button type="button" class="cancel">Cancel</button>` +
+    `<span class="warn" id="mverr"></span>` +
+    `<div class="note">Applies to everything under it on ${esc(host)}, in every session. Transcripts stay as they are; a resumed agent is told.</div>`;
+  btn.replaceWith(box);
+  box.elements.new.focus();
+  box.querySelector(".cancel").onclick = done;
+  if (host === G.host) api("/api/suggest?path=" + encodeURIComponent(btn.dataset.mv)).then((s) => {
+    const paths = s.paths || [];
+    box.querySelector("#mvs").innerHTML = paths.map((p) => `<option value="${esc(p)}">`).join("");
+    const sug = box.querySelector("#mvsug");
+    sug.innerHTML = paths.map((p) => `<a href="#" data-p="${esc(p)}">${esc(p)}</a>`).join("<br>");
+    sug.querySelectorAll("a").forEach((a) => a.onclick = (e) => { e.preventDefault(); box.elements.new.value = a.dataset.p; });
+  });
+  box.onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await postMove({ host, old: box.elements.old.value.trim(), new: box.elements.new.value.trim() });
+    if (r.error) box.querySelector("#mverr").textContent = " " + r.error; else done();
+  };
+}
+const postMove = (m) => api("/api/move", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(m) });
 
 let G = { nodes: [], edges: [], artefacts: [], host: "" }, bySid = new Map(), byArt = new Map();
 let selected = null; // {sid} or {aid}: kept highlighted while its panel is open
@@ -470,7 +506,7 @@ function makeCard(n, p) {
     `<div class="mid" title="${esc(n.hosts.join(" → ") + " · " + n.cwd)}">` +
     (n.hosts.length > 1 ? `<span class="hop" title="continued on another machine">${esc(n.hosts.join(" → "))}</span>` : esc(n.host)) +
     ` · ${esc(tail(n.cwd))}<br>` +
-    `<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
+    `${n.gone ? '<span class="warn" title="this folder is not on this machine any more">⚠ gone</span> ' : ""}<span class="chip">${esc(n.harness)}</span>${n.model ? " " + esc(n.model.replace(/^claude-/, "")) : ""}</div>` +
     `<div class="low">${n.summary ? `<div class="sum" title="${esc(n.summary)}">${esc(n.summary)}</div>` : ""}` +
     `<div class="meta">${esc(n.time)}${n.turns ? " · " + esc(n.turns) + " turns" : ""}${n.size ? " · " + human(n.size) : ""}` +
     `${n.archived ? "" : ' · <span class="warn" title="transcript not in the archive on this machine">not here</span>'}</div></div>`;
@@ -652,9 +688,15 @@ const refList = (sid, mine, theirs) => G.edges.filter((e) => e.kind === "ref" &&
   .map((e) => `${sidLink(e[theirs])} <span class="note">(${e.how === "typed" ? "you named it" : "pulled from the archive"})</span>`).join("<br>");
 const artName = (a) => `<i class="sw pill" style="--c: var(--k-${esc(a.kind)})"></i><b>${esc(a.label)}</b>` +
   ` <span class="note">${esc(KIND[a.kind] || a.kind)}</span>`;
-function wire(root) {
+function wire(root, again, host) {
   root.querySelectorAll("a.sid").forEach((a) => a.onclick = () => open(a.dataset.sid));
   root.querySelectorAll("[data-aid]").forEach((a) => a.onclick = () => openArt(a.dataset.aid));
+  // A move can change what the panel shows, an artefact's id included: redraw, then look again.
+  const after = async () => { await load(); again(); };
+  root.querySelectorAll("[data-mv]").forEach((b) => b.onclick = () => moveForm(b, after));
+  root.querySelectorAll("[data-undo]").forEach((b) => b.onclick = async () => {
+    await postMove({ host, old: b.dataset.undo, new: "" }); after();
+  });
 }
 
 async function open(sid) {
@@ -674,7 +716,7 @@ async function open(sid) {
     `<h3>Session</h3>` + kv([
       ["started", esc(`${n.date} ${n.time}`)], ["host", esc(n.host) + (n.host === G.host ? ' <span class="note">(this machine)</span>' : "")],
       ["ran on", n.hosts.length > 1 ? esc(n.hosts.join(" → ")) + ' <span class="note">(handed off with /sjresume)</span>' : ""],
-      ["folder", esc(n.cwd) + cloudA(n.cwd)], ["project", esc(n.project)],
+      ["folder", esc(n.cwd) + cloudA(n.cwd) + wasMoved(n.moved) + moveBtn(n.host, n.cwd, bySid.get(n.sid)?.gone)], ["project", esc(n.project)],
       ["agent", `<span class="chip" style="--h: var(--${esc(n.harness)})">${esc(n.harness)}</span>`],
       ...extra.filter(([k]) => !["harness", "summary", "resumed_from", "forked_from"].includes(k)),
       ["topic from", n.essence ? "written with /sjlog" : last.prompts ? `Haiku, over ${esc(last.prompts)} prompts` : "the first prompt"],
@@ -709,7 +751,7 @@ async function open(sid) {
     `<h3>Topic history (${s.rows.length} rows)</h3>` +
     kv(s.rows.map((w) => [`${w.date} ${w.time}`, esc(w.topic || "(untitled)") +
       (w.prompts ? ` <span class="note">· ${esc(w.prompts)} prompts</span>` : "")]));
-  wire($("dbody"));
+  wire($("dbody"), () => open(sid), n.host);
   if ($("readc")) $("readc").onclick = () => read(n);
   if ($("copy")) $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(r.cmd); $("copy").textContent = "Copied"; }
@@ -769,7 +811,8 @@ async function openArt(aid) {
   $("dbody").innerHTML =
     `<h2>${artName(a)}</h2>` +
     (a.url ? `<div><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)} ↗</a></div>` : "") +
-    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}${cloudA(a.path)}</div>` : "") +
+    (a.path ? `<div class="note">${esc(a.path)}${a.host ? " on " + esc(a.host) : ""}${cloudA(a.path)}` +
+      `${wasMoved(a.moved)}${moveBtn(a.host, a.path, byArt.get(aid)?.gone)}</div>` : "") +
     `<div class="stats">` +
       `<span class="stat">${plural(d.sessions.length, "session")}</span>` +
       (merged.length ? `<span class="stat">merged ${merged.map((n) => "#" + n).join(" ")}</span>` : "") +
@@ -780,7 +823,8 @@ async function openArt(aid) {
       (span ? `<span class="stat">${esc(span)}</span>` : "") +
     `</div>` +
     `<h3>Milestones, newest first</h3>` + d.sessions.map((s) => milestones(s, a, titles)).join("");
-  wire($("dbody"));
+  // Moving a folder gives its artefact a new id, so there may be nothing left to show under this one.
+  wire($("dbody"), () => byArt.has(aid) ? openArt(aid) : closePanel(), a.host);
 }
 
 // The archive's readable Markdown, drawn as turns. Everything is escaped first; only the few
