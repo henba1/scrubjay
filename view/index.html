@@ -563,6 +563,7 @@ function countLive() {
   sel.length = 1;
   for (const [v, word] of [["active", "active (open here)"], ...Object.entries(LIVE_WORD)]) sel.add(new Option(`${word} (${count(v)})`, v));
   sel.value = keep;
+}
 
 // A context pack: pick sessions (Shift+click, or the panel's button), then start a new one on them.
 const PACK = new Set(), PACK_MAX = 12;

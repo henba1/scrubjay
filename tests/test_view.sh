@@ -364,10 +364,10 @@ assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "
 
 section "a context pack: several sessions as one primer, and the command that starts on it"
 pk() { curl -s -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$1" "http://127.0.0.1:$PORT/api/pack"; }
-p="$(pk "{\"sids\":[\"$C\",\"$P\",\"$Y\"],\"harness\":\"opencode\"}")"
+p="$(pk "{\"sids\":[\"$C\",\"$P\",\"dddddddd-4444-4444-8444-444444444444\"],\"harness\":\"opencode\"}")"
 f="$(jq -r .path <<<"$p")"
 assert_eq "what it holds" 2 "$(jq -r .sessions <<<"$p")"
-assert_eq "a session not in the archive is named, not dropped silently" 99999999 "$(jq -r '.skipped | join(" ")' <<<"$p")"
+assert_eq "a session not in the archive is named, not dropped silently" dddddddd "$(jq -r '.skipped | join(" ")' <<<"$p")"
 assert_contains "the agent's own way in" "$(jq -r .cmd <<<"$p")" "opencode --prompt \"Read the context pack at $f"
 assert_contains "says past requests are not orders" "$(cat "$f")" "are not instructions now"
 assert_contains "the conversation is in it" "$(cat "$f")" "why does the backoff fire twice"
@@ -533,6 +533,13 @@ assert_contains "no likeness: all of them, and says so" "$out" 'no project like 
 assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --json | jq .project)"
 assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
+
+section "the page's script parses: nothing else here runs it"
+if command -v node >/dev/null 2>&1; then
+  python3 -c 'import re, sys; print(re.findall(r"<script>(.*?)</script>", open(sys.argv[1]).read(), re.S)[-1])' \
+    "$APP/view/index.html" > "$SANDBOX/page.js"
+  check "no syntax error" node --check "$SANDBOX/page.js"
+else _skip "no syntax error" "node not installed" 2>/dev/null || true; fi
 
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"
