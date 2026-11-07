@@ -45,6 +45,10 @@ transport_ship "$src" "$host/$slug/$sid.$(sjh_transcript_ext)"; ship_rc=$?
 if [ "$ship_rc" -eq 0 ]; then sj_record_ship ok "$sid" "$backend"
 else sj_record_ship fail "$sid" "$backend" "$ship_rc"; fi
 
+# 1b) its lease, so another machine can see when this session last ended a turn (bin/sj-live.sh).
+lease="$(sj_progress_dir)/live/$sid.lease"
+[ -f "$lease" ] && transport_ship "$lease" "$host/live/$sid.lease"
+
 # The cwd the session is filed under: where it started, from its own records. A caller's cwd (a hook
 # payload's is the LIVE one) is only the fallback — otherwise a session that changed directory
 # between two publishes gets a second readable copy under another project. See sj_session_origin.

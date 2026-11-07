@@ -236,6 +236,31 @@ https://github.com/someone/else/releases/tag/v1
 https://github.com/upstream/lib/issues/5#issuecomment-1
 ```
 MD
+# A session that names others on purpose: one typed, one pulled, and one only seen in an output.
+ref_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_laptop__99999999.md"
+mkdir -p "$(dirname "$ref_md")"
+cat > "$ref_md" <<'MD'
+# Refs
+
+## User
+
+carry on from aaaaaaaa, and deadbeef is no session at all
+
+## Assistant
+
+**→ mcp__sjmcp__sj_get**
+
+```json
+{"id":"cccccccc"}
+```
+
+**⎿ output:**
+
+```text
+see bbbbbbbb
+```
+MD
+
 # The fork's transcript starts with all of that, then does one thing of its own.
 fork_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_jitter__bbbbbbbb.md"
 { cat "$read_md"; printf '\n**→ Bash**\n\n```bash\ngit commit -qm "try jitter"\n```\n\n**⎿ output:**\n\n```text\n```\n'; } > "$fork_md"
@@ -337,6 +362,90 @@ assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_reques
 assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
+section "a context pack: several sessions as one primer, and the command that starts on it"
+pk() { curl -s -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$1" "http://127.0.0.1:$PORT/api/pack"; }
+p="$(pk "{\"sids\":[\"$C\",\"$P\",\"dddddddd-4444-4444-8444-444444444444\"],\"harness\":\"opencode\"}")"
+f="$(jq -r .path <<<"$p")"
+assert_eq "what it holds" 2 "$(jq -r .sessions <<<"$p")"
+assert_eq "a session not in the archive is named, not dropped silently" dddddddd "$(jq -r '.skipped | join(" ")' <<<"$p")"
+assert_contains "the agent's own way in" "$(jq -r .cmd <<<"$p")" "opencode --prompt \"Read the context pack at $f"
+assert_contains "says past requests are not orders" "$(cat "$f")" "are not instructions now"
+assert_contains "the conversation is in it" "$(cat "$f")" "why does the backoff fire twice"
+first="$(command grep -n '^# Session' "$f" | head -1)"
+assert_contains "oldest first" "$first" aaaaaaaa
+assert_eq "private, like the archive" "$f" "$(find "$f" -perm 600)"
+assert_eq "no sessions: refused" '"a pack needs sessions"' "$(pk '{"sids":[],"harness":"claude"}' | jq .error)"
+assert_eq "an unknown agent: refused" '"no such agent"' "$(pk "{\"sids\":[\"$P\"],\"harness\":\"sh -c x\"}" | jq .error)"
+assert_contains "only what is in the archive" "$(pk '{"sids":["nope"],"harness":"claude"}' | jq -r .error)" "in the archive"
+assert_eq "a pack needs a token" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "http://127.0.0.1:$PORT/api/pack")"
+
+section "liveness: a process holds a session open, and only this machine's can be asked"
+L="$SCRUBJAY_RUN_DIR/live"; mkdir -p "$L"
+now="$(date +%s)"; sleep 300 & holder=$!
+start="$(ps -o lstart= -p "$holder" | sed 's/^ *//; s/ *$//')"
+lease() { jq -nc --arg sid "$1" --arg state "$2" --arg pid "$3" --arg start "$4" --argjson ts "${5:-$now}" \
+  '{sid: $sid, state: $state, pid: $pid, start: $start, ts: $ts}'; }
+lease "$P" working "$holder" "$start" > "$L/$P.lease"
+lease "$C" working 999999 "" > "$L/$C.lease"
+lease "$X" idle 999999 "" > "$L/$X.lease"
+lease "$O" waiting "$holder" "not this process" > "$L/$O.lease"
+mkdir -p "$SCRUBJAY_LOCAL_CHATS/laptop/live"
+lease "$Y" idle 1 "" > "$SCRUBJAY_LOCAL_CHATS/laptop/live/$Y.lease"
+sleep 6   # past the short cache
+lv="$(get /api/live)"
+st() { jq -r --arg s "$1" '.[$s].state // "none"' <<<"$lv"; }
+assert_eq "its process is alive: what the lease says" working "$(st "$P")"
+assert_eq "its process went mid-turn: died" died "$(st "$C")"
+assert_eq "its process went at rest: closed, nothing to report" none "$(st "$X")"
+assert_eq "a reused process id is not the holder" died "$(st "$O")"
+assert_eq "another machine's turn: recent, never working" recent "$(st "$Y")"
+lease "$P" ended "$holder" "$start" > "$L/$P.lease"
+lease "$Y" idle 1 "" $((now - 3600)) > "$SCRUBJAY_LOCAL_CHATS/laptop/live/$Y.lease"
+sleep 6; lv="$(get /api/live)"
+assert_eq "ended is ended, whatever runs" none "$(st "$P")"
+assert_eq "another machine's old turn is not recent" none "$(st "$Y")"
+kill "$holder" 2>/dev/null; rm -rf "$L" "$SCRUBJAY_LOCAL_CHATS/laptop/live"
+assert_contains "the page filters by status" "$(cat "$APP/view/index.html")" '<select id="status"'
+
+section "references: sessions named on purpose, not every id in a transcript"
+rg="$(get /api/graph)"
+ref() { jq -r --arg y "$Y" --arg s "$1" '.edges[] | select(.kind == "ref" and .to == $y and .from == $s) | .how' <<<"$rg"; }
+assert_eq "an id you typed" typed "$(ref "$P")"
+assert_eq "an id the agent pulled from the archive" pulled "$(ref "$X")"
+assert_eq "an id in a tool's output is not one" "" "$(ref "$C")"
+assert_eq "a fork does not cite what its parent cited" 0 "$(jq --arg c "$C" '[.edges[] | select(.kind == "ref" and .to == $c)] | length' <<<"$rg")"
+
+section "a path that moved: recorded beside the transcript, applied everywhere"
+post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:$PORT$1"; }
+assert_eq "a folder missing from this machine is flagged" true "$(get /api/graph | jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .gone')"
+assert_eq "another machine's folder is not judged from here" false "$(get /api/graph | jq -r --arg s "$Y" '.nodes[] | select(.sid == $s) | .gone')"
+new="$SANDBOX/widget-moved"; mkdir -p "$new"
+assert_eq "a move needs a token" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "http://127.0.0.1:$PORT/api/move")"
+assert_eq "a target that is not on this machine is refused" 400 "$(post /api/move '{"host":"testhost","old":"/home/user/widget-api","new":"/nowhere/at/all"}')"
+assert_eq "nonsense is refused" 400 "$(post /api/move '[1,2]')"
+assert_eq "a relative path is refused" 400 "$(post /api/move "{\"host\":\"testhost\",\"old\":\"rel\",\"new\":\"$new\"}")"
+assert_eq "a move is recorded" 200 "$(post /api/move "{\"host\":\"testhost\",\"old\":\"/home/user/widget-api\",\"new\":\"$new\"}")"
+n="$(get /api/graph | jq -c --arg s "$P" '.nodes[] | select(.sid == $s)')"
+assert_eq "the session shows the new folder" "$new" "$(jq -r .cwd <<<"$n")"
+assert_eq "its lane follows" widget-moved "$(jq -r .project <<<"$n")"
+assert_eq "what it recorded stays" /home/user/widget-api "$(jq -r .recorded_cwd <<<"$n")"
+assert_eq "and is no longer gone" false "$(jq -r .gone <<<"$n")"
+assert_eq "another machine's same-named folder did not move" /home/user/widget-api \
+  "$(get /api/graph | jq -r --arg s "$Y" '.nodes[] | select(.sid == $s) | .cwd')"
+r="$(get "/api/session?sid=$P" | jq -c .resume)"
+assert_eq "resuming it stages it there first" moved "$(jq -r .where <<<"$r")"
+assert_contains "with the hand-off" "$(jq -r .cmd <<<"$r")" "--into '$new'"
+assert_eq "undo" 200 "$(post /api/move '{"host":"testhost","old":"/home/user/widget-api","new":""}')"
+bash "$APP/bin/sj-moves.sh" add testhost /home/user/notes /home/user/docs   # the sandbox is scratch, so not there
+assert_eq "an artefact's folder moves too, and says from where" /home/user/notes \
+  "$(get /api/graph | jq -r '.artefacts[] | select(.path == "/home/user/docs") | .moved.old')"
+post /api/move '{"host":"testhost","old":"/home/user/notes","new":""}' >/dev/null
+assert_eq "and it is as it was" /home/user/widget-api "$(get /api/graph | jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .cwd')"
+sug="$SANDBOX/elsewhere/widget-api"; mkdir -p "$sug"
+echo "$today 08:00 | testhost | $sug | \"Elsewhere\" | session=ffffffff-6666-4666-8666-666666666666 | harness=claude | turns=1 | size=10" >> "$LOG"
+assert_contains "a folder of the same name is offered" "$(get "/api/suggest?path=/home/user/widget-api" | jq -r '.paths | join(" ")')" "$sug"
+sed -i.bak '/session=ffffffff/d' "$LOG"; rm -f "$LOG.bak"
+
 section "stop: the command, the page's button, and idle"
 out="$(bash "$APP/bin/sj-view.sh" stop 2>&1)"
 assert_contains "stop says so" "$out" "stopped"
@@ -355,6 +464,12 @@ python3 "$APP/view/sj_view.py" --port 0 --idle 0.03 --state "$STATE" >/dev/null 
 ipid=$!
 for _ in $(seq 100); do kill -0 "$ipid" 2>/dev/null || break; sleep 0.1; done
 check_fails "an unused viewer stops by itself" kill -0 "$ipid"
+python3 "$APP/view/sj_view.py" --port 0 --idle 0.05 --state "$STATE" >/dev/null 2>&1 &
+ipid=$!
+for _ in $(seq 40); do [ -f "$STATE" ] && break; sleep 0.1; done
+PORT="$(jq -r .port "$STATE")"; URL="$(jq -r .url "$STATE")"; TOK="${URL#*t=}"
+for _ in $(seq 150); do kill -0 "$ipid" 2>/dev/null || break; get /api/live >/dev/null; sleep 0.1; done
+check_fails "an open tab's status poll does not keep it alive" kill -0 "$ipid"
 
 section "Nextcloud links: the settings reach the page, the most specific folder first"
 R2="$SANDBOX/run2"
@@ -418,6 +533,22 @@ assert_contains "no likeness: all of them, and says so" "$out" 'no project like 
 assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --json | jq .project)"
 assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
+
+section "colour presets: each one in the menu has its colours, and sets all of them"
+page="$APP/view/index.html"
+names="$(sed -n 's/.*<select id="theme".*/&/p' "$page" | command grep -o 'option value="[a-z-]\+"' | sed 's/.*"\(.*\)"/\1/')"
+assert_eq "eight presets" 8 "$(printf '%s\n' "$names" | wc -l | tr -d ' ')"
+for t in $names; do
+  rule="$(command grep -F ":root[data-theme=\"$t\"]" "$page")"
+  assert_eq "$t sets every colour" 26 "$(printf '%s' "$rule" | command grep -o -- '--[a-z-]*:' | wc -l | tr -d ' ')"
+done
+
+section "the page's script parses: nothing else here runs it"
+if command -v node >/dev/null 2>&1; then
+  python3 -c 'import re, sys; print(re.findall(r"<script>(.*?)</script>", open(sys.argv[1]).read(), re.S)[-1])' \
+    "$APP/view/index.html" > "$SANDBOX/page.js"
+  check "no syntax error" node --check "$SANDBOX/page.js"
+else skip "no syntax error" "node not installed"; fi
 
 section "bad arguments are named"
 assert_contains "a non-number port" "$(bash "$APP/bin/sj-view.sh" --port x 2>&1)" "--port needs a number"

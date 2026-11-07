@@ -30,6 +30,9 @@ command -v jq >/dev/null 2>&1 || exit 0
 # the detached copy (--detached) finishes the work independently.
 if [ "${1:-}" != "--detached" ]; then
   self0="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  # The lease first, while this process still sits under the harness, and so the publish below ships
+  # it. Opencode's plugin marks its own: this hook's SessionEnd there only means a turn ended.
+  [ "${SCRUBJAY_HARNESS:-}" = opencode ] || printf '%s' "$input" | bash "${self0%/*}/../bin/sj-live.sh" hook >/dev/null 2>&1
   if command -v setsid >/dev/null 2>&1; then
     printf '%s' "$input" | setsid "$self0" --detached >/dev/null 2>&1 &
   else

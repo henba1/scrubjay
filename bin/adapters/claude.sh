@@ -24,9 +24,8 @@ sjh_resume_cmd()      { printf 'claude --resume %s' "$1"; }   # ($2 = staged fil
 # Cross-harness carry-over: the session came from a DIFFERENT agent, so there is no native session
 # to resume — hand the conversation over as context instead. See bin/adapters/ROADMAP.md for the
 # open issue on translating a session into this harness's own format.
-sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
-  printf 'claude "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
-    "$3" "$2" "$1"
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness> [prompt]
+  printf 'claude "%s"' "${4:-Continue the $3 session from $2. Read the full transcript at $1 first, then pick up where it left off.}"
 }
 
 # Claude Code stores a session at <root>/projects/<slug>/<sid>.jsonl, where <slug> is the session's
@@ -92,6 +91,19 @@ sjh_session_meta() {  # sjh_session_meta <transcript.jsonl>
 # with `forkedFrom.sessionId`, so the first hit suffices. `--fork-session` writes no such pointer.
 sjh_session_parent() {  # sjh_session_parent <transcript.jsonl>
   jq -rn 'first(inputs | .forkedFrom.sessionId? // empty | strings)' "$1" 2>/dev/null
+}
+
+# Sessions Claude Code holds open, from its own per-process registry: truer than any hook, it knows
+# working from waiting from idle. The format is internal (seen in 2.1.x), so a change here costs
+# only the detail: the lease still stands. `spare` is a process kept warm, with no session yet.
+sjh_live_sessions() {  # TSV <sid> <pid> <state> <epoch> <cwd>
+  local f
+  for f in "$(sjh_config_dir)/sessions"/*.json; do
+    [ -f "$f" ] || continue
+    jq -r 'select((.sessionId // "") != "" and .pid and (.spare | not))
+      | [.sessionId, .pid, ({busy: "working", waiting: "waiting", idle: "idle"}[.status // ""] // "idle"),
+         (((.statusUpdatedAt // .updatedAt // 0) / 1000) | floor), (.cwd // "")] | @tsv' "$f" 2>/dev/null
+  done
 }
 
 # Is <file> a Claude Code transcript? JSONL whose records carry Claude's own `sessionId` (which

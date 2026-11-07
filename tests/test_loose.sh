@@ -30,7 +30,8 @@ prs = [{"number": 1, "state": "OPEN", "headRefName": "x", "title": "still open",
        {"number": 2, "state": "MERGED", "headRefName": "y", "title": "m", "url": "u2"},
        {"number": 3, "state": "MERGED", "headRefName": "has-pr", "title": "m", "url": "u3"}]
 disk = {"/r/api": {"ahead": 2, "dirty": 1}, "/r/clean": {"ahead": 0, "dirty": 0}}
-print(json.dumps({"checked": v.loose_items(work, lambda r: prs, disk.get),
+d = v.died_items([{**n("x"), "project": "p"}, {**n("y"), "project": "p"}], {"x": {"state": "died"}, "y": {"state": "idle"}})
+print(json.dumps({"died": d, "checked": v.loose_items(work, lambda r: prs, disk.get),
                   "offline": v.loose_items(work[:1], lambda r: None, disk.get)}))
 PY
 )"
@@ -43,6 +44,9 @@ assert_eq "the branch with no PR; not one with a PR, not main" "branch no-pr pus
 assert_eq "commits not pushed" "2 commits not pushed" "$(what unpushed)"
 assert_eq "files not committed" "1 file not committed" "$(what dirty)"
 assert_eq "a clean repo says nothing" 0 "$(jq '[.checked[] | select(.repo == "r")] | length' <<<"$out")"
+
+section "a session that died mid-turn is one too"
+assert_eq "only the one that died" x "$(jq -r '[.died[].sid] | join(" ")' <<<"$out")"
 
 section "what could not be checked says so"
 assert_eq "GitLab is not asked" false "$(jq -r '.checked[] | select(.repo == "acme/lib") | .checked' <<<"$out")"

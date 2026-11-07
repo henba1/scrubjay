@@ -405,9 +405,8 @@ sjh_resume_cmd() {  # sjh_resume_cmd <sid> <staged-file> [installed]
 #
 # `--prompt` opens the TUI with that first prompt — a conversation to go on with. `opencode run` (what this
 # printed before) answers the one message and exits, so the hand-off ended after a single reply.
-sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness>
-  printf 'opencode --prompt "Continue the %s session from %s. Read the full transcript at %s first, then pick up where it left off."' \
-    "$3" "$2" "$1"
+sjh_context_cmd() {  # sjh_context_cmd <primer.md> <src_host> <src_harness> [prompt]
+  printf 'opencode --prompt "%s"' "${4:-Continue the $3 session from $2. Read the full transcript at $1 first, then pick up where it left off.}"
 }
 
 # /sjlog publishes the session you are IN, but opencode keeps no transcript file to point at — so
