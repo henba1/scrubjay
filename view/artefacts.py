@@ -16,6 +16,7 @@ Two stages, because only the second depends on this machine:
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -678,3 +679,31 @@ def summary(link: dict) -> str:
         n = len(link["files"])
         bits.append(f"{n} file{'s' if n != 1 else ''}")
     return " · ".join(bits) or "git activity"
+
+
+# ── when a session was at work ────────────────────────────────────────────────────────────────
+# The catalogue holds when a session started. Its raw transcript stamps every record, and a session
+# left open for a week was at work for a few hours of it, so the stamps are grouped into bursts.
+
+BURST_GAP = 1200  # seconds of silence that end a burst
+_STAMP = re.compile(rb'"timestamp":\s*"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)')  # Claude, Codex: UTC
+_MILLIS = re.compile(rb'"(?:created|completed)":\s*(\d{13})')                    # opencode
+
+
+def bursts(raw: bytes) -> list[list[int]]:
+    """[[start, end], …] in epoch seconds, from a raw transcript of any harness."""
+    utc = datetime.timezone.utc
+    stamps = {int(datetime.datetime.fromisoformat(m.decode()).replace(tzinfo=utc).timestamp()) for m in _STAMP.findall(raw)}
+    stamps |= {int(m) // 1000 for m in _MILLIS.findall(raw)}
+    return joined([[t, t] for t in stamps])
+
+
+def joined(spans: list[list[int]]) -> list[list[int]]:
+    """Spans in order, those less than a gap apart made one: a session's copies on two machines."""
+    out: list[list[int]] = []
+    for s, e in sorted(spans):
+        if out and s - out[-1][1] <= BURST_GAP:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return out

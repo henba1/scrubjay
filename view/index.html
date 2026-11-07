@@ -19,6 +19,7 @@ try { const t = localStorage.getItem("sj-theme"); if (t) document.documentElemen
   --k-github: #8957e5; --k-gitlab: #d6336c; --k-git: #1098ad; --k-repo: #5c7cfa;
   --k-folder: #c99a06; --k-record: #4f8ff7;
   --ok: #2f9e44; --merged: #8957e5; --closed: #c92a2a; --carry: #0c8599; --ref: #7048e8; --wait: #e8590c; --issue: #e8590c; --on: #fff;
+  --join: var(--k-repo);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
@@ -224,11 +225,99 @@ a.cloud:hover { text-decoration: underline; }
 .turn p { margin: 4px 0; white-space: pre-wrap; word-break: break-word; }
 .turn code { font-family: var(--mono); font-size: 12px; }
 #empty { padding: 40px 16px; color: var(--dim); }
+/* the switch between the two views */
+#viewsw { display: inline-flex; }
+#viewsw button { border-radius: 0; color: var(--dim); }
+#viewsw button:first-child { border-radius: 6px 0 0 6px; }
+#viewsw button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+#viewsw button[aria-pressed="true"] { color: var(--on); background: var(--blue); border-color: var(--blue); }
+
+/* the timeline: time runs right to now, a lane per project. Its names sit in a gutter that scrolls
+   with the lanes; everything right of it is one SVG, redrawn from the window of time in view. */
+#map > #empty { position: relative; z-index: 7; pointer-events: none; }
+#tl { position: absolute; inset: 0; z-index: 5; background: var(--bg); overflow: hidden; touch-action: none; user-select: none; cursor: grab; }
+#tl.panning { cursor: grabbing; }
+#tlsvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#tlgut { position: absolute; left: 0; top: 30px; bottom: 0; overflow: hidden; background: var(--panel); border-right: 1px solid var(--line); cursor: default; }
+#tlrows { position: absolute; left: 0; right: 0; top: 0; }
+.trow { position: absolute; left: 0; right: 0; padding: 4px 22px 0 10px; border-bottom: 1px solid var(--line); overflow: hidden; }
+.trow.drop { background: color-mix(in srgb, var(--join) 20%, var(--panel)); }
+.trow.trib { padding-left: 22px; }
+.trow .nm { display: block; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trow .also { display: block; font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trow .also a { color: var(--join); cursor: pointer; }
+.port { position: absolute; right: 5px; top: 6px; width: 13px; height: 13px; padding: 0; border-radius: 50%; cursor: crosshair; touch-action: none;
+  background: var(--panel); border: 2px solid var(--join); opacity: .55; }
+.trow:hover .port, .port:focus-visible { opacity: 1; }
+.port:hover { background: var(--join); }
+.port.sug { opacity: 1; background: var(--join); }
+#tlcorner { position: absolute; left: 0; top: 0; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 8px; z-index: 1; cursor: default;
+  background: var(--panel); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11px; color: var(--dim); overflow: hidden; white-space: nowrap; }
+#tlsug { font-size: 11px; padding: 0 6px; color: var(--join); border-color: var(--join); }
+#tlnote { position: absolute; left: 50%; top: 38px; transform: translateX(-50%); z-index: 2; padding: 3px 10px; border-radius: 6px; font-size: 12px; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink); }
+.tband { fill: color-mix(in srgb, var(--join) 5%, var(--lane)); }
+.tstripe { stroke: var(--line); stroke-width: 1; }
+.tgrid { stroke: var(--line); stroke-width: 1; opacity: .6; }
+.ttick { font: 11px system-ui, sans-serif; fill: var(--dim); }
+.taxis { fill: var(--bg); }
+.tnow { stroke: var(--blue); stroke-width: 1.5; }
+.tnowl { font: 600 11px system-ui, sans-serif; fill: var(--blue); }
+/* a project joining another: the stream, the line that carries the eye along it, and its name */
+.tjoin { cursor: pointer; }
+.tjoin .rib { fill: color-mix(in srgb, var(--join) 38%, var(--lane)); }
+.tjoin .flow { fill: none; stroke: var(--join); stroke-width: 2; }
+.tjoin .seam { stroke: var(--join); stroke-width: 2; stroke-dasharray: 5 3; }
+.tjoin .hit { stroke: transparent; stroke-width: 14; fill: none; }
+.tjoin text, .tmoved text { font: 600 11px system-ui, sans-serif; fill: var(--join); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+.tjoin:hover .flow, .tjoin:hover .seam { stroke-width: 3.5; }
+.tmoved line { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 2 2; }
+.tmoved path { fill: var(--warn); }
+.tghost { fill: none; stroke: var(--join); stroke-width: 2.5; stroke-dasharray: 6 4; pointer-events: none; }
+.tghostx { stroke: var(--join); stroke-width: 1; pointer-events: none; }
+.tbrush { fill: color-mix(in srgb, var(--blue) 18%, transparent); stroke: var(--blue); pointer-events: none; }
+/* a session: a bar per burst of work on a thin line for its whole span; a tick when only its start is known */
+.tb { --h: var(--dim); cursor: pointer; }
+.tb.h-claude { --h: var(--claude); } .tb.h-opencode { --h: var(--opencode); } .tb.h-codex { --h: var(--codex); }
+.tb rect { fill: var(--h); }
+.tb .span { stroke: var(--h); stroke-width: 1.5; opacity: .55; }
+.tb .only { fill: var(--panel); stroke: var(--h); stroke-width: 1.5; }
+.tb .pad { fill: transparent; }
+.tb text { font: 11px system-ui, sans-serif; fill: var(--on); pointer-events: none; }
+.tb:hover rect, .tb:hover .only { stroke: var(--ink); stroke-width: 1; }
+.tb.sel rect, .tb.sel .only { stroke: var(--ink); stroke-width: 2; }
+.tb.inpack rect, .tb.inpack .only { stroke: var(--blue); stroke-width: 2.5; }
+#tl.kin .tb:not(.kin):not(.sel) { opacity: .25; }
+.tb .rel { font: 10px var(--mono); fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.tld { stroke: none; }
+.tld.s-working { fill: var(--ok); } .tld.s-waiting { fill: var(--wait); }
+.tld.s-idle { fill: var(--panel); stroke: var(--ok); stroke-width: 2; }
+.tld.s-recent { fill: var(--panel); stroke: var(--dim); stroke-width: 2; stroke-dasharray: 2 2; }
+.tld.s-died { fill: var(--closed); }
+.tarc { fill: none; stroke-width: 1.8; pointer-events: none; }
+.tarc.fork { stroke: var(--blue); } .tarc.carry { stroke: var(--carry); stroke-dasharray: 6 4; }
+.tarc.ref { stroke: var(--ref); stroke-dasharray: 1 5; stroke-linecap: round; }
+#tltip { position: absolute; z-index: 3; max-width: 340px; padding: 5px 8px; border-radius: 6px; font-size: 12px; pointer-events: none;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+#tltip b { display: block; } #tltip span { color: var(--dim); display: block; overflow-wrap: anywhere; }
+#tlpop { position: absolute; z-index: 4; left: 50%; top: 70px; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); padding: 12px; display: grid; gap: 8px; cursor: default;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.22); font-size: 13px; }
+#tlpop[hidden] { display: none; }
+#tlpop h3 { margin: 0; font-size: 14px; }
+#tlpop .pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
+#tlpop select, #tlpop input[type=date] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; min-width: 0; width: 100%; }
+#tlpop input[type=date] { width: auto; }
+#tlpop label { display: flex; gap: 6px; align-items: center; }
+#tlpop .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+#tlpop .acts .undo { margin-left: auto; color: var(--warn); }
+#tlpop ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+#tlpop li { display: grid; gap: 3px; padding-top: 6px; border-top: 1px solid var(--line); }
 </style>
 </head>
 <body>
 <header>
   <h1>◆ scrubjay sessions</h1>
+  <span id="viewsw" role="group" aria-label="view"><button data-view="map" aria-pressed="true" title="sessions as a map, and where their work landed">Map</button><button data-view="timeline" aria-pressed="false" title="sessions in time, a lane per project, and how projects joined">Timeline</button></span>
   <input id="q" type="search" placeholder="search topic, folder, session id, repo">
   <select id="project"><option value="">all projects</option></select>
   <select id="host"><option value="">all hosts</option></select>
@@ -270,8 +359,16 @@ a.cloud:hover { text-decoration: underline; }
   <span><i class="sw line dash" style="--c: var(--carry)"></i>carried over to another agent</span>
   <span><i class="sw line dot" style="--c: var(--ref)"></i>referenced (hover or select a session)</span>
   <span><i class="sw line" style="--c: var(--dim)"></i>changed (hover a node for what)</span>
+  <b>timeline</b>
+  <span><i class="sw" style="--c: var(--claude)"></i>a burst of work</span>
+  <span><i class="sw line" style="--c: var(--claude)"></i>the session's span</span>
+  <span>◇ only its start is known</span>
+  <span><i class="sw line" style="--c: var(--join)"></i>one project joins another</span>
 </div>
 <div id="map" title=""><div id="canvas"><svg id="edges"></svg></div><div id="days"></div><div id="empty" hidden></div>
+  <div id="tl" hidden><svg id="tlsvg"></svg><div id="tlgut"><div id="tlrows"></div></div>
+    <div id="tlcorner"><span>drag ○ to connect</span><button id="tlsug" hidden></button></div>
+    <div id="tlnote" hidden></div><div id="tltip" hidden></div><div id="tlpop" hidden></div></div>
   <div id="pack" hidden></div>
   <div id="zoombar" title="drag (or Space+drag) to pan · wheel scrolls, Shift+wheel sideways · Ctrl+wheel or pinch zooms · arrows/WASD pan · + − 0 F zoom · / search">
     <button data-z="out" title="zoom out (−)">−</button><button id="zpct" data-z="one" title="actual size (0)">100%</button>
@@ -377,7 +474,7 @@ let first = true, lastSig = "";
 async function load() {
   G = await api("/api/graph");
   // While the artefact index fills, most polls bring nothing new but the progress count.
-  const sig = JSON.stringify([G.nodes, G.edges, G.artefacts]);
+  const sig = JSON.stringify([G.nodes, G.edges, G.artefacts, G.links, G.suggested]);
   if (sig === lastSig) {
     $("count").textContent = $("count").textContent.replace(/ · reading artefacts .*$/, "") +
       (G.indexing ? ` · reading artefacts ${G.indexing.done}/${G.indexing.total}` : "");
@@ -389,13 +486,13 @@ async function load() {
   bySid = new Map(G.nodes.map((n) => [n.sid, n]));
   byArt = new Map((G.artefacts || []).map((a) => [a.id, a]));
   const uniq = (k) => [...new Set(G.nodes.map((n) => n[k]).filter(Boolean))].sort();
-  fillSelect("project", uniq("project"));
+  fillSelect("project", uniq("line"));
   fillSelect("host", uniq("host"));
   fillSelect("harness", uniq("harness"));
   draw();
   countLive();
   // Open on the newest day: the right end of the timeline, at actual size.
-  if (first) { first = false; setView(Math.min(0, $("map").clientWidth - WORLD.w), STRIP, 1); }
+  if (first) { first = false; setView(Math.min(0, $("map").clientWidth - WORLD.w), STRIP, 1); tlHome(); }
   // The artefact index fills in the background on a cold start; redraw until it is done.
   if (G.indexing) setTimeout(load, 1500);
 }
@@ -409,7 +506,7 @@ function visible() {
     const x = byArt.get(e.to); if (x && (x.label + " " + (x.url || "") + " " + (x.path || "")).toLowerCase().includes(q)) hitArt.add(e.from);
   }
   // A status filter looks past the date and "empty" filters: a live session is never hidden by its age.
-  return G.nodes.filter((n) => (!want || hasStatus(n.sid, want)) && (want || all || n.size !== "0" || n.topic) && (!p || n.project === p) && (!h || n.host === h) && (!a || n.harness === a)
+  return G.nodes.filter((n) => (!want || hasStatus(n.sid, want)) && (want || all || n.size !== "0" || n.topic) && (!p || n.line === p) && (!h || n.host === h) && (!a || n.harness === a)
     && (want || !cut || n.date >= cut)
     && (!q || hitArt.has(n.sid) || [n.topic, n.cwd, n.sid, n.host, n.model].join(" ").toLowerCase().includes(q)));
 }
@@ -443,11 +540,11 @@ function draw() {
   const col = new Map(days.map((d, i) => [d, i]));
   const lanes = new Map();
   for (const n of nodes) {
-    const k = n.project || "(no folder)";
+    const k = n.line || "(no folder)";
     if (!lanes.has(k)) lanes.set(k, []);
     lanes.get(k).push(n);
   }
-  const laneOf = new Map(nodes.map((n) => [n.sid, n.project || "(no folder)"]));
+  const laneOf = new Map(nodes.map((n) => [n.sid, n.line || "(no folder)"]));
   // An artefact sits in the lane whose sessions changed it most, in a column right of the timeline.
   const artLane = new Map();
   {
@@ -552,6 +649,7 @@ function draw() {
   svg.innerHTML = html;
   focus(selected);
   setView(V.x, V.y, V.k); // re-clamp to the new extent; this also makes the cards in view
+  if (TL.on) tlBuild();
 }
 
 const LIVE_WORD = { working: "working", waiting: "waiting on you", idle: "open, idle",
@@ -575,6 +673,7 @@ async function pollLive() {
   try { LIVE_NOW = await api("/api/live"); } catch { return; }
   for (const [sid, el] of cardEl) paintLive(el, sid);
   countLive();
+  if (!TL.act) tlPaint();
   if ($("status").value) {
     const shown = new Set(LAYOUT.nodes.map((n) => n.sid)), now = visible();
     if (now.length !== shown.size || now.some((n) => !shown.has(n.sid))) draw();
@@ -598,6 +697,7 @@ function togglePack(sid) {
   cardEl.get(sid)?.classList.toggle("inpack", PACK.has(sid));
   drawPack();
   if ($("packc")) $("packc").textContent = PACK.has(sid) ? "− Remove from context pack" : "+ Add to context pack";
+  tlPaint();
 }
 function drawPack() {
   const box = $("pack");
@@ -717,10 +817,11 @@ function paint() {
     d.style.transform = `translateX(${x}px)`;
     d.style.visibility = !isLand && (i % nth || landX - x < 90) ? "hidden" : "";
   });
-  $("zpct").textContent = Math.round(V.k * 100) + "%";
+  if (!TL.on) $("zpct").textContent = Math.round(V.k * 100) + "%";
   cull();
 }
-const panBy = (dx, dy) => setView(V.x + dx, V.y + dy, V.k);
+const panBy = (dx, dy) => TL.on ? tlPan(dx, dy) : setView(V.x + dx, V.y + dy, V.k);
+const zoomBy = (f, sx, sy) => TL.on ? tlZoom(1 / f) : zoomAt(sx, sy, V.k * f);
 // Zoom keeping the canvas point under (sx, sy) on the screen where it was.
 function zoomAt(sx, sy, k) {
   k = Math.min(ZMAX, Math.max(ZMIN, k));
@@ -728,6 +829,7 @@ function zoomAt(sx, sy, k) {
 }
 const mapCentre = () => { const m = $("map"); return [m.clientWidth / 2, m.clientHeight / 2]; };
 function fit() {
+  if (TL.on) return tlFit();
   const m = $("map"), k = Math.min(1, (m.clientWidth - 2 * PAD) / WORLD.w, (m.clientHeight - STRIP - PAD) / WORLD.h);
   setView(PAD, STRIP, k);
 }
@@ -805,6 +907,7 @@ function select(f) {
   const p = f?.sid ? LAYOUT.pos.get(f.sid) : f?.aid ? LAYOUT.apos.get(f.aid) : null;
   if (p) reveal(p, f.sid ? CARD_W : ART_W, f.sid ? CARD_H : ART_H);
   focus(f);
+  if (TL.on) { if (f?.sid) tlReveal(f.sid); tlPaint(); }
 }
 
 function kv(rows) {
@@ -1090,9 +1193,9 @@ $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeo
   $("zoombar").addEventListener("pointerdown", (e) => e.preventDefault()); // keep focus (and Space) off it
   $("zoombar").addEventListener("click", (e) => {
     const z = e.target.closest("button")?.dataset.z, [cx, cy] = mapCentre();
-    if (z === "in") zoomAt(cx, cy, V.k * 1.25);
-    else if (z === "out") zoomAt(cx, cy, V.k / 1.25);
-    else if (z === "one") zoomAt(cx, cy, 1);
+    if (z === "in") zoomBy(1.25, cx, cy);
+    else if (z === "out") zoomBy(.8, cx, cy);
+    else if (z === "one") TL.on ? tlHome() : zoomAt(cx, cy, 1);
     else if (z === "fit") fit();
   });
 
@@ -1107,9 +1210,9 @@ $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeo
       ArrowRight: () => panBy(-step, 0), d: () => panBy(-step, 0),
       ArrowUp: () => panBy(0, step), w: () => panBy(0, step),
       ArrowDown: () => panBy(0, -step), s: () => panBy(0, -step),
-      "+": () => zoomAt(cx, cy, V.k * 1.25), "=": () => zoomAt(cx, cy, V.k * 1.25),
-      "-": () => zoomAt(cx, cy, V.k / 1.25), _: () => zoomAt(cx, cy, V.k / 1.25),
-      0: () => zoomAt(cx, cy, 1), f: () => fit(), "/": () => $("q").focus(),
+      "+": () => zoomBy(1.25, cx, cy), "=": () => zoomBy(1.25, cx, cy),
+      "-": () => zoomBy(.8, cx, cy), _: () => zoomBy(.8, cx, cy),
+      0: () => TL.on ? tlHome() : zoomAt(cx, cy, 1), f: () => fit(), "/": () => $("q").focus(),
     }[k];
     if (act) { e.preventDefault(); act(); }
   });
@@ -1119,19 +1222,503 @@ $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeo
     if (!typingIn(e.target)) e.preventDefault();
   });
   window.addEventListener("blur", () => { space = false; map.classList.remove("grab", "panning"); });
-  new ResizeObserver(() => setView(V.x, V.y, V.k)).observe(map);
+  new ResizeObserver(() => { setView(V.x, V.y, V.k); tlPaint(); }).observe(map);
 }
+// --- the timeline -------------------------------------------------------------------------------
+// The second view of the same sessions, filters and selection: when the work happened, a lane per
+// project. Sessions sit in the lane their project stood in that day, so a project that joined
+// another (a link: <from> flows into <into> on a date) shows as one of three shapes, and which is
+// decided by the record, not by asking:
+//   the other had work before the date   a stream beside it that curves in on the date
+//   the other had none                    one lane, with a seam: a rename or a move
+//   no date                               one lane all along, the other name beside it
+const ZOOM_HELP = $("zoombar").title;
+const TL = { on: false, t1: 0, span: 14 * 86400, top: 0, rows: [], byName: new Map(), height: 0, act: null, hover: "" };
+const TL_AXIS = 30, TL_SUB = 20, TL_PAD = 5, TL_SUBS = 6, TL_MIN = 1800, TL_DEFAULT = 14 * 86400;
+const gutter = () => Math.min(210, Math.round($("map").clientWidth * .34));
+const stamp = (n) => Date.parse(`${n.date}T${(n.time || "00:00")}`) / 1000;
+const nowS = () => Date.now() / 1000;
+const startOf = (n) => n.bursts?.length ? n.bursts[0][0] : stamp(n);
+const endOf = (n) => isActive(n.sid) ? nowS() : n.bursts?.length ? n.bursts.at(-1)[1] : stamp(n);
+const ymd = (t) => { const d = new Date(t * 1000), z = (v) => String(v).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+const dayStart = (s) => Date.parse(`${s}T00:00`) / 1000;
+const laneName = (n) => n.lane || n.project || "(no folder)";
+const lengthOf = (s) => s < 90 ? "under 2 minutes" : s < 5400 ? `${Math.round(s / 60)} minutes` : s < 172800 ? `${(s / 3600).toFixed(1)} hours` : `${Math.round(s / 86400)} days`;
+
+// Which lanes share a row, from the whole catalogue so a filter never reshapes the links.
+function tlRows(nodes) {
+  const links = G.links || [], byFrom = new Map(links.map((l) => [l.from, l])), firstIn = new Map();
+  for (const n of G.nodes) { const k = laneName(n); if (!firstIn.has(k) || n.date < firstIn.get(k)) firstIn.set(k, n.date); }
+  const shares = new Map(), taken = new Set();
+  const dated = links.filter((l) => l.at).sort((a, b) => b.at.localeCompare(a.at));
+  for (const l of dated) if (!taken.has(l.into) && !(firstIn.get(l.into) < l.at)) { shares.set(l.from, l.into); taken.add(l.into); }
+  const rowName = (k) => { for (let i = 0; i < 32 && shares.has(k); i++) k = shares.get(k); return k; };
+  // The row a link arrives in: where its target itself stood on that day.
+  const landing = (l) => {
+    let p = l.into;
+    for (let i = 0; i < 32; i++) { const m = byFrom.get(p); if (!m || m.into === l.from || (m.at && m.at > l.at)) break; p = m.into; }
+    return rowName(p);
+  };
+  const rows = new Map();
+  for (const n of nodes) {
+    const k = rowName(laneName(n));
+    if (!rows.has(k)) rows.set(k, { name: k, nodes: [], also: [], was: [], seams: [], join: null, depth: 0 });
+    rows.get(k).nodes.push(n);
+  }
+  for (const l of links) {
+    const r = rows.get(landing(l));
+    if (!l.at) r?.also.push(l);
+    else if (shares.get(l.from)) { r?.was.push(l); r?.seams.push(l); }
+    else if (rows.has(l.from)) rows.get(l.from).join = l;
+  }
+  // A project and the streams that reach it stay together, the trunk on top.
+  const kids = new Map(), tops = [];
+  for (const r of rows.values()) {
+    const into = r.join && rows.get(landing(r.join));
+    if (into) { if (!kids.has(into.name)) kids.set(into.name, []); kids.get(into.name).push(r); } else tops.push(r);
+  }
+  const family = (r, seen = new Set()) => {
+    if (!seen.has(r)) { seen.add(r); for (const k of kids.get(r.name) || []) family(k, seen); }
+    return seen;
+  };
+  const latest = (r) => Math.max(...[...family(r)].flatMap((m) => m.nodes.map(endOf)));
+  const open_ = (r) => [...family(r)].some((m) => m.nodes.some((n) => isActive(n.sid)));
+  const ordered = [], seen = new Set();
+  const add = (r, depth) => {
+    if (seen.has(r.name)) return;
+    seen.add(r.name); r.depth = depth; ordered.push(r);
+    for (const k of (kids.get(r.name) || []).sort((a, b) => latest(b) - latest(a))) add(k, depth + 1);
+  };
+  tops.sort((a, b) => open_(b) - open_(a) || latest(b) - latest(a)).forEach((r) => add(r, 0));
+  for (const r of rows.values()) add(r, 0); // two machines' links may make a loop: nothing is lost
+  TL.landing = landing; TL.byFrom = byFrom;
+  return ordered;
+}
+
+// Sessions at the same time stack. A lane is as tall as the time in view needs, worked out when the
+// view comes to rest (tlSettle), so a lane never moves under a drag and a quiet one stays thin.
+function tlPack(r) {
+  const ends = [], sub = new Map(), t0 = TL.t1 - TL.span;
+  for (const n of r.nodes.filter((n) => endOf(n) >= t0 && startOf(n) <= TL.t1).sort((a, b) => startOf(a) - startOf(b))) {
+    const s = startOf(n), e = Math.max(endOf(n), s + TL_MIN);
+    let i = ends.findIndex((t) => t <= s);
+    if (i < 0) i = ends.length < TL_SUBS ? ends.length : ends.indexOf(Math.min(...ends));
+    ends[i] = e; sub.set(n.sid, i);
+  }
+  r.sub = sub; r.subs = Math.max(1, ends.length);
+}
+
+function tlBuild() {
+  tlClamp();
+  const rows = tlRows(LAYOUT.nodes), wrap = $("tlrows"), offers = tlOffers();
+  let y = 0;
+  wrap.textContent = "";
+  TL.byName = new Map();
+  TL.where = new Map();
+  for (const r of rows) {
+    tlPack(r);
+    const extra = r.also.length || r.was.length;
+    r.y = y; r.h = Math.max(r.subs * TL_SUB + 2 * TL_PAD, extra ? 46 : 32);
+    y += r.h;
+    TL.byName.set(r.name, r);
+    for (const n of r.nodes) TL.where.set(n.sid, r);
+    const el = document.createElement("div");
+    el.className = "trow" + (r.depth ? " trib" : "");
+    el.style.top = r.y + "px"; el.style.height = r.h + "px"; el.dataset.row = r.name;
+    const names = (ls) => ls.map((l) => `<a data-link="${esc(l.from)}">${esc(l.from)}</a>`).join(", ");
+    const sites = new Set(r.nodes.map((n) => n.host + ":" + n.cwd)), offered = offers.some((s) => s.from === r.name || s.into === r.name);
+    el.title = [...sites].slice(0, 8).join("\n");
+    el.innerHTML = `<span class="nm">${r.depth ? "↳ " : ""}${esc(r.name)} · ${r.nodes.length}</span>` +
+      (r.also.length ? `<span class="also">+ ${names(r.also)}</span>` : "") +
+      (r.was.length ? `<span class="also">was ${names(r.was)}</span>` : "") +
+      `<button class="port${offered ? " sug" : ""}" data-port="${esc(r.name)}" ` +
+      `title="drag onto another lane to connect the two projects, or click to choose"></button>`;
+    wrap.appendChild(el);
+  }
+  TL.rows = rows; TL.height = y;
+  $("tlsug").hidden = !offers.length;
+  $("tlsug").textContent = `${offers.length} suggested`;
+  tlPaint();
+}
+
+function tlClamp() {
+  const all = G.nodes.length ? Math.min(...G.nodes.map(startOf)) : nowS() - TL_DEFAULT, now = nowS();
+  const most = (now - all) * 1.1 + 86400;
+  TL.span = Math.min(most, Math.max(3600, TL.span));
+  const hi = now + TL.span * .06;
+  TL.t1 = Math.min(hi, Math.max(all + TL.span * .5, TL.t1));
+  const room = Math.max(0, TL.height - ($("tl").clientHeight - TL_AXIS - 40));
+  TL.top = Math.min(room, Math.max(0, TL.top));
+}
+const tlX = (t) => { const g = gutter(), w = $("tl").clientWidth - g; return g + (t - (TL.t1 - TL.span)) * w / TL.span; };
+const tlT = (x) => { const g = gutter(), w = $("tl").clientWidth - g; return TL.t1 - TL.span + (x - g) * TL.span / w; };
+const tlY = (y) => TL_AXIS + y - TL.top;
+const tlRowAt = (sy) => TL.rows.find((r) => sy >= tlY(r.y) && sy < tlY(r.y + r.h));
+
+function tlTicks(t0, t1, px) {
+  const hour = 3600, day = 86400, want = (t1 - t0) * 90 / px;
+  const step = [hour, 3 * hour, 6 * hour, 12 * hour, day, 2 * day, 7 * day, 14 * day, 30 * day, 91 * day, 365 * day].find((s) => s >= want) || 365 * day;
+  const d = new Date(t0 * 1000), out = [], M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  d.setMinutes(0, 0, 0);
+  if (step >= day) d.setHours(0);
+  if (step === 7 * day || step === 14 * day) d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+  if (step >= 30 * day) d.setDate(1);
+  if (step >= 91 * day) d.setMonth(d.getMonth() - d.getMonth() % 3);
+  if (step >= 365 * day) d.setMonth(0);
+  if (step < day) d.setHours(d.getHours() - d.getHours() % (step / hour));
+  for (let i = 0; i < 400 && d.getTime() / 1000 < t1; i++) {
+    const t = d.getTime() / 1000;
+    const label = step >= 30 * day ? `${M[d.getMonth()]} ${d.getFullYear()}` : step >= day || d.getHours() === 0 ? `${d.getDate()} ${M[d.getMonth()]}` : `${String(d.getHours()).padStart(2, "0")}:00`;
+    if (t >= t0) out.push({ t, label });
+    if (step >= 365 * day) d.setFullYear(d.getFullYear() + 1);
+    else if (step >= 30 * day) d.setMonth(d.getMonth() + Math.round(step / (30 * day)));
+    else if (step >= day) d.setDate(d.getDate() + step / day);
+    else d.setHours(d.getHours() + step / hour);
+  }
+  return out;
+}
+
+function tlBar(n, r, pick) {
+  const spans = n.bursts?.length ? n.bursts.map((b) => [...b]) : [];
+  const active = isActive(n.sid), s = startOf(n), e = endOf(n);
+  if (active) { if (spans.length) spans.at(-1)[1] = e; else spans.push([s, e]); }
+  const y = tlY(r.y) + TL_PAD + (r.sub.get(n.sid) || 0) * TL_SUB, h = TL_SUB - 4, mid = y + h / 2;
+  const x1 = tlX(s), x2 = tlX(e), l = LIVE_NOW[n.sid], k = kin.get(n.sid);
+  const cls = `tb h-${n.harness}${pick.has(n.sid) ? " sel" : ""}${k ? " kin" : ""}${PACK.has(n.sid) ? " inpack" : ""}`;
+  let g = `<g class="${cls}" data-sid="${esc(n.sid)}"><rect class="pad" style="fill:transparent;stroke:none" x="${x1 - 3}" y="${y}" width="${Math.max(x2 - x1, 0) + 6}" height="${h}"/>`;
+  if (spans.length > 1) g += `<line class="span" x1="${x1}" y1="${mid}" x2="${x2}" y2="${mid}"/>`;
+  let wide = 0, wideX = 0;
+  for (const [a, b] of spans) {
+    const xa = tlX(a), w = Math.max(tlX(b) - xa, 3);
+    g += `<rect x="${xa}" y="${y}" width="${w}" height="${h}" rx="3"/>`;
+    if (w > wide) { wide = w; wideX = xa; }
+  }
+  if (!spans.length) g += `<path class="only" d="M${x1},${y + 3} l4,${h / 2 - 3} l-4,${h / 2 - 3} l-4,-${h / 2 - 3} z"/>`;
+  if (wide > 56) {
+    const room = Math.max(0, wide - 10), text = n.topic || n.sid8, cut = Math.floor(room / 6);
+    g += `<text x="${Math.max(wideX, gutter()) + 5}" y="${mid + 4}">${esc(text.length > cut ? text.slice(0, Math.max(1, cut - 1)) + "…" : text)}</text>`;
+  }
+  if (l) g += l.state === "died" ? `<rect class="tld s-died" x="${x2 + 2}" y="${mid - 4}" width="8" height="8" rx="1"/>` : `<circle class="tld s-${l.state}" cx="${x2 + 7}" cy="${mid}" r="4.5"/>`;
+  if (k) g += `<text class="rel" x="${x2 + (l ? 16 : 5)}" y="${mid + 4}">${esc(k.rel)}</text>`;
+  return g + "</g>";
+}
+
+// Where a stream leaves its own row and where it lands in the other's.
+function tlShape(r) {
+  const into = r.join && TL.byName.get(TL.landing(r.join));
+  if (!into) return null;
+  const xe = tlX(dayStart(r.join.at)), yc = tlY(r.y) + r.h / 2, yt = tlY(into.y) + into.h / 2;
+  const L = Math.min(90, Math.max(30, Math.abs(yc - yt)));
+  return { xe, yc, yt, L, xj: xe - L, h: r.h / 2 - 2 };
+}
+function tlJoin(r) {
+  const c = tlShape(r), l = r.join;
+  if (!c) return "";
+  const { xe, yc, yt, L, xj, h } = c;
+  const flow = `M${xj},${yc} C${xj + L * .6},${yc} ${xe - L * .4},${yt} ${xe},${yt}`;
+  const rib = `M${xj},${yc - h} C${xj + L * .6},${yc - h} ${xe - L * .4},${yt - 3} ${xe},${yt - 3} L${xe},${yt + 3} C${xe - L * .4},${yt + 3} ${xj + L * .6},${yc + h} ${xj},${yc + h} z`;
+  return `<g class="tjoin" data-link="${esc(l.from)}" data-tip="${esc(`${l.from} joins ${l.into} on ${l.at}`)}"><path class="rib" d="${rib}"/>` +
+    `<path class="hit" d="${flow}"/><path class="flow" d="${flow}" marker-end="url(#tl-arrow)"/>` +
+    `<text x="${Math.max(xe + 6, gutter() + 6)}" y="${yc + 4}">joined ${esc(l.into)} · ${esc(l.at)}</text></g>`;
+}
+
+function tlPaint() {
+  if (!TL.on) return;
+  tlClamp();
+  const W = $("tl").clientWidth, H = $("tl").clientHeight, g = gutter(), t0 = TL.t1 - TL.span, t1 = TL.t1;
+  $("tlgut").style.width = $("tlcorner").style.width = g + "px";
+  $("tlrows").style.transform = `translateY(${-TL.top}px)`;
+  const pick = new Set(selected?.sid ? [selected.sid] : []);
+  const ticks = tlTicks(t0, t1, W - g);
+  let s = `<defs><marker id="tl-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--join)"/></marker></defs>`;
+  for (const t of ticks) s += `<line class="tgrid" x1="${tlX(t.t)}" y1="${TL_AXIS}" x2="${tlX(t.t)}" y2="${H}"/>`;
+  const inView = TL.rows.filter((r) => tlY(r.y + r.h) > TL_AXIS - 200 && tlY(r.y) < H + 200);
+  // A project's band is its life: from its first session to now, or to where it joined another.
+  for (const r of inView) {
+    const y = tlY(r.y);
+    s += `<line class="tstripe" x1="${g}" y1="${y + r.h}" x2="${W}" y2="${y + r.h}"/>`;
+    const a = tlX(Math.min(...r.nodes.map(startOf)));
+    const b = tlShape(r)?.xj ?? tlX(Math.max(...r.nodes.map(endOf)));
+    if (b > g && a < W) s += `<rect class="tband" x="${Math.max(a, g)}" y="${y + 1}" width="${Math.max(0, b - Math.max(a, g))}" height="${r.h - 2}"/>`;
+  }
+  for (const r of TL.rows) if (r.join) s += tlJoin(r);
+  for (const r of inView) {
+    for (const l of r.seams) {
+      const x = tlX(dayStart(l.at)), y = tlY(r.y);
+      if (x < g || x > W) continue;
+      s += `<g class="tjoin" data-link="${esc(l.from)}" data-tip="${esc(`${l.from} became ${l.into} on ${l.at}`)}"><line class="hit" x1="${x}" y1="${y}" x2="${x}" y2="${y + r.h}"/>` +
+        `<line class="seam" x1="${x}" y1="${y}" x2="${x}" y2="${y + r.h}"/><text x="${x + 5}" y="${y + r.h - 4}">${esc(l.from)} → ${esc(l.into)}</text></g>`;
+    }
+    // A recorded move: after the last session that still names the old folder.
+    const last = new Map();
+    for (const n of r.nodes) if (n.moved && (last.get(n.moved.old)?.at ?? 0) < endOf(n)) last.set(n.moved.old, { at: endOf(n), m: n.moved });
+    for (const { at, m } of last.values()) {
+      const x = tlX(at), y = tlY(r.y);
+      if (x > g && x < W) s += `<g class="tmoved" data-tip="${esc(`folder moved after this: ${home(m.old)} → ${home(m.new)}`)}"><line x1="${x}" y1="${y}" x2="${x}" y2="${y + r.h}"/><path d="M${x - 4},${y + 1} h8 l-4,6 z"/></g>`;
+    }
+  }
+  for (const r of inView) for (const n of r.nodes) if (endOf(n) >= t0 - TL.span * .02 && startOf(n) <= t1) s += tlBar(n, r, pick);
+  // Lineage and citations of the session in focus; forks and carry-overs always.
+  const hot = TL.hover || selected?.sid || "";
+  const anchor = (sid, end) => { const n = bySid.get(sid), r = TL.where.get(sid); if (!n || !r) return null; return { x: tlX(end ? endOf(n) : startOf(n)), y: tlY(r.y) + TL_PAD + (r.sub.get(sid) || 0) * TL_SUB + (TL_SUB - 4) / 2 }; };
+  for (const e of G.edges) {
+    if (e.kind !== "fork" && e.kind !== "carry" && e.kind !== "ref") continue;
+    if (e.kind === "ref" && e.from !== hot && e.to !== hot) continue;
+    const a = anchor(e.from, true), b = anchor(e.to, false);
+    if (!a || !b) continue;
+    const m = Math.max(24, Math.abs(b.x - a.x) / 2);
+    s += `<path class="tarc ${e.kind}" d="M${a.x},${a.y} C${a.x + m},${a.y} ${b.x - m},${b.y} ${b.x},${b.y}"/>`;
+  }
+  // The axis and "now" go over the bars; the gutter and its corner sit above all of it.
+  const nx = tlX(nowS());
+  s += `<rect class="taxis" x="${g}" y="0" width="${W - g}" height="${TL_AXIS}"/><line class="tgrid" x1="${g}" y1="${TL_AXIS}" x2="${W}" y2="${TL_AXIS}"/>`;
+  for (const t of ticks) s += `<text class="ttick" x="${tlX(t.t) + 3}" y="19">${esc(t.label)}</text>`;
+  if (nx > g && nx <= W) s += `<line class="tnow" x1="${nx}" y1="${TL_AXIS - 8}" x2="${nx}" y2="${H}"/><text class="tnowl" x="${nx - 5}" y="19" text-anchor="end" paint-order="stroke" stroke="var(--bg)" stroke-width="3">now</text>`;
+  const a = TL.act;
+  if (a?.kind === "connect") {
+    const m = (a.x + a.px) / 2;
+    s += `<path class="tghost" d="M${a.px},${a.py} C${m},${a.py} ${m},${a.y} ${a.x},${a.y}"/>`;
+    if (a.x > g) s += `<line class="tghostx" x1="${a.x}" y1="${TL_AXIS}" x2="${a.x}" y2="${H}"/>`;
+  }
+  if (a?.kind === "brush") {
+    const r = a.row, x = Math.min(a.sx, a.x);
+    s += `<rect class="tbrush" x="${x}" y="${tlY(r.y)}" width="${Math.abs(a.x - a.sx)}" height="${r.h}"/>`;
+  }
+  $("tlsvg").innerHTML = s;
+  $("tl").classList.toggle("kin", kin.size > 0);
+  const d = TL.span / 86400;
+  $("zpct").textContent = d >= 2 ? `${Math.round(d)}d` : `${Math.round(TL.span / 3600)}h`;
+}
+
+function tlZoom(f, sx) {
+  const x = sx ?? ($("tl").clientWidth + gutter()) / 2, at = tlT(x), W = $("tl").clientWidth - gutter();
+  TL.span *= f; tlClamp();
+  TL.t1 = at + TL.span * (1 - (x - gutter()) / W);
+  tlQueue();
+}
+// One paint a frame however fast the pointer reports, and a fresh fit once it stops.
+function tlQueue() {
+  if (!TL.on) return;
+  if (!TL.frame) TL.frame = requestAnimationFrame(() => { TL.frame = 0; tlPaint(); });
+  clearTimeout(TL.rest);
+  TL.rest = setTimeout(() => { if (!TL.act) tlBuild(); }, 220);
+}
+const tlPan = (dx, dy) => { TL.t1 -= dx * TL.span / ($("tl").clientWidth - gutter()); TL.top -= dy; tlQueue(); };
+const tlHome = () => { TL.span = TL_DEFAULT; TL.t1 = nowS() + TL_DEFAULT * .06; TL.top = 0; tlQueue(); };
+function tlFit() {
+  const ns = LAYOUT.nodes; if (!ns.length) return;
+  const a = Math.min(...ns.map(startOf)), b = nowS();
+  TL.span = (b - a) * 1.08 + 3600; TL.t1 = b + TL.span * .04; tlQueue();
+}
+// A selected session comes into view, clear of the side panel.
+function tlReveal(sid) {
+  const n = bySid.get(sid), r = TL.where?.get(sid); if (!n || !r) return;
+  const side = $("detail").classList.contains("open") ? $("detail").offsetWidth : 0, W = $("tl").clientWidth - side, g = gutter();
+  const x = tlX(startOf(n));
+  if (x < g + 20 || x > W - 20) TL.t1 += (x - (g + W) / 2) * TL.span / ($("tl").clientWidth - g);
+  const y = tlY(r.y);
+  if (y < TL_AXIS || y + r.h > $("tl").clientHeight) TL.top = r.y - 40;
+}
+
+function setMode(mode) {
+  TL.on = mode === "timeline";
+  $("tl").hidden = !TL.on;
+  for (const b of $("viewsw").children) b.setAttribute("aria-pressed", String(b.dataset.view === mode));
+  try { localStorage.setItem("sj-view", mode); } catch {}
+  $("zoombar").title = TL.on ? "drag to pan · wheel scrolls, Shift+wheel sideways · Ctrl+wheel zooms time · arrows/WASD pan · + − zoom · 0 last two weeks · F everything" : ZOOM_HELP;
+  if (TL.on) { if (selected?.sid) tlReveal(selected.sid); tlBuild(); } else setView(V.x, V.y, V.k);
+}
+
+// --- connecting projects ------------------------------------------------------------------------
+function tlOffers() {
+  let no = [];
+  try { no = JSON.parse(localStorage.getItem("sj-nolink") || "[]"); } catch {}
+  return (G.suggested || []).filter((s) => !no.includes(s.from + "\t" + s.into));
+}
+function tlDismiss(s) {
+  try {
+    const no = JSON.parse(localStorage.getItem("sj-nolink") || "[]");
+    localStorage.setItem("sj-nolink", JSON.stringify([...no, s.from + "\t" + s.into]));
+  } catch {}
+}
+const tlProjects = () => [...new Set(G.nodes.map((n) => n.project).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+function tlSay(text) {
+  const el = $("tlnote"); el.textContent = text; el.hidden = false;
+  clearTimeout(tlSay.t); tlSay.t = setTimeout(() => { el.hidden = true; }, 4000);
+}
+// What a link will look like, in the words of what it does, before anything is written.
+function tlOutcome(from, into, at) {
+  if (!from || !into || from === into) return "Pick two projects.";
+  if (!at) return `One lane for their whole history, with ${from} named beside ${into}.`;
+  const earlier = G.nodes.some((n) => laneName(n) === into && n.project === into && n.date < at);
+  return earlier ? `${from} runs beside ${into} until ${at}, then flows into it. Its later sessions sit in ${into}'s lane.`
+    : `${into} has nothing before ${at}, so this reads as one lane with a seam there: a rename or a move.`;
+}
+function tlConnect(l, existing) {
+  const pop = $("tlpop"), ps = tlProjects(), opts = (v) => ps.map((p) => `<option${p === v ? " selected" : ""}>${esc(p)}</option>`).join("");
+  pop.hidden = false;
+  pop.innerHTML = `<h3>${existing ? "Project link" : "Connect two projects"}</h3>` +
+    `<div class="pair"><select id="lfrom" aria-label="project that joins">${opts(l.from)}</select>` +
+    `<button id="lswap" title="swap which one flows into which">⇄</button><select id="linto" aria-label="project it joins">${opts(l.into)}</select></div>` +
+    `<label><input type="radio" name="lwhen" id="lon"${l.at ? " checked" : ""}> joins it on <input type="date" id="lat" value="${esc(l.at || ymd(nowS()))}"></label>` +
+    `<label><input type="radio" name="lwhen" id="lall"${l.at ? "" : " checked"}> was always the same project</label>` +
+    (l.why ? `<div class="note">Suggested: ${esc(l.why)}.</div>` : "") +
+    `<div class="note" id="lout"></div><span class="warn" id="lerr"></span>` +
+    `<div class="acts"><button id="lgo">${existing ? "Save" : "Connect"}</button><button id="lno">Cancel</button>` +
+    (existing ? `<button id="lundo" class="undo">Undo link</button>` : "") + `</div>` +
+    `<div class="note">Kept beside the catalogue: no transcript changes, and the link can be undone.</div>`;
+  const at = () => $("lon").checked ? $("lat").value : "";
+  const say = () => { $("lout").textContent = tlOutcome($("lfrom").value, $("linto").value, at()); };
+  say();
+  for (const id of ["lfrom", "linto", "lat", "lon", "lall"]) $(id).oninput = say;
+  $("lswap").onclick = () => { const a = $("lfrom").value; $("lfrom").value = $("linto").value; $("linto").value = a; say(); };
+  $("lno").onclick = () => { pop.hidden = true; };
+  const send = async (body) => {
+    const r = await api("/api/link", { method: "POST", body: JSON.stringify(body) }).catch(() => ({ error: "could not reach the viewer" }));
+    if (r.error) { $("lerr").textContent = r.error; return; }
+    pop.hidden = true; lastSig = ""; await load();
+  };
+  $("lgo").onclick = async () => {
+    if ($("lfrom").value === $("linto").value) { $("lerr").textContent = "Pick two different projects."; return; }
+    if (existing && $("lfrom").value !== l.from) await api("/api/link", { method: "POST", body: JSON.stringify({ from: l.from, into: "" }) });
+    send({ from: $("lfrom").value, into: $("linto").value, at: at() });
+  };
+  if (existing) $("lundo").onclick = () => send({ from: l.from, into: "" });
+}
+function tlSuggestions() {
+  const pop = $("tlpop"), offers = tlOffers();
+  pop.hidden = false;
+  pop.innerHTML = `<h3>Projects that look like one</h3><ul>` + offers.map((s, i) =>
+    `<li><b>${esc(s.from)} → ${esc(s.into)}</b><span class="note">${esc(s.why)}</span>` +
+    `<span class="acts"><button data-i="${i}" data-do="see">Review</button><button data-i="${i}" data-do="no">Not these</button></span></li>`).join("") +
+    `</ul><div class="acts"><button id="lno">Close</button></div>`;
+  $("lno").onclick = () => { pop.hidden = true; };
+  pop.querySelectorAll("[data-do]").forEach((b) => { b.onclick = () => {
+    const s = offers[b.dataset.i];
+    if (b.dataset.do === "see") return tlConnect(s, false);
+    tlDismiss(s); tlBuild();
+    if (tlOffers().length) tlSuggestions(); else pop.hidden = true;
+  }; });
+}
+
+// Pan by dragging, a port starts a link, and Shift+drag along a lane gathers that stretch into the pack.
+{
+  const tl = $("tl"), pad = 4;
+  const local = (e) => { const r = tl.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const tip = $("tltip");
+  const showTip = (html, x, y) => {
+    tip.innerHTML = html; tip.hidden = false;
+    tip.style.left = Math.min(x + 14, tl.clientWidth - tip.offsetWidth - 6) + "px";
+    tip.style.top = Math.min(y + 14, tl.clientHeight - tip.offsetHeight - 6) + "px";
+  };
+  const sessionTip = (n) => {
+    const l = LIVE_NOW[n.sid], worked = (n.bursts || []).reduce((a, b) => a + b[1] - b[0], 0);
+    const when = n.bursts?.length ? `${n.date} ${n.time} · at work ${lengthOf(worked)}${n.bursts.length > 1 ? ` in ${n.bursts.length} bursts` : ""}` : `${n.date} ${n.time} · only its start is known`;
+    return `<b>${esc(n.topic || "(untitled)")}</b><span>${esc(when)}${l ? " · " + esc(LIVE_WORD[l.state]) : ""}</span>` +
+      `<span>${esc(n.harness)} on ${esc(n.host)} · ${esc(tail(n.cwd))}${n.project !== laneName(n) ? ` (recorded as ${esc(n.project)})` : ""}</span>`;
+  };
+  tl.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    if (e.button !== 0 || e.target.closest("#tlpop, #tlcorner, a, select, input")) return;
+    const [x, y] = local(e), port = e.target.closest(".port");
+    tip.hidden = true;
+    if (port) {
+      const r = TL.byName.get(port.dataset.port);
+      TL.act = { kind: "connect", from: port.dataset.port, px: gutter() - 8, py: tlY(r.y) + 12, x, y, sx: x, sy: y };
+    } else if (e.shiftKey && x > gutter()) {
+      const row = tlRowAt(y);
+      if (!row) return;
+      TL.act = { kind: "brush", row, sx: x, x, y, sy: y };
+    } else if (e.target.closest("#tlgut")) return;
+    else TL.act = { kind: "pan", sx: x, sy: y, x, y, moved: false };
+    tl.setPointerCapture(e.pointerId);
+  });
+  tl.addEventListener("pointermove", (e) => {
+    const [x, y] = local(e), a = TL.act;
+    if (!a) {
+      const hit = e.target.closest?.("[data-sid], [data-tip]");
+      const sid = hit?.dataset.sid || "";
+      if (sid !== TL.hover) { TL.hover = sid; tlPaint(); }
+      if (sid) showTip(sessionTip(bySid.get(sid)), x, y);
+      else if (hit) showTip(`<b>${esc(hit.dataset.tip)}</b>`, x, y);
+      else tip.hidden = true;
+      return;
+    }
+    if (a.kind === "pan") {
+      if (Math.abs(x - a.sx) + Math.abs(y - a.sy) > pad) { a.moved = true; tl.classList.add("panning"); }
+      if (a.moved) tlPan(x - a.x, y - a.y);
+    } else if (a.kind === "connect") {
+      const row = tlRowAt(y), own = row?.name === a.from;
+      document.querySelectorAll(".trow.drop").forEach((el) => el.classList.remove("drop"));
+      if (row && !own) document.querySelector(`.trow[data-row="${CSS.escape(row.name)}"]`)?.classList.add("drop");
+      a.over = own ? null : row; a.x = x; a.y = y;
+      tlQueue();
+      if (a.over) showTip(`<b>${esc(a.from)} → ${esc(a.over.name)}</b><span>${x > gutter() ? "joins on " + esc(ymd(tlT(x))) : "always one project"}</span>`, x, y);
+      else tip.hidden = true;
+      return;
+    } else { a.x = x; tlQueue(); }
+    a.x = x; a.y = y;
+  });
+  const finish = (e) => {
+    const a = TL.act; TL.act = null;
+    tl.classList.remove("panning");
+    document.querySelectorAll(".trow.drop").forEach((el) => el.classList.remove("drop"));
+    tip.hidden = true;
+    if (!a) return;
+    if (e.type === "pointercancel") return tlPaint();
+    const [x, y] = local(e);
+    if (a.kind === "connect") {
+      const still = Math.abs(x - a.sx) + Math.abs(y - a.sy) <= pad;
+      const old = TL.byFrom.get(a.from);
+      if (still) tlConnect(old || { from: a.from, into: tlProjects().find((p) => p !== a.from) || "", at: ymd(nowS()) }, !!old);
+      else if (a.over) tlConnect({ from: a.from, into: a.over.name, at: x > gutter() ? ymd(tlT(x)) : "" }, false);
+      tlPaint();
+    } else if (a.kind === "brush") {
+      const lo = tlT(Math.min(a.sx, x)), hi = tlT(Math.max(a.sx, x));
+      const got = a.row.nodes.filter((n) => endOf(n) >= lo && startOf(n) <= hi);
+      let left = 0;
+      for (const n of got) if (!PACK.has(n.sid)) { if (PACK.size < PACK_MAX) togglePack(n.sid); else left++; }
+      if (left) tlSay(`The pack holds ${PACK_MAX}: ${plural(left, "session")} left out.`);
+      tlPaint();
+    } else if (!a.moved) {
+      const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest?.("[data-sid], .tjoin");
+      if (hit?.dataset.sid) { e.shiftKey ? togglePack(hit.dataset.sid) : open(hit.dataset.sid); return; }
+      if (hit?.dataset.link) tlConnect(TL.byFrom.get(hit.dataset.link), true);
+    }
+  };
+  tl.addEventListener("pointerup", finish);
+  tl.addEventListener("pointercancel", finish);
+  tl.addEventListener("pointerleave", () => { if (!TL.act) { tip.hidden = true; if (TL.hover) { TL.hover = ""; tlPaint(); } } });
+  tl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const a = e.target.closest("[data-link]");
+    if (a && a.tagName === "A") tlConnect(TL.byFrom.get(a.dataset.link), true);
+  });
+  tl.addEventListener("wheel", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (e.target.closest("#tlpop")) return;
+    if (e.ctrlKey) return tlZoom(Math.exp(e.deltaY * .004), Math.max(gutter(), local(e)[0]));
+    const sideways = e.shiftKey ? e.deltaY : e.deltaX;
+    tlPan(-sideways, e.shiftKey ? 0 : -e.deltaY);
+  }, { passive: false });
+  $("tlsug").onclick = tlSuggestions;
+  for (const b of $("viewsw").children) b.onclick = () => setMode(b.dataset.view);
+}
+
 $("stop").onclick = async () => {
   await api("/api/stop", { method: "POST" }).catch(() => {});
   document.body.innerHTML = '<p id="empty">The viewer has stopped. Run <code>/sjview</code> to start it again.</p>';
 };
 // `#sid=<id>` opens a session's panel, `#read=<id>` its transcript, `#art=<id>` an artefact's
-// milestones, `#project=<name>` that project's lane alone: links you can keep.
+// milestones, `#project=<name>` that project's lane alone, `#view=timeline` that view: links you can keep.
 setInterval(pollLive, 10000);
 load().then(async () => {
   const h = new URLSearchParams(location.hash.slice(1)), sid = h.get("sid") || h.get("read"), aid = h.get("art");
-  const proj = h.get("project");
-  if (proj && [...$("project").options].some((o) => o.value === proj)) { $("project").value = proj; draw(); }
+  const proj = h.get("project"), line = G.nodes.find((n) => n.project === proj)?.line || proj;
+  if (proj && [...$("project").options].some((o) => o.value === line)) { $("project").value = line; draw(); }
+  let mode = h.get("view");
+  try { mode ||= localStorage.getItem("sj-view"); } catch {}
+  if (mode === "timeline") setMode(mode);
   if (sid && bySid.has(sid)) { await open(sid); if (h.get("read")) read(bySid.get(sid)); }
   else if (aid) openArt(aid);
 }).catch(() => { $("empty").hidden = false; $("empty").textContent = "Could not reach the viewer — it may have stopped. Run /sjview again."; });

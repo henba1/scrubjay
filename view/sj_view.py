@@ -9,7 +9,8 @@ Started and stopped by bin/sj-view.sh (/sjview); not a daemon. It exits on its o
 
 Built on sjmcp's own readers (mcp/sjmcp_server.py imports nothing beyond the standard library until
 it builds the MCP server), so the catalogue and the archive are parsed one way only. It reads the
-archive and never changes it; its one write is a line in the moves ledger (bin/sj-moves.sh). Same
+archive and never changes it; its only writes are a line in the moves ledger (bin/sj-moves.sh) or
+the project links (bin/sj-projects.sh). Same
 environment as sjmcp: SCRUBJAY_DATA, SCRUBJAY_LOCAL_CHATS, SCRUBJAY_MEMORY; SCRUBJAY_HOST names this
 machine.
 
@@ -29,6 +30,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
@@ -45,6 +47,7 @@ LIVE = APP / "bin" / "sj-live.sh"
 RECENT = 15 * 60          # seconds: how long a turn elsewhere counts as recent
 DIED_WITHIN = 7 * 86400   # seconds: a session that died is news for this long
 MOVES = APP / "bin" / "sj-moves.sh"
+PROJECTS = APP / "bin" / "sj-projects.sh"
 BODY_MAX = 16_384  # bytes of a POST: two paths and a host
 PACK_MAX = 240_000        # chars in a context pack, about 60K tokens: room left to work in
 PACK_SESSIONS = 12
@@ -53,6 +56,8 @@ PACK_KEEP = 7 * 86400     # seconds a built pack stays on disk
 LOOSE_DAYS = 30           # how far back Loose ends looks
 LOOSE_REPOS = 20          # most repos asked about, newest work first
 LOOSE_CACHE = 300         # seconds before the forge and the disk are asked again
+CONTAINER = 3             # a folder holding this many projects is a shelf, not a project
+SHARE = 0.3               # of a project's sessions on one remote, for that remote to be its home
 DEFAULT_BRANCHES = {"main", "master", "trunk", "develop"}
 
 
@@ -205,6 +210,58 @@ class Artefacts:
         return out
 
 
+class Activity:
+    """When each session was at work (view/artefacts.py:bursts), read in the background from the raw
+    transcripts and cached like the artefacts. A session with no raw transcript here has none."""
+
+    VERSION = 1
+
+    def __init__(self, r: sj.Roots, cache: Path):
+        self.r, self.cache = r, cache
+        self.spans: dict[str, list[list[int]]] = {}   # sid8 -> bursts
+        self.done = self.total = 0
+        self.ready = False
+        self.lock = threading.Lock()
+
+    def start(self):
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def of(self, sid8: str) -> list[list[int]]:
+        with self.lock:
+            return self.spans.get(sid8, [])
+
+    def _run(self):
+        try:
+            disk = json.loads(self.cache.read_text())
+            entries = disk.get("entries", {}) if disk.get("version") == self.VERSION else {}
+        except (OSError, ValueError):
+            entries = {}
+        # <host>/<project>/<sid>.json[l]; a host's history.jsonl sits a level higher.
+        todo = [p for p in self.r.chats.glob("*/*/*.json*") if p.suffix in (".json", ".jsonl")] if self.r.chats else []
+        self.total, fresh = len(todo), {}
+        for p in todo:
+            try:
+                st = os.stat(p)
+                key = [st.st_size, int(st.st_mtime)]
+                hit = entries.get(str(p))
+                spans = hit["spans"] if hit and hit.get("key") == key else art.bursts(p.read_bytes())
+                fresh[str(p)] = {"key": key, "spans": spans}
+                h = sj._handle(p.stem)
+                with self.lock:
+                    self.spans[h] = art.joined(self.spans.get(h, []) + spans)
+            except OSError:
+                pass
+            self.done += 1
+        self.ready = True
+        try:
+            tmp = self.cache.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"version": self.VERSION, "entries": fresh}))
+            os.chmod(tmp, 0o600)
+            tmp.replace(self.cache)
+        except OSError:
+            pass
+
+
 def _hops(hosts: list[str]) -> list[str]:
     """Hosts in order, a repeat of the one before dropped: laptop, henpi, laptop."""
     return [h for i, h in enumerate(hosts) if i == 0 or h != hosts[i - 1]]
@@ -248,6 +305,119 @@ def _node(sid: str, rows: list[dict], arch: Archive, mv: dict | None = None) -> 
         "resumed_from": next((w["resumed_from"] for w in reversed(rows) if w.get("resumed_from")), ""),
         "rows": len(rows), "archived": bool(arch.readable(sid8)),
     }
+
+
+# ── which projects are one ────────────────────────────────────────────────────────────────────
+# A link says <from> flows into <into> on a date, or always did with none. Every session keeps the
+# project it recorded; these say whose lane it sits in then, and which project it is part of now.
+
+
+def project_links() -> dict[str, dict]:
+    """The links in force, by the project that flows."""
+    try:
+        out = subprocess.run(["bash", str(PROJECTS), "list"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    table = {}
+    for line in out.splitlines():
+        src, into, at = (line.split("\t") + ["", ""])[:3]
+        if src and into:
+            table[src] = {"from": src, "into": into, "at": at}
+    return table
+
+
+def follow(project: str, links: dict[str, dict], date: str = "") -> str:
+    """Where a project ends up, or with a date where it stood that day. Two machines can each write
+    half a loop, so a project seen twice stops the walk."""
+    seen = {project}
+    while (link := links.get(project)) and link["into"] not in seen and (not date or date >= link["at"]):
+        project = link["into"]
+        seen.add(project)
+    return project
+
+
+def suggest_links(nodes: list[dict], edges: list[dict], arts: dict[str, dict], links: dict[str, dict]) -> list[dict]:
+    """Projects that look like one, for someone to confirm: a folder directly inside another, work
+    that lands on a repo named after another project, or two that land on the same remote. A folder
+    that holds several projects is a shelf, not a project, and so is a hidden one or one near the root."""
+    roots: dict[str, set] = {}
+    first: dict[str, str] = {}
+    last: dict[str, str] = {}
+    count: Counter = Counter()
+    for n in nodes:
+        p = n["project"]
+        if p and n["cwd"].startswith("/") and not n["cwd"].startswith("/tmp/"):
+            roots.setdefault(p, set()).add((n["host"], n["cwd"]))
+            first[p] = min(first.get(p, n["date"]), n["date"])
+            last[p] = max(last.get(p, n["date"]), n["date"])
+            count[p] += 1
+    inside: dict[str, set] = {}   # project -> the projects within it
+    for p, rs in roots.items():
+        for q, qs in roots.items():
+            if p != q and any(h == g and os.path.dirname(c) == d for h, c in rs for g, d in qs):
+                inside.setdefault(q, set()).add(p)
+    shelf = {q for q, kids in inside.items() if len(kids) >= CONTAINER or q.startswith(".")
+             or all(d.count("/") < 2 for _, d in roots[q])}
+    out: list[dict] = []
+    said: set = set()
+
+    def offer(src: str, into: str, at: str, why: str) -> None:
+        if frozenset((src, into)) not in said and follow(src, links) != follow(into, links):
+            said.add(frozenset((src, into)))
+            out.append({"from": src, "into": into, "at": at, "why": why})
+
+    for q, kids in sorted(inside.items()):
+        for p in sorted(kids):
+            if q not in shelf and p not in shelf:
+                offer(p, q, "", f"{p} is a folder inside {q}")
+    # A project's home is the remote a good share of its sessions changed.
+    project_of = {n["sid"]: n["project"] for n in nodes}
+    landed: dict[str, Counter] = {}
+    for e in edges:
+        a = arts.get(e["to"]) if e["kind"] == "artefact" else None
+        if a and a.get("kind") in ("github", "gitlab", "git"):
+            landed.setdefault(project_of.get(e["from"], ""), Counter())[a["id"]] += 1
+    homes: dict[str, list[str]] = {}
+    for p, c in landed.items():
+        if p in roots and p not in shelf:
+            aid, n = c.most_common(1)[0]
+            if n >= 2 and n >= SHARE * sum(c.values()):
+                homes.setdefault(aid, []).append(p)
+
+    def plain(name: str) -> str:
+        return name.lower().replace("-", "").replace("_", "")
+
+    named = {plain(p): p for p in roots if p not in shelf}
+    for aid, ps in sorted(homes.items()):
+        label = arts[aid].get("label", aid)
+        into = named.get(plain(label.rsplit("/", 1)[-1]))
+        for p in ps:
+            if into and into != p:
+                offer(p, into, "", f"its work lands on {label}")
+    for aid, ps in sorted(homes.items()):
+        # The newer name is where a rename went, and with overlap the busier project is the trunk.
+        ps.sort(key=lambda p: (-count[p], p))
+        into = ps[0]
+        for p in ps[1:]:
+            a, b = (p, into) if first[p] <= first[into] else (into, p)
+            ended = last[a] < first[b]
+            offer(a if ended else p, b if ended else into, first[b] if ended else "",
+                  f"both land on {arts[aid].get('label', aid)}")
+    return out
+
+
+def record_link(src: str, into: str, at: str, known: set) -> str:
+    """A link into the ledger, or an undo when `into` is empty. "" when done, else what is wrong."""
+    if not (isinstance(src, str) and isinstance(into, str) and isinstance(at, str)) or not src:
+        return "a link needs a project"
+    if src not in known or (into and into not in known):
+        return "no such project in the catalogue"
+    args = ["add", src, into, *([at] if at else [])] if into else ["undo", src]
+    try:
+        r = subprocess.run(["bash", str(PROJECTS), *args], capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return "could not reach the ledger"
+    return "" if r.returncode == 0 else (r.stderr.strip().removeprefix("sj-projects: ") or "could not record the link")
 
 
 # ── which sessions are alive ──────────────────────────────────────────────────────────────────
@@ -406,6 +576,10 @@ def graph(st: "State") -> dict:
     mv = moves()
     here = os.environ.get("SCRUBJAY_HOST", "")
     nodes = [_node(s, rs, st.arch, mv) for s, rs in rows.items()]
+    links = project_links()
+    for n in nodes:
+        n["lane"], n["line"] = follow(n["project"], links, n["date"]), follow(n["project"], links)
+        n["bursts"] = st.acts.of(n["sid8"])
     known = {n["sid"] for n in nodes}
     edges = [{"from": n["forked_from"], "to": n["sid"], "kind": "fork"}
              for n in nodes if n["forked_from"] and n["forked_from"] in known]
@@ -448,12 +622,15 @@ def graph(st: "State") -> dict:
 
     for n in nodes:
         n["gone"] = is_gone(n["host"], n["cwd"])
+    suggested = suggest_links(nodes, edges, arts, links)
     for a in arts.values():
         a["prs"] = len(a["prs"])
         a["gone"] = is_gone(a.get("host", ""), a.get("path", ""))
     return {"host": os.environ.get("SCRUBJAY_HOST", ""), "nodes": nodes, "edges": edges, "live": live(st),
             "artefacts": list(arts.values()), "archive": bool(st.r.chats), "cloud": cloud_links(),
-            "indexing": None if st.arts.ready else {"done": st.arts.done, "total": st.arts.total}}
+            "links": list(links.values()), "suggested": suggested,
+            "indexing": None if st.arts.ready and st.acts.ready else
+            {"done": st.arts.done + st.acts.done, "total": st.arts.total + st.acts.total}}
 
 
 def artefact(st: "State", aid: str) -> dict | None:
@@ -747,6 +924,7 @@ class State:
         self.token, self.port, self.idle, self.r = token, port, idle, r
         self.arch = Archive(r)
         self.arts = Artefacts(self.arch, cache or Path(os.devnull), os.environ.get("SCRUBJAY_HOST", ""))
+        self.acts = Activity(r, cache.with_name("view-activity.json") if cache else Path(os.devnull))
         self.last = time.time()
         self.server: ThreadingHTTPServer | None = None
         self.live_dir = Path(os.environ.get("SCRUBJAY_RUN_DIR") or Path.home() / ".scrubjay" / "run") / "live"
@@ -839,6 +1017,18 @@ def handler_for(st: State):
                     return self._json({"error": "not a move"}, 400)
                 err = record_move(body.get("host"), body.get("old"), body.get("new", ""))
                 return self._json({"error": err}, 400) if err else self._json({"ok": True})
+            if method == "POST" and u.path == "/api/link":
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    body = json.loads(self.rfile.read(n)) if 0 < n <= BODY_MAX else None
+                except ValueError:
+                    body = None
+                if not isinstance(body, dict):
+                    return self._json({"error": "not a link"}, 400)
+                mv = moves()
+                known = {_node(s, rs, st.arch, mv)["project"] for s, rs in _rows(st.r).items()} - {""}
+                err = record_link(body.get("from"), body.get("into", ""), body.get("at", ""), known)
+                return self._json({"error": err}, 400) if err else self._json({"ok": True})
             if method == "POST" and u.path == "/api/pack":
                 try:
                     n = int(self.headers.get("Content-Length") or 0)
@@ -890,6 +1080,7 @@ def main() -> int:
     st = State(secrets.token_urlsafe(18), port, a.idle * 60, r, state.parent / "view-artefacts.json")
     st.server = srv
     st.arts.start({sj._handle(sid): rs[-1]["cwd"] for sid, rs in _rows(r).items()})
+    st.acts.start()
     srv.RequestHandlerClass = handler_for(st)
     srv.daemon_threads = True
 

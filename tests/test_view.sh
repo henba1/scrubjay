@@ -30,6 +30,10 @@ today="$(date +%Y-%m-%d)"
   echo "$today 12:30 | laptop | /home/user/widget-api | \"Laptop only\" | session=$Y | harness=claude | turns=2 | size=500"
   echo "$today 13:00 | testhost | /home/user/widget-api | \"\" | session=dddddddd-4444-4444-8444-444444444444 | harness=claude | turns= | size=0"
 } > "$LOG"
+# Its raw transcript, for when it was at work: the stamps are all the viewer reads from it.
+mkdir -p "$SCRUBJAY_LOCAL_CHATS/testhost/-home-user-widget-api"
+printf '{"timestamp":"2026-01-01T10:00:00.000Z"}\n{"timestamp":"2026-01-01T10:05:00.000Z"}\n{"timestamp":"2026-01-01T13:00:00.000Z"}\n' \
+  > "$SCRUBJAY_LOCAL_CHATS/testhost/-home-user-widget-api/$P.jsonl"
 read_md="$SCRUBJAY_LOCAL_CHATS/testhost/readable/widget-api/${today}_retry-backoff__aaaaaaaa.md"
 mkdir -p "$(dirname "$read_md")"
 # The parent's transcript, in the shape every renderer emits: writes in the repo, outside it, to
@@ -441,6 +445,35 @@ assert_eq "an artefact's folder moves too, and says from where" /home/user/notes
   "$(get /api/graph | jq -r '.artefacts[] | select(.path == "/home/user/docs") | .moved.old')"
 post /api/move '{"host":"testhost","old":"/home/user/notes","new":""}' >/dev/null
 assert_eq "and it is as it was" /home/user/widget-api "$(get /api/graph | jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .cwd')"
+
+section "projects that are one: a link beside the catalogue, and every view follows"
+Z="eeeeeeee-5555-4555-8555-555555555555"
+echo "2026-01-02 09:00 | testhost | /home/user/gadget | \"Before the merge\" | session=$Z | harness=claude | turns=1 | size=10" >> "$LOG"
+echo "2026-06-02 09:00 | testhost | /home/user/gadget | \"After the merge\" | session=e2eeeeee-5555-4555-8555-555555555555 | harness=claude | turns=1 | size=10" >> "$LOG"
+g() { get /api/graph | jq -r --arg s "$1" --arg k "$2" '.nodes[] | select(.sid == $s) | .[$k]'; }
+assert_eq "unlinked: a project is its own lane" gadget "$(g "$Z" lane)"
+assert_eq "a link needs a token" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "http://127.0.0.1:$PORT/api/link")"
+assert_eq "nonsense is refused" 400 "$(post /api/link '[1,2]')"
+assert_eq "a project nobody has is refused" 400 "$(post /api/link '{"from":"gadget","into":"nowhere"}')"
+assert_eq "a bad date is refused" 400 "$(post /api/link '{"from":"gadget","into":"widget-api","at":"soon"}')"
+assert_eq "a link is recorded" 200 "$(post /api/link '{"from":"gadget","into":"widget-api","at":"2026-03-01"}')"
+assert_eq "the graph carries it" 2026-03-01 "$(get /api/graph | jq -r '.links[0].at')"
+assert_eq "before the date a session stays in its lane" gadget "$(g "$Z" lane)"
+assert_eq "from the date it sits in the other" widget-api "$(g e2eeeeee-5555-4555-8555-555555555555 lane)"
+assert_eq "either way it is part of the one project" widget-api "$(g "$Z" line)"
+assert_eq "what it recorded stays" gadget "$(g "$Z" project)"
+assert_eq "a loop is refused" 400 "$(post /api/link '{"from":"widget-api","into":"gadget"}')"
+assert_eq "undo" 200 "$(post /api/link '{"from":"gadget","into":""}')"
+assert_eq "and it is its own again" gadget "$(g "$Z" line)"
+command grep -v '/home/user/gadget' "$LOG" > "$LOG.keep"; mv "$LOG.keep" "$LOG"
+
+section "when a session was at work: from its raw transcript, or not at all"
+assert_eq "a silence splits it into bursts" 2 "$(g "$P" bursts | jq length)"
+assert_eq "no raw transcript here: only its start is known" 0 "$(g "$Y" bursts | jq length)"
+page="$(cat "$APP/view/index.html")"
+assert_contains "the page switches views" "$page" 'data-view="timeline"'
+assert_contains "and draws the join" "$page" 'function tlJoin'
+
 sug="$SANDBOX/elsewhere/widget-api"; mkdir -p "$sug"
 echo "$today 08:00 | testhost | $sug | \"Elsewhere\" | session=ffffffff-6666-4666-8666-666666666666 | harness=claude | turns=1 | size=10" >> "$LOG"
 assert_contains "a folder of the same name is offered" "$(get "/api/suggest?path=/home/user/widget-api" | jq -r '.paths | join(" ")')" "$sug"

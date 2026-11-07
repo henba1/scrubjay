@@ -60,6 +60,33 @@ push's `To …`); failing that, on this machine, by the folder's `origin`. A for
 its parent's history, so a fork shows only what it did after branching. The map reads the archive in
 the background on start and caches the result, so a later start reads only new transcripts.
 
+**Timeline.** **Timeline** in the header shows the same sessions in time: a lane per project, now
+at the right edge, opening on the last two weeks. Filters and the selected session carry over, and
+the page remembers which view you left it on. Each bar is a burst of work read from the raw
+transcript, on a thin line for the session's whole span, so a session left open for a week reads as
+the few hours it was busy. A ◇ is a session with no raw transcript on this machine: only its start
+is known, and it gets no made-up length. Drag to pan, Ctrl+wheel to zoom, `0` for the last two
+weeks and `F` for everything. Shift+drag along a lane gathers that stretch into a context pack.
+
+**Connecting projects.** A lane is a folder's name, so a rename, a merge or a subfolder reads as
+separate projects until you say otherwise. Drag the ○ by a lane's name onto another lane: where you
+drop it is the date it joined, and dropping on the other's name means it was always the same
+project. Clicking the ○ lets you pick both from a form instead. The form says what the link will
+look like before anything is written, and one link gives one of three shapes, decided by the record:
+
+| What the record shows | How it looks |
+|---|---|
+| The other project had work before that date | A merge: a stream beside it that curves in on the date |
+| The other project had nothing before that date | A rename or move: one lane with a seam at the date |
+| You said it was always one project | One lane all along, with `+ name` under the lane's name |
+
+Sessions keep the project they recorded, and sit in the lane their project stood in that day. The map
+and the project filter treat linked projects as one. Links are kept in
+`<data>/projects/<host>.tsv`, beside the catalogue rather than in it, so click a join to change or
+undo it. **Suggested** in the corner lists pairs that look like one: a folder directly inside
+another project, work landing on a repo named after another project, or two projects on the same
+remote. Nothing is linked until you confirm it.
+
 **Context packs.** Shift+click cards, or use **Add to context pack** in a panel, to gather up to 12
 archived sessions from any machine or agent. **Build** writes them into one primer, oldest first and
 condensed, and gives you the command that starts a new session on it, in the agent you choose. It
