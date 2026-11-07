@@ -62,13 +62,16 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   recorded it. Applied at read time by the viewer, told to a resumed agent by `hooks/sync-session.sh`,
   and fed to `bin/sj-resume.sh`'s rewrite map. Transcripts are a record and are not edited. Tests:
   `tests/test_moves.sh`.
+- `bin/sj-projects.sh` — project links (`<data>/projects/<host>.tsv`): which projects are one, and from
+  when. Applied at read time by the viewer as each session's `lane` and `line`; the catalogue keeps
+  what it recorded. Tests: `tests/test_projects.sh`.
 - `mcp/sjmcp_server.py` — the read-only archive MCP server (`uv run --script`).
   `bin/sjmcp-serve.sh` is its receiver-side forced command, and also answers `resolve`/`fetch` over
   `$SSH_ORIGINAL_COMMAND` so write-only `rsync-wg` hosts have a read path for hand-off.
 - `view/` — the session map behind `/sjview`: `sj_view.py`, a stdlib-only local server built on
   sjmcp's readers; `artefacts.py`, which reads what a session changed (files, repos, PRs, commits)
   from its readable transcript; and `index.html`, its one self-contained page. Started and stopped by
-  `bin/sj-view.sh`; never left running. Its one write is a line in the moves ledger. Tests: `tests/test_view.sh`.
+  `bin/sj-view.sh`; never left running. Its only writes are a line in the moves ledger or the project links. Tests: `tests/test_view.sh`.
 - `commands/` — the generic `/dc*` slash commands shipped with the app.
 - `mods/scrubjay-ui/` — the optional Claude Code mod (TypeScript hooks module) that draws scrubjay
   in the native interface; listed by `.claude-plugin/marketplace.json`. Tests:
