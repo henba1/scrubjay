@@ -401,9 +401,9 @@ def record_move(host: str, old: str, new: str) -> str:
     """A move into the ledger, or an undo when `new` is empty. "" when done, else what is wrong."""
     if not (isinstance(host, str) and isinstance(old, str) and isinstance(new, str)) or not host or not old:
         return "a move needs a host and a path"
-    if new and host == os.environ.get("SCRUBJAY_HOST", "") and not os.path.exists(new):
-        return f"{new} does not exist on this machine"
-    args = ["add", host, old, new] if new else ["undo", host, old]
+    # On this machine the target must exist; the ledger checks, so no path from a request is opened here.
+    here = host == os.environ.get("SCRUBJAY_HOST", "")
+    args = (["add", *(["--must-exist"] if here else []), host, old, new]) if new else ["undo", host, old]
     try:
         r = subprocess.run(["bash", str(MOVES), *args], capture_output=True, text=True, timeout=15)
     except (OSError, subprocess.TimeoutExpired):

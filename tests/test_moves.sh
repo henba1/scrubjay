@@ -28,6 +28,8 @@ assert_contains "the root" "$(bash "$M" add testhost / /new 2>&1)" "root folder"
 assert_contains "no change" "$(bash "$M" add testhost /a /a/ 2>&1)" "same path"
 assert_contains "a tab" "$(bash "$M" add testhost "$(printf '/a\tb')" /new 2>&1)" "tab or line break"
 check_fails "and says so by its exit code" bash "$M" add testhost old /new
+assert_contains "--must-exist: a target that is not there" "$(bash "$M" add --must-exist testhost /a /no/such/place 2>&1)" "does not exist"
+assert_eq "and nothing is recorded" "" "$(bash "$M" list)"
 
 section "chains, and moving back"
 reset; led 1 testhost /a /b; led 2 testhost /b /c

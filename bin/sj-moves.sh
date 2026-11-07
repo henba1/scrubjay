@@ -6,7 +6,7 @@
 # folder that moved is noted beside it rather than edited into it; the viewer shows the new path,
 # a resume tells the agent, and a hand-off rewrites with it.
 #
-#   usage: sj-moves.sh add <host> <old> <new>      record a move, publish it
+#   usage: sj-moves.sh add [--must-exist] <host> <old> <new>   record a move, publish it
 #          sj-moves.sh undo <host> <old>           forget one
 #          sj-moves.sh list                        TSV <host> <old> <new>, the moves in force
 #          sj-moves.sh resolve <host> <path>       where <path> is now (itself when it never moved)
@@ -70,10 +70,12 @@ record() {  # record <host> <old> <new> <commit-message>
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
   add)
-    [ $# -eq 3 ] && [ -n "$1" ] || die "usage: sj-moves.sh add <host> <old> <new>"
+    must=0; [ "${1:-}" = --must-exist ] && { must=1; shift; }
+    [ $# -eq 3 ] && [ -n "$1" ] || die "usage: sj-moves.sh add [--must-exist] <host> <old> <new>"
     case "$1" in *$'\t'*|*$'\n'*) die "not a host name: $1" ;; esac
     old="$(clean "$2")" || exit 2; new="$(clean "$3")" || exit 2
     [ "$old" != "$new" ] || die "that is the same path"
+    [ "$must" = 0 ] || [ -e "$new" ] || die "$new does not exist on this machine"
     record "$1" "$old" "$new" "moved on $1: $old -> $new" ;;
   undo)
     [ $# -eq 2 ] && [ -n "$1" ] || die "usage: sj-moves.sh undo <host> <old>"
