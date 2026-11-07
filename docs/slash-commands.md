@@ -66,6 +66,16 @@ harness's own resume command for a session from this machine, or `sj-resume.sh` 
 another machine ([hand-off](handoff.md)). **Read transcript** shows the archived conversation,
 condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
 
+**A path that moved.** A folder that no longer exists on this machine shows **⚠ gone** on its card.
+In a session's or an artefact's panel, **✎ moved?** records where it went, offering folders from the
+catalogue with the same name or the same git remote. The move covers everything under the path, on
+that machine, in every session: cards, lanes and artefacts show the new place, and **undo** takes it
+back. Transcripts are never edited. A resumed session is told instead, in its first context, of each
+move its history touches; a session whose own folder moved is staged there on resume, because the
+harness files sessions by folder. Moves live in `moves/` in your data repo, so they reach every
+machine; `bin/sj-moves.sh` does the same from a terminal. Claude Code gets the note; opencode does
+not yet, and Codex only if its SessionStart payload says `source: resume`.
+
 `/sjview <project>` opens the map on one project's lane. The name need not be exact: `widget`,
 `WIDGET_API` or `widgt-api` all find `widget-api`. Case and punctuation are ignored, part of a name
 is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and

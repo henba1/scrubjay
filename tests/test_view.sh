@@ -337,6 +337,37 @@ assert_eq "the MR links to GitLab" "https://gitlab.com/team/greyk/-/merge_reques
 assert_eq "the push to the gitlab remote lands on GitLab, not origin" "feat-x" "$(jq -r '.[] | select(.type == "push") | .branch' <<<"$mr")"
 assert_eq "the facts cache is private" "$SCRUBJAY_RUN_DIR/view-artefacts.json" "$(find "$SCRUBJAY_RUN_DIR/view-artefacts.json" -perm 600)"
 
+section "a path that moved: recorded beside the transcript, applied everywhere"
+post() { curl -s -o /dev/null -w '%{http_code}' -X POST -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$2" "http://127.0.0.1:$PORT$1"; }
+assert_eq "a folder missing from this machine is flagged" true "$(get /api/graph | jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .gone')"
+assert_eq "another machine's folder is not judged from here" false "$(get /api/graph | jq -r --arg s "$Y" '.nodes[] | select(.sid == $s) | .gone')"
+new="$SANDBOX/widget-moved"; mkdir -p "$new"
+assert_eq "a move needs a token" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "http://127.0.0.1:$PORT/api/move")"
+assert_eq "a target that is not on this machine is refused" 400 "$(post /api/move '{"host":"testhost","old":"/home/user/widget-api","new":"/nowhere/at/all"}')"
+assert_eq "nonsense is refused" 400 "$(post /api/move '[1,2]')"
+assert_eq "a relative path is refused" 400 "$(post /api/move "{\"host\":\"testhost\",\"old\":\"rel\",\"new\":\"$new\"}")"
+assert_eq "a move is recorded" 200 "$(post /api/move "{\"host\":\"testhost\",\"old\":\"/home/user/widget-api\",\"new\":\"$new\"}")"
+n="$(get /api/graph | jq -c --arg s "$P" '.nodes[] | select(.sid == $s)')"
+assert_eq "the session shows the new folder" "$new" "$(jq -r .cwd <<<"$n")"
+assert_eq "its lane follows" widget-moved "$(jq -r .project <<<"$n")"
+assert_eq "what it recorded stays" /home/user/widget-api "$(jq -r .recorded_cwd <<<"$n")"
+assert_eq "and is no longer gone" false "$(jq -r .gone <<<"$n")"
+assert_eq "another machine's same-named folder did not move" /home/user/widget-api \
+  "$(get /api/graph | jq -r --arg s "$Y" '.nodes[] | select(.sid == $s) | .cwd')"
+r="$(get "/api/session?sid=$P" | jq -c .resume)"
+assert_eq "resuming it stages it there first" moved "$(jq -r .where <<<"$r")"
+assert_contains "with the hand-off" "$(jq -r .cmd <<<"$r")" "--into '$new'"
+assert_eq "undo" 200 "$(post /api/move '{"host":"testhost","old":"/home/user/widget-api","new":""}')"
+bash "$APP/bin/sj-moves.sh" add testhost /home/user/notes /home/user/docs   # the sandbox is scratch, so not there
+assert_eq "an artefact's folder moves too, and says from where" /home/user/notes \
+  "$(get /api/graph | jq -r '.artefacts[] | select(.path == "/home/user/docs") | .moved.old')"
+post /api/move '{"host":"testhost","old":"/home/user/notes","new":""}' >/dev/null
+assert_eq "and it is as it was" /home/user/widget-api "$(get /api/graph | jq -r --arg s "$P" '.nodes[] | select(.sid == $s) | .cwd')"
+sug="$SANDBOX/elsewhere/widget-api"; mkdir -p "$sug"
+echo "$today 08:00 | testhost | $sug | \"Elsewhere\" | session=ffffffff-6666-4666-8666-666666666666 | harness=claude | turns=1 | size=10" >> "$LOG"
+assert_contains "a folder of the same name is offered" "$(get "/api/suggest?path=/home/user/widget-api" | jq -r '.paths | join(" ")')" "$sug"
+sed -i.bak '/session=ffffffff/d' "$LOG"; rm -f "$LOG.bak"
+
 section "stop: the command, the page's button, and idle"
 out="$(bash "$APP/bin/sj-view.sh" stop 2>&1)"
 assert_contains "stop says so" "$out" "stopped"

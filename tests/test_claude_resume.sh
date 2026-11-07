@@ -82,6 +82,17 @@ assert_contains "and names the local copy" "$out" "already exists at $staged"
 assert_eq "the local copy is untouched" "$before" "$(cat "$staged")"
 assert_no_file "and not even backed up-and-replaced" "$staged.bak"
 
+section "its folder moved, and the ledger knows: it continues there, wherever you stand"
+MS=22222222-2222-4333-8444-555555555555
+was="$SANDBOX/was-here"; now="$SANDBOX/now-here"; mkdir -p "$now"; now_real="$(cd -P "$now" && pwd)"
+pd="$CLAUDE_CONFIG_DIR/projects/$(printf '%s' "$was" | sed 's/[^A-Za-z0-9-]/-/g')"; mkdir -p "$pd"
+sed "s#/home/user/widget-api#$was#g" "$FIXTURES/claude-session.jsonl" > "$pd/$MS.jsonl"
+mkdir -p "$ARCHIVE/testhost/$(basename "$pd")"; cp "$pd/$MS.jsonl" "$ARCHIVE/testhost/$(basename "$pd")/"
+bash "$APP/bin/sj-moves.sh" add testhost "$was" "$now"
+out="$(run_sh bash "$work" resume 22222222)"
+assert_contains "says where it went" "$out" "moved to"
+assert_eq "resumed in the new folder, not the one you stood in" "$now_real|--resume $MS" "$(calls)"
+
 section "an ambiguous prefix lists the sessions and stops"
 for s in 22222222-aaaa-4333-8444-555555555555 22222222-bbbb-4333-8444-555555555555; do
   printf '%s\n' "2026-10-02 10:00 | otherhost | /home/user/x | \"twin $s\" | session=$s | harness=claude" >> "$SCRUBJAY_DATA/logs/otherhost.log"

@@ -579,6 +579,29 @@ def minus(child: dict, parent: dict) -> dict:
     return {**child, "events": events, "files": files}
 
 
+def moved(path: str, pairs: list[tuple[str, str]]) -> str:
+    """Where a path is now, by the moves of its machine (longest old path first)."""
+    for old, new in pairs:
+        if path == old or path.startswith(old + "/"):
+            return new + path[len(old):]
+    return path
+
+
+def relocate(f: dict, pairs: list[tuple[str, str]]) -> dict:
+    """Facts with their paths where they are now, so a moved repo still resolves, and old sessions
+    meet new ones on one artefact. The facts themselves stay as the transcript has them."""
+    if not pairs:
+        return f
+    files: dict[str, int] = {}
+    for p, n in f.get("files", {}).items():
+        q = moved(p, pairs)
+        files[q] = files.get(q, 0) + n
+    return {**f, "files": files,
+            "events": [{**e, "dir": moved(e["dir"], pairs)} if e.get("dir") else e for e in f.get("events", [])],
+            "remotes": {moved(d, pairs): v for d, v in f.get("remotes", {}).items()},
+            "names": {moved(d, pairs): v for d, v in f.get("names", {}).items()}}
+
+
 def _record(path: str, host: str, cwd: str = "") -> dict | None:
     """scrubjay's own records: cross-machine memory and plans."""
     if "/.claude/plans/" in path:
