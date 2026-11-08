@@ -53,7 +53,9 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   this machine's `~/.claude/projects/` so `claude --resume` continues it. See `docs/handoff.md`.
   `bin/sj-shell.sh` (sourced from the user's rc, installed by `bin/sj-shell-install.sh`) wraps the
   `claude` command so `claude resume <sid>` does that hand-off from a terminal, via
-  `bin/sj-claude-resume.sh`.
+  `bin/sj-claude-resume.sh`. It also routes interactive `claude`/`opencode`/`codex` launches through
+  `bin/sj-keep.sh`, which runs them inside tmux when `SCRUBJAY_KEEP` says so, so a closed terminal
+  detaches the agent instead of killing it. Tests: `tests/test_keep.sh`.
 - `bin/sj-live.sh` — session leases: which sessions a harness process holds open. Marked from
   lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
   `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it

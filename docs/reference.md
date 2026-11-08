@@ -127,6 +127,29 @@ installed (`~/.scrubjay/scrubjay/bin/sj-shell-install.sh`, once per machine):
 claude resume <sid8>                               # also: claude --resume <sid8>, claude -r <sid8>
 ```
 
+## Keep agents running when the terminal closes
+
+Closing an SSH connection hangs up the agent it started, mid-turn. With the shell integration
+installed and `SCRUBJAY_KEEP` set, an interactive `claude`, `opencode` or `codex` launched outside
+tmux runs inside a named tmux session instead (`bin/sj-keep.sh`), so the connection dropping only
+detaches it:
+
+```sh
+echo ': "${SCRUBJAY_KEEP:=ssh}"' >> ~/.config/scrubjay/config   # needs tmux on this machine
+claude                                  # now inside tmux session sj-claude-<folder>
+#   Ctrl-b d detaches on purpose; closing the terminal does the same
+~/.scrubjay/scrubjay/bin/sj-keep.sh ls  # the kept sessions on this machine
+tmux attach -t sj-claude-<folder>       # back in
+~/.scrubjay/scrubjay/bin/sj-keep.sh -- pi   # any other agent, by hand
+```
+
+Only interactive launches are wrapped: `claude -p`, `claude --bg`, `opencode serve`/`run`,
+`codex exec`, `--version` and other subcommands run directly, and so does everything already
+inside tmux or without a terminal. With no tmux installed it says so once and runs the agent as
+before. A second agent in the same folder gets `sj-claude-<folder>-2`, never the first one's session.
+The agent sees the environment of the shell you launched it from, even when the tmux server was
+started days earlier with a different one.
+
 ## Register the current machine (first-time onboarding)
 
 ```sh
@@ -147,6 +170,7 @@ editing needed:
 | `SCRUBJAY_TURN_PUBLISH=0` | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
+| `SCRUBJAY_KEEP=ssh` | run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (`always`: whenever outside tmux; default `off`). See [above](#keep-agents-running-when-the-terminal-closes) |
 | `SCRUBJAY_VIEW_PORT=<n>` | the port `/sjview` listens on (default 7787; the next free one if taken) |
 | `SCRUBJAY_VIEW_NEXTCLOUD=<url>` | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below) |
 | `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;` |

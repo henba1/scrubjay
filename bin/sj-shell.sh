@@ -20,17 +20,35 @@
 # a session id (8–36 hex digits and dashes) is intercepted — `claude --resume` with no value (the
 # picker), `--resume <search words>` and `--resume <session name>` are all passed through untouched.
 # `resume` is only special as the first word: `claude "resume the build"` is still a prompt.
+#
+# It also keeps interactive agents alive past the terminal: with SCRUBJAY_KEEP=ssh (or always) in
+# ~/.config/scrubjay/config, an interactive `claude`, `opencode` or `codex` launched outside tmux
+# runs inside a named tmux session (bin/sj-keep.sh), so closing the SSH connection detaches it
+# instead of killing it mid-turn. Inside tmux, or with no terminal, nothing extra runs at all.
 
 _sj_is_sid() {  # _sj_is_sid <arg> — 0 when it looks like a session id or an 8+ hex prefix of one
   case "$1" in *[!0-9a-fA-F-]*|'') return 1 ;; esac
   [ "${#1}" -ge 8 ] && [ "${#1}" -le 36 ]
 }
 
+# _sj_keep [sj-keep flags] -- <cmd> [args…] — run it, through bin/sj-keep.sh when that could matter
+_sj_keep() {
+  if [ -z "${TMUX:-}" ] && [ -t 0 ] && [ -t 1 ]; then
+    bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-keep.sh" "$@"; return
+  fi
+  while [ $# -gt 0 ] && [ "$1" != -- ]; do shift; done
+  shift
+  command "$@"
+}
+
+function opencode { _sj_keep --as opencode -- opencode "$@"; }
+function codex    { _sj_keep --as codex -- codex "$@"; }
+
 function claude {
   # fast path: nothing that could be a resume — hand over before doing anything else
   case " $* " in
     *" resume "*|*" -r "*|*" --resume "*|*" --resume="*) ;;
-    *) command claude "$@"; return ;;
+    *) _sj_keep --as claude -- claude "$@"; return ;;
   esac
 
   local sid="" flag="" a
@@ -53,6 +71,6 @@ function claude {
     [ -n "$flag" ] && rest+=("$flag")
   fi
 
-  if [ -z "$sid" ]; then command claude "$@"; return; fi
-  bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-claude-resume.sh" "$sid" "${rest[@]}"
+  if [ -z "$sid" ]; then _sj_keep --as claude -- claude "$@"; return; fi
+  _sj_keep --as claude --force -- bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-claude-resume.sh" "$sid" "${rest[@]}"
 }
