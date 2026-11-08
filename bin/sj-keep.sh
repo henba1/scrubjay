@@ -118,7 +118,7 @@ decide() {  # prints "wrap" or "direct: <why>"
     *)      echo "direct: SCRUBJAY_KEEP='$mode' is not off|ssh|always"; return ;;
   esac
   [ -n "${TMUX:-}" ] && { echo "direct: already inside tmux"; return; }
-  [ "${SJ_KEEP_ASSUME_TTY:-0}" = 1 ] || { [ -t 0 ] && [ -t 1 ]; } || { echo "direct: not a terminal"; return; }
+  [ "$on_tty" = 1 ] || { echo "direct: not a terminal"; return; }
   if [ "$force" = 0 ] && [ -n "$as" ] && ! interactive "$as" "${@:2}"; then  # args, not the command
     echo "direct: not an interactive $as session"; return
   fi
@@ -136,6 +136,9 @@ session_name() {  # sj-<harness>-<folder>, unique among this server's sessions
   printf '%s' "$n"
 }
 
+# Asked out here: inside $(decide) stdout is a pipe, never the terminal.
+on_tty=0
+if [ "${SJ_KEEP_ASSUME_TTY:-0}" = 1 ] || { [ -t 0 ] && [ -t 1 ]; }; then on_tty=1; fi
 verdict="$(decide "$@")"
 if [ "$explain" = 1 ]; then
   if [ "$verdict" = wrap ]; then echo "wrap $(session_name "$@")"; else echo "$verdict"; fi
@@ -154,7 +157,13 @@ name="$(session_name "$@")"
 envf="$(umask 077; mktemp "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/sj-keep.XXXXXX")" || exec "$@"
 export -p > "$envf"
 "$TMUX_BIN" new-session -s "$name" -c "$PWD" "$SELF" --inner "$envf" -- "$@"
-rm -f "$envf"   # normally gone already; this covers a session that failed to start
+# --inner deletes the file the moment it starts, so a file still here means the agent never ran:
+# tmux itself failed (a dead server, an unusable socket). Never block a launch: run it here.
+if [ -f "$envf" ]; then
+  rm -f "$envf"
+  echo "scrubjay: tmux could not start a session, so this one ends with the terminal" >&2
+  exec "$@"
+fi
 if "$TMUX_BIN" has-session -t "=$name" 2>/dev/null; then
   echo "scrubjay: still running in tmux session '$name'. Reattach with: tmux attach -t $name" >&2
 fi

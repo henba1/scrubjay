@@ -61,6 +61,14 @@ assert_eq "no terminal" "direct: not a terminal" "$(ex SJ_KEEP_ASSUME_TTY=0 bash
 assert_eq "no tmux" "direct: tmux is not installed" "$(SJ_KEEP_TMUX=sj-no-such-tmux dec -- agent)"
 assert_eq "a bad mode is off" "direct: SCRUBJAY_KEEP='yes' is not off|ssh|always" "$(SCRUBJAY_KEEP=yes SJ_KEEP_ASSUME_TTY=1 bash "$KEEP" --explain -- agent)"
 
+# The real terminal check, no SJ_KEEP_ASSUME_TTY: util-linux `script` gives the command a pty.
+if script --version 2>/dev/null | grep -q util-linux; then
+  out="$(SCRUBJAY_KEEP=always script -qfc "bash '$KEEP' --explain -- agent" /dev/null < <(echo) 2>&1 | tr -d '\r')"
+  assert_contains "a real terminal is seen as one" "$out" "wrap sj-agent-my-project"
+else
+  skip "a real terminal is seen as one" "util-linux script not installed"
+fi
+
 section "only interactive launches of a harness"
 for a in "claude" "claude fix the retry" "claude --model opus" "claude -c" "claude --remote-control" \
          "opencode" "opencode -c" "opencode ." "codex" "codex resume" "codex --full-auto"; do
@@ -113,6 +121,17 @@ assert_contains "and runs the command anyway" "$(cat "$SANDBOX/agent.calls")" "a
 : > "$SANDBOX/agent.calls"
 bash "$KEEP" --as claude -- agent -p hi
 assert_contains "off: runs the command directly" "$(cat "$SANDBOX/agent.calls")" "TMUX= pwd"
+
+# tmux is installed but cannot start a session (dead server, unusable socket)
+cat > "$SANDBOX/stubbin/brokentmux" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in has-session) exit 1 ;; new-session) echo "error connecting to socket" >&2; exit 1 ;; esac
+EOF
+chmod +x "$SANDBOX/stubbin/brokentmux"
+: > "$SANDBOX/agent.calls"
+out="$(SJ_KEEP_TMUX=brokentmux ex bash "$KEEP" -- agent y 2>&1)"
+assert_contains "tmux failing: says so" "$out" "tmux could not start a session"
+assert_contains "and runs the command anyway" "$(cat "$SANDBOX/agent.calls")" "args=y"
 
 section "ls"
 printf 'sj-claude-a\nother\n' > "$SANDBOX/tmux.sessions"
