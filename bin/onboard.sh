@@ -288,6 +288,26 @@ case " $SCRUBJAY_HARNESSES " in
     fi ;;
 esac
 
+# ---- 7e) keep agents running when the terminal closes (tmux) -------------------------------
+# Rides the shell integration: its claude/opencode/codex functions are what route a launch through
+# bin/sj-keep.sh. A setting in the config, plus tmux; tmux is a distro package, so a missing one is
+# reported with the install command rather than installed (that needs root). Preset SCRUBJAY_KEEP
+# (ssh|always|off) to answer it unattended.
+if [ "${_shell_hook:-0}" = 1 ] && [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_KEEP' "$CFG"; then
+  case "${SCRUBJAY_KEEP:-}" in
+    ssh|always|off) _keep="$SCRUBJAY_KEEP" ;;
+    *) if confirm "keep agents running when an SSH connection drops (runs them inside tmux)?" Y
+       then _keep=ssh; else _keep=off; fi ;;
+  esac
+  if [ "$_keep" != off ]; then
+    echo ": \"\${SCRUBJAY_KEEP:=$_keep}\"" >> "$CFG"
+    ok "agents launched over SSH will run inside tmux (SCRUBJAY_KEEP=$_keep)"
+    have tmux || warn "tmux is not installed, so until it is, agents still end with the terminal: $(sj_install_hint tmux)"
+  else
+    info "Skipped. Later: add ': \"\${SCRUBJAY_KEEP:=ssh}\"' to $(sj_pretty_path "$CFG")"
+  fi
+fi
+
 # ---- 8) offer to push the new host dir------------------------------------------------
 if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \

@@ -150,4 +150,20 @@ for sh in bash zsh; do
 done
 rm -f "$SANDBOX/stubbin/opencode"
 
+section "sj-doctor and the install hint"
+d() { bash "$APP/bin/sj-doctor.sh" harnesses 2>&1; }
+assert_contains "off: suggests it" "$(d)" "set SCRUBJAY_KEEP=ssh"
+out="$(SCRUBJAY_KEEP=ssh d)"
+assert_contains "on, with tmux: says so" "$out" "keep: SCRUBJAY_KEEP=ssh, agents run inside tmux"
+out="$(SCRUBJAY_KEEP=ssh SJ_KEEP_TMUX=sj-no-such-tmux d)"; rc=0
+SCRUBJAY_KEEP=ssh SJ_KEEP_TMUX=sj-no-such-tmux bash "$APP/bin/sj-doctor.sh" --quiet harnesses >/dev/null 2>&1 || rc=$?
+assert_contains "on, without tmux: a failure" "$out" "but tmux is not installed"
+assert_contains "with the command that installs it" "$out" "fix: "
+assert_eq "and a non-zero exit" "1" "$([ "$rc" -ne 0 ] && echo 1 || echo 0)"
+assert_contains "a bad value is a failure" "$(SCRUBJAY_KEEP=yes d)" "is not off, ssh or always"
+# the hint names whichever package manager is here; with none it still says what to install
+assert_contains "install hint names the package" "$(bash -c '. "$1/bin/lib.sh"; sj_install_hint tmux' _ "$APP")" "tmux"
+assert_eq "no package manager: still useful" "install 'tmux' with this system's package manager" \
+  "$(PATH=/nonexistent /bin/bash -c '. "$1/bin/lib.sh"; sj_install_hint tmux' _ "$APP")"
+
 finish

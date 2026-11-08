@@ -56,7 +56,7 @@ and zsh) in `bin/sj-shell.sh`. It intercepts only `resume <id>` as the *first* w
 Everything else — `claude`, `claude -p "resume the build"`, `claude --resume` (the picker),
 `claude --resume <search words>` — goes straight to the binary after one pattern match on the
 arguments, so there is no startup cost. (The same file also defines `opencode` and `codex`, for
-[keeping agents running](reference.md#keep-agents-running-when-the-terminal-closes) when the
+[keeping agents running](keep-alive.md) when the
 terminal closes; that only runs when you launch one from a terminal outside tmux.)
 
 **Installing it.** Once per machine:

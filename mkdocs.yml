@@ -84,6 +84,7 @@ nav:
   - Day-to-day: day-to-day.md
   - Query the archive (MCP): archive-mcp.md
   - Session hand-off: handoff.md
+  - Keeping agents alive: keep-alive.md
   - Slash commands: slash-commands.md
   - "Transcripts: relay + NAS": transports.md
   - Reference: reference.md

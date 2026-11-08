@@ -147,7 +147,7 @@ fi
 
 if [ "$verdict" != wrap ]; then
   [ "$verdict" = "direct: tmux is not installed" ] &&
-    echo "scrubjay: SCRUBJAY_KEEP is on but tmux is not installed, so this session ends with the terminal (install tmux)" >&2
+    echo "scrubjay: SCRUBJAY_KEEP is on but tmux is not installed, so this session ends with the terminal ($(sj_install_hint tmux))" >&2
   exec "$@"
 fi
 
