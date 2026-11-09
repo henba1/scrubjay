@@ -219,6 +219,19 @@ doctor_harnesses() {
         note "shell integration not in your rc — for 'claude resume <sid>' from any machine: bash $(sj_pretty_path "$APP")/bin/sj-shell-install.sh"
       fi ;;
   esac
+  # A bell when an agent finishes a turn or asks for a permission (bin/sj-notify.sh).
+  case "${SCRUBJAY_NOTIFY:-off}" in
+    on)
+      ok "notify: a bell when an agent finishes a turn or asks for a permission"
+      # Run from inside nvim's :terminal: its default 'belloff' swallows the bell.
+      if [ -n "${NVIM:-}" ] && sj_has nvim; then
+        case ",$(sj_timeout 3 nvim --server "$NVIM" --remote-expr '&belloff' 2>/dev/null)," in
+          *,all,*|*,term,*) note "notify: this nvim's 'belloff' swallows the bell — set it without \"term\" (docs: day-to-day, Notifications)" ;;
+        esac
+      fi ;;
+    off) note "notify: off — for a bell when an agent finishes a turn: set SCRUBJAY_NOTIFY=on in ~/.config/scrubjay/config" ;;
+    *)   bad "SCRUBJAY_NOTIFY='$SCRUBJAY_NOTIFY' is not on or off" "set SCRUBJAY_NOTIFY=on or off in ~/.config/scrubjay/config" ;;
+  esac
 }
 
 # ── last recorded outcomes ─────────────────────────────────────────────────────────────────────

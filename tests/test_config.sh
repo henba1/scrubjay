@@ -180,6 +180,8 @@ check "Stop -> log-session registered"  bash -c 'jq -e "$0 == 1" "$1" >/dev/null
 check "SessionEnd still registered"     bash -c 'jq -e "[.hooks.SessionEnd[].hooks[].command] | map(test(\"log-session\")) | any" "$1" >/dev/null' _ "$settings"
 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "a second sync adds no second one" bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$stops" "$settings"
+perms='[.hooks.PermissionRequest[]?.hooks[]? | select(.command | test("live-session")) | select(.async == true)] | length'
+check "PermissionRequest -> live-session registered once, async" bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$perms" "$settings"
 SCRUBJAY_TURN_PUBLISH=0 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "SCRUBJAY_TURN_PUBLISH=0 leaves it out" bash -c 'jq -e "$0 == 0" "$1" >/dev/null' "$stops" "$settings"
 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true

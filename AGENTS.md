@@ -58,6 +58,10 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
   `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it
   for a transcript. Tests: `tests/test_live.sh`.
+- `bin/sj-notify.sh` — notifications: a terminal bell when an agent finishes a turn or stops at a
+  permission prompt, with `SCRUBJAY_NOTIFY=on`. Called by `bin/sj-live.sh` on the lease's state change,
+  so every harness rings through the same path. Writes BEL to the agent's own terminal, so the sound
+  reaches the human through tmux and SSH. Tests: `tests/test_notify.sh`.
 - `bin/sj-moves.sh` — the moves ledger (`<data>/moves/<host>.tsv`): where a path went after a session
   recorded it. Applied at read time by the viewer, told to a resumed agent by `hooks/sync-session.sh`,
   and fed to `bin/sj-resume.sh`'s rewrite map. Transcripts are a record and are not edited. Tests:
