@@ -60,6 +60,11 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
   `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it
   for a transcript. Tests: `tests/test_live.sh`.
+- `bin/sj-status.sh` — the tmux status bar (`tmux/scrubjay.conf` sources it): this pane's agent — its
+  project (git repository, worktrees included) ⎇ branch · session id · working/waiting/idle — and the
+  project's other sessions here, which a click on the bar offers in a menu to switch to. Built on
+  `bin/sj-live.sh`'s sessions and leases plus the process tree (a tmux pane, GreyKnight's `gk`).
+  Tests: `tests/test_status.sh`.
 - `bin/sj-notify.sh` — notifications: a terminal bell when an agent finishes a turn or stops at a
   permission prompt, with `SCRUBJAY_NOTIFY=on`. Called by `bin/sj-live.sh` on the lease's state change,
   so every harness rings through the same path. Writes BEL to the agent's own terminal, so the sound
