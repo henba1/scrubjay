@@ -60,6 +60,10 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
   `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it
   for a transcript. Tests: `tests/test_live.sh`.
+- `bin/sj-notify.sh` — notifications: a terminal bell when an agent finishes a turn or stops at a
+  permission prompt, with `SCRUBJAY_NOTIFY=on`. Called by `bin/sj-live.sh` on the lease's state change,
+  so every harness rings through the same path. Writes BEL to the agent's own terminal, so the sound
+  reaches the human through tmux and SSH. Tests: `tests/test_notify.sh`.
 - `bin/sj-moves.sh` — the moves ledger (`<data>/moves/<host>.tsv`): where a path went after a session
   recorded it. Applied at read time by the viewer, told to a resumed agent by `hooks/sync-session.sh`,
   and fed to `bin/sj-resume.sh`'s rewrite map. Transcripts are a record and are not edited. Tests:
@@ -106,7 +110,8 @@ Steps:
    `scrubjay-storage`, may nest but must stay inside the mountpoint; via
    `bin/sj-mount.sh` — see below); which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
    auto-detects installed ones via each adapter's PATH-based `sjh_present`, so you usually only
-   set this to override, e.g. an opencode that isn't on PATH yet); and whether to enable
+   set this to override, e.g. an opencode that isn't on PATH yet); whether to ring the terminal bell
+   when an agent finishes a turn (`SCRUBJAY_NOTIFY=on|off`); and whether to enable
    cross-machine memory (on the `git` backend this puts real filesystem paths in a private GitHub
    repo — surface that trade-off, don't just enable it).
 2. **Confirm, then run non-interactively** from the clone, e.g.:

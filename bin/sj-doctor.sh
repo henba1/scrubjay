@@ -228,6 +228,19 @@ doctor_harnesses() {
       else bad "keep: SCRUBJAY_KEEP=$keep but tmux is not installed, so agents still end with the terminal" "$(sj_install_hint tmux)"; fi ;;
     *) bad "keep: SCRUBJAY_KEEP='$keep' is not off, ssh or always" "set SCRUBJAY_KEEP=ssh in ~/.config/scrubjay/config" ;;
   esac
+  # A bell when an agent finishes a turn or asks for a permission (bin/sj-notify.sh).
+  case "${SCRUBJAY_NOTIFY:-off}" in
+    on)
+      ok "notify: a bell when an agent finishes a turn or asks for a permission"
+      # Run from inside nvim's :terminal: its default 'belloff' swallows the bell.
+      if [ -n "${NVIM:-}" ] && sj_has nvim; then
+        case ",$(sj_timeout 3 nvim --server "$NVIM" --remote-expr '&belloff' 2>/dev/null)," in
+          *,all,*|*,term,*) note "notify: this nvim's 'belloff' swallows the bell — set it without \"term\" (docs: day-to-day, Notifications)" ;;
+        esac
+      fi ;;
+    off) note "notify: off — for a bell when an agent finishes a turn: set SCRUBJAY_NOTIFY=on in ~/.config/scrubjay/config" ;;
+    *)   bad "SCRUBJAY_NOTIFY='$SCRUBJAY_NOTIFY' is not on or off" "set SCRUBJAY_NOTIFY=on or off in ~/.config/scrubjay/config" ;;
+  esac
 }
 
 # ── last recorded outcomes ─────────────────────────────────────────────────────────────────────

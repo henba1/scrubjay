@@ -59,6 +59,28 @@ reader takes the newest row for a session id.
 For recall by *topic* (rather than an exact word you remember typing) from inside a live
 session, use the [`sjmcp` MCP server](archive-mcp.md).
 
+## Notifications
+
+`SCRUBJAY_NOTIFY=on` in `~/.config/scrubjay/config` rings your terminal's bell when an agent finishes
+a turn or stops at a permission prompt. Claude Code, opencode and codex all ring it. It costs no
+tokens: a hook writes one byte to the agent's terminal.
+
+The bell goes to the agent's terminal rather than a sound device, so over SSH it rings on the
+machine you're sitting at. tmux passes it on by default. Your terminal emulator decides what a
+bell sounds like, so turn on its audible bell. A headless run (`claude -p`, `opencode run`) has no
+terminal and rings nothing.
+
+**nvim's `:terminal`** swallows the bell under its default `belloff=all`. Anything that leaves out
+`term` lets it through:
+
+```lua
+vim.opt.belloff = { "backspace", "cursor", "complete", "copy", "ctrlg", "error", "esc", "ex", "hangul",
+  "insertmode", "lang", "mess", "showmatch", "operator", "register", "shell", "spell", "wildmode" }
+```
+
+Leave Claude Code's own `preferredNotifChannel` unset: it alerts only after you've been away for
+a while (about 60 s after a turn), and with both on you'd get a second bell later.
+
 ## Troubleshooting
 
 **Hooks only activate on the *next* session.** `claude-sync.sh` (and `onboard.sh`, which runs

@@ -306,6 +306,11 @@ jq -n --argjson keep "$KEEPJSON" --argjson base "$(cat "$BASE")" --argjson host 
   | if ([.hooks.UserPromptSubmit[]?.hooks[]?.command] | map(test("live-session")) | any) then .
     else .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/live-session.sh\"", async: true}]}])
     end
+  # The agent stopping at a permission prompt: the lease says waiting, and bin/sj-notify.sh can ring.
+  # Async and silent, so it never answers the prompt itself.
+  | if ([.hooks.PermissionRequest[]?.hooks[]?.command] | map(test("live-session")) | any) then .
+    else .hooks.PermissionRequest = ((.hooks.PermissionRequest // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/live-session.sh\"", async: true}]}])
+    end
 ' > "$tmp"
 if [ -f "$OUT" ] && [ ! -L "$OUT" ] && ! cmp -s "$tmp" "$OUT"; then
   cp "$OUT" "$OUT.bak.$(date +%s)"; echo "  bak   $(sj_pretty_path "$OUT")"

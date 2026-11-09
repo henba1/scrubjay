@@ -46,6 +46,15 @@ mark() {  # mark <sid> <state> [cwd]
   pid="$(owner_pid)"
   # A process id comes round again: its start time tells the holder from a stranger.
   start=""; [ -n "$pid" ] && start="$(ps -o lstart= -p "$pid" 2>/dev/null | sed 's/^ *//; s/ *$//')"
+  # A turn ending or stopping at a permission prompt: tell the human (bin/sj-notify.sh). From waiting
+  # too, since Claude marks nothing when a permission is granted and the turn runs on. Detached: a
+  # terminal that blocks on the write must not hold up the hook.
+  if [ "${SCRUBJAY_NOTIFY:-off}" = on ] && [ -n "$pid" ]; then
+    case "$state:$(jq -r '.state // ""' "$dir/$sid.lease" 2>/dev/null)" in
+      idle:working|idle:waiting|waiting:working)
+        nohup bash "$APP/bin/sj-notify.sh" "$pid" </dev/null >/dev/null 2>&1 & ;;
+    esac
+  fi
   tmp="$dir/.$sid.$$"
   jq -nc --arg sid "$sid" --arg harness "$(sj_harness)" --arg host "$(sj_host)" --arg state "$state" \
     --arg cwd "$cwd" --arg pid "$pid" --arg start "$start" --argjson ts "$(date +%s)" \
