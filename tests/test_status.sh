@@ -22,10 +22,11 @@ mkdir -p "$wt/src" "$plain"
 
 # Stand-in agents: real processes (the bar checks they live and walks their parents). One is named
 # nvim under NVIM_APPNAME=greyknight - an agent in GreyKnight's pane is a child of that Neovim.
-mkdir -p "$SANDBOX/bin"; cp "$(command -v sleep)" "$SANDBOX/bin/nvim"
+# A script, not a copy of sleep: a multi-call coreutils (uutils) picks its tool by name and has no nvim.
+mkdir -p "$SANDBOX/bin"; printf '#!/bin/sh\nwhile :; do sleep 1; done\n' > "$SANDBOX/bin/nvim"; chmod +x "$SANDBOX/bin/nvim"
 sleep 300 & A=$!                 # this pane's agent, in the repo
 sleep 300 & B=$!                 # another tmux pane, in a subfolder of the worktree
-NVIM_APPNAME=greyknight "$SANDBOX/bin/nvim" 300 & G=$!   # in GreyKnight, in the repo
+NVIM_APPNAME=greyknight "$SANDBOX/bin/nvim" & G=$!   # in GreyKnight, in the repo
 sleep 300 & O=$!                 # a pane in a folder outside git
 trap 'kill $A $B $G $O 2>/dev/null' EXIT
 sid() { printf '%s1111111-2222-4333-8444-555555555555' "$1"; }
