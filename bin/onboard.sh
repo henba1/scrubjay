@@ -308,6 +308,28 @@ if [ "${_shell_hook:-0}" = 1 ] && [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_KEEP' "$C
   fi
 fi
 
+# ---- 7e') the agents' status bar in tmux ------------------------------------------------------------
+# tmux/scrubjay.conf: this pane's agent and its project's other sessions, a click opens a menu to
+# switch (bin/sj-status.sh). A line in ~/.tmux.conf, which is the user's: asked, never assumed.
+# Preset SCRUBJAY_TMUX_BAR (on|off) to answer it unattended.
+_tmux_conf="$HOME/.tmux.conf"
+if have tmux && ! grep -qs 'scrubjay.conf' "$_tmux_conf"; then
+  case "${SCRUBJAY_TMUX_BAR:-}" in
+    on|off) _bar="$SCRUBJAY_TMUX_BAR" ;;
+    *) if confirm "show the agents' status in tmux's bar (this session's project, branch, state, the related ones)?" Y
+       then _bar=on; else _bar=off; fi ;;
+  esac
+  if [ "$_bar" = on ]; then
+    # shellcheck disable=SC2016  # written verbatim, tmux's shell expands it
+    printf '\n# scrubjay: the agents in the status bar (a click: switch between them, needs mouse on)\nsource-file "%s"\n' \
+      '${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../tmux/scrubjay.conf' >> "$_tmux_conf"
+    ok "tmux shows the agents in its bar: $(sj_pretty_path "$_tmux_conf") (reload: tmux source-file ~/.tmux.conf)"
+    grep -qs 'mouse on' "$_tmux_conf" || info "to switch with a click: add 'set -g mouse on' to $(sj_pretty_path "$_tmux_conf")"
+  else
+    info "Skipped. Later: add 'source-file ~/.claude/hooks/../tmux/scrubjay.conf' to $(sj_pretty_path "$_tmux_conf")"
+  fi
+fi
+
 # ---- 7f) a bell when an agent finishes a turn or asks for a permission -------------------------
 # bin/sj-notify.sh, for every harness. Asked once: a config that already says either way is left
 # alone. Preset SCRUBJAY_NOTIFY (on|off) to answer it unattended.
