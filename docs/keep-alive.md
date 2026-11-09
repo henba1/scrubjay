@@ -96,9 +96,10 @@ ships one that says what the agent in the pane is doing, and what else runs in i
   than fit: `+n`.
 - **right:** the session's title, time, date and host. On a narrow terminal the bar drops things to
   fit, related sessions first, then the date.
-- **a click on the left** opens a menu of those sessions; choosing one switches to its tmux pane
-  (one in a Neovim can't be switched to and is shown greyed out). "All tmux sessions" is tmux's own
-  picker. The click needs `set -g mouse on`.
+- **a click on a related session** switches to its tmux pane (tmux 3.4 and later). **A click
+  elsewhere on the left** opens a menu of those sessions, which works on any tmux: choosing one
+  switches to it (one in a Neovim can't be switched to and is shown greyed out). "All tmux sessions"
+  is tmux's own picker. Clicks need `set -g mouse on`.
 
 It is black and dim, and nothing on it stays put: the text drifts a cell every two minutes and its
 grey breathes slowly, so an OLED screen doesn't burn it in. `SCRUBJAY_STATUS_DRIFT=off` keeps it
@@ -107,7 +108,7 @@ still; `SCRUBJAY_STATUS_MAX` (default 3) is how many related sessions it names.
 `bin/onboard.sh` offers to add it; by hand, one line in `~/.tmux.conf`:
 
 ```sh
-source-file "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../tmux/scrubjay.conf"
+source-file "$HOME/.claude/hooks/../tmux/scrubjay.conf"   # tmux expands $HOME; with CLAUDE_CONFIG_DIR, its path
 ```
 
 Where the information comes from: each harness's own registry of running sessions (Claude Code's
