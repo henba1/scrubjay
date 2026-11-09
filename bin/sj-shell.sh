@@ -26,13 +26,15 @@
 # runs inside a named tmux session (bin/sj-keep.sh), so closing the SSH connection detaches it
 # instead of killing it mid-turn. Inside tmux, or with no terminal, nothing extra runs at all.
 
-_sj_is_sid() {  # _sj_is_sid <arg> — 0 when it looks like a session id or an 8+ hex prefix of one
+# No helper name starts with "_": Claude Code's shell snapshot drops those, which breaks `claude` in
+# its Bash tool. tests/test_keep.sh checks.
+sjsh_is_sid() {  # sjsh_is_sid <arg> — 0 when it looks like a session id or an 8+ hex prefix of one
   case "$1" in *[!0-9a-fA-F-]*|'') return 1 ;; esac
   [ "${#1}" -ge 8 ] && [ "${#1}" -le 36 ]
 }
 
-# _sj_keep [sj-keep flags] -- <cmd> [args…] — run it, through bin/sj-keep.sh when that could matter
-_sj_keep() {
+# sjsh_keep [sj-keep flags] -- <cmd> [args…] — run it, through bin/sj-keep.sh when that could matter
+sjsh_keep() {
   if [ -z "${TMUX:-}" ] && [ -t 0 ] && [ -t 1 ]; then
     bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-keep.sh" "$@"; return
   fi
@@ -41,36 +43,36 @@ _sj_keep() {
   command "$@"
 }
 
-function opencode { _sj_keep --as opencode -- opencode "$@"; }
-function codex    { _sj_keep --as codex -- codex "$@"; }
+function opencode { sjsh_keep --as opencode -- opencode "$@"; }
+function codex    { sjsh_keep --as codex -- codex "$@"; }
 
 function claude {
   # fast path: nothing that could be a resume — hand over before doing anything else
   case " $* " in
     *" resume "*|*" -r "*|*" --resume "*|*" --resume="*) ;;
-    *) _sj_keep --as claude -- claude "$@"; return ;;
+    *) sjsh_keep --as claude -- claude "$@"; return ;;
   esac
 
   local sid="" flag="" a
   local -a rest
   rest=()
   if [ "$1" = resume ]; then
-    if [ $# -ge 2 ] && _sj_is_sid "$2"; then sid="$2"; shift 2; rest=("$@"); fi
+    if [ $# -ge 2 ] && sjsh_is_sid "$2"; then sid="$2"; shift 2; rest=("$@"); fi
   else
     for a in "$@"; do
       if [ -n "$flag" ]; then                       # the value after -r / --resume
-        if [ -z "$sid" ] && _sj_is_sid "$a"; then sid="$a"; flag=""; continue; fi
+        if [ -z "$sid" ] && sjsh_is_sid "$a"; then sid="$a"; flag=""; continue; fi
         rest+=("$flag"); flag=""
       fi
       case "$a" in
         -r|--resume) [ -z "$sid" ] && { flag="$a"; continue; } ;;
-        --resume=*)  if [ -z "$sid" ] && _sj_is_sid "${a#--resume=}"; then sid="${a#--resume=}"; continue; fi ;;
+        --resume=*)  if [ -z "$sid" ] && sjsh_is_sid "${a#--resume=}"; then sid="${a#--resume=}"; continue; fi ;;
       esac
       rest+=("$a")
     done
     [ -n "$flag" ] && rest+=("$flag")
   fi
 
-  if [ -z "$sid" ]; then _sj_keep --as claude -- claude "$@"; return; fi
-  _sj_keep --as claude --force -- bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-claude-resume.sh" "$sid" "${rest[@]}"
+  if [ -z "$sid" ]; then sjsh_keep --as claude -- claude "$@"; return; fi
+  sjsh_keep --as claude --force -- bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-claude-resume.sh" "$sid" "${rest[@]}"
 }

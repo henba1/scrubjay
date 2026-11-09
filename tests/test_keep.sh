@@ -149,6 +149,10 @@ for sh in bash zsh; do
   assert_contains "$sh: opencode passes through without a terminal" "$(cat "$SANDBOX/agent.calls")" "args=serve --port 1"
 done
 rm -f "$SANDBOX/stubbin/opencode"
+# Claude Code's Bash tool replays a snapshot of the user's shell functions and leaves out every name
+# starting with "_" (taken for completion helpers): a wrapper calling one is broken there.
+helpers="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)() *{.*/\1/p; s/^function \([A-Za-z_][A-Za-z0-9_]*\).*/\1/p' "$APP/bin/sj-shell.sh" | grep '^_' | tr '\n' ' ')"
+assert_eq "no shell function name starts with _" "" "$helpers"
 
 section "sj-doctor and the install hint"
 d() { bash "$APP/bin/sj-doctor.sh" harnesses 2>&1; }
