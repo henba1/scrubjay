@@ -1170,15 +1170,16 @@ ships one that says what the agent in the pane is doing, and what else runs in i
   than fit: <code>+n</code>.</li>
 <li><strong>right:</strong> the session's title, time, date and host. On a narrow terminal the bar drops things to
   fit, related sessions first, then the date.</li>
-<li><strong>a click on the left</strong> opens a menu of those sessions; choosing one switches to its tmux pane
-  (one in a Neovim can't be switched to and is shown greyed out). "All tmux sessions" is tmux's own
-  picker. The click needs <code>set -g mouse on</code>.</li>
+<li><strong>a click on a related session</strong> switches to its tmux pane (tmux 3.4 and later). <strong>A click
+  elsewhere on the left</strong> opens a menu of those sessions, which works on any tmux: choosing one
+  switches to it (one in a Neovim can't be switched to and is shown greyed out). "All tmux sessions"
+  is tmux's own picker. Clicks need <code>set -g mouse on</code>.</li>
 </ul>
 <p>It is black and dim, and nothing on it stays put: the text drifts a cell every two minutes and its
 grey breathes slowly, so an OLED screen doesn't burn it in. <code>SCRUBJAY_STATUS_DRIFT=off</code> keeps it
 still; <code>SCRUBJAY_STATUS_MAX</code> (default 3) is how many related sessions it names.</p>
 <p><code>bin/onboard.sh</code> offers to add it; by hand, one line in <code>~/.tmux.conf</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>source-file<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">CLAUDE_CONFIG_DIR</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.claude</span><span class="si">}</span><span class="s2">/hooks/../tmux/scrubjay.conf"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>source-file<span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.claude/hooks/../tmux/scrubjay.conf"</span><span class="w">   </span><span class="c1"># tmux expands $HOME; with CLAUDE_CONFIG_DIR, its path</span>
 </code></pre></div>
 <p>Where the information comes from: each harness's own registry of running sessions (Claude Code's
 <code>~/.claude/sessions/</code>, via <code>bin/sj-live.sh</code>), the leases for the waiting state, and the process tree
