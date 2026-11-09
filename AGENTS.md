@@ -110,7 +110,8 @@ Steps:
    `scrubjay-storage`, may nest but must stay inside the mountpoint; via
    `bin/sj-mount.sh` — see below); which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
    auto-detects installed ones via each adapter's PATH-based `sjh_present`, so you usually only
-   set this to override, e.g. an opencode that isn't on PATH yet); and whether to enable
+   set this to override, e.g. an opencode that isn't on PATH yet); whether to ring the terminal bell
+   when an agent finishes a turn (`SCRUBJAY_NOTIFY=on|off`); and whether to enable
    cross-machine memory (on the `git` backend this puts real filesystem paths in a private GitHub
    repo — surface that trade-off, don't just enable it).
 2. **Confirm, then run non-interactively** from the clone, e.g.:

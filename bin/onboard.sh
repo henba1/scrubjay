@@ -308,6 +308,23 @@ if [ "${_shell_hook:-0}" = 1 ] && [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_KEEP' "$C
   fi
 fi
 
+# ---- 7f) a bell when an agent finishes a turn or asks for a permission -------------------------
+# bin/sj-notify.sh, for every harness. Asked once: a config that already says either way is left
+# alone. Preset SCRUBJAY_NOTIFY (on|off) to answer it unattended.
+if [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_NOTIFY' "$CFG"; then
+  case "${SCRUBJAY_NOTIFY:-}" in
+    on|off) _notify="$SCRUBJAY_NOTIFY" ;;
+    *) if confirm "ring the terminal bell when an agent finishes a turn or asks for a permission?" Y
+       then _notify=on; else _notify=off; fi ;;
+  esac
+  echo ": \"\${SCRUBJAY_NOTIFY:=$_notify}\"" >> "$CFG"
+  if [ "$_notify" = on ]; then
+    ok "agents ring the terminal bell when they want you (SCRUBJAY_NOTIFY=on; in nvim see docs: day-to-day, Notifications)"
+  else
+    info "No bell. Later: set SCRUBJAY_NOTIFY=on in $(sj_pretty_path "$CFG")"
+  fi
+fi
+
 # ---- 8) offer to push the new host dir------------------------------------------------
 if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \
