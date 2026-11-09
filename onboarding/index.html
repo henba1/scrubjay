@@ -628,6 +628,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../keep-alive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keeping agents alive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../slash-commands/" class="md-nav__link">
         
   
@@ -749,10 +776,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
         
           
-          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="">
             
   
   
@@ -770,8 +797,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_13">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1111,7 +1138,9 @@
 </table>
 <p>Everywhere: <code>bash</code>, <code>git</code>, <code>jq</code>, an SSH key on GitHub, and ideally <a href="https://cli.github.com"><code>gh</code></a>
 and <a href="https://docs.astral.sh/uv/"><code>uv</code></a> (the latter powers the <code>sjmcp</code> archive server behind
-<code>/sjrecall</code> and friends). No root required, except to install a NAS mount for the <code>local</code> backend.</p>
+<code>/sjrecall</code> and friends). Optionally <a href="../keep-alive/"><code>tmux</code></a>, on machines where you run agents over SSH, so
+closing the terminal doesn't kill them. No root required, except to install a NAS mount for the
+<code>local</code> backend (and tmux, a distro package, if it isn't there yet).</p>
 <h3 id="windows-use-wsl-2-and-stay-inside-it">Windows: use WSL 2, and stay inside it<a class="headerlink" href="#windows-use-wsl-2-and-stay-inside-it" title="Permanent link">&para;</a></h3>
 <p>Claude Code runs <a href="https://code.claude.com/docs/en/setup">natively on Windows <em>or</em> inside WSL</a>.
 scrubjay only supports the second. Four things are genuinely different from a plain Linux box:</p>

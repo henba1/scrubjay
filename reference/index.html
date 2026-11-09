@@ -476,6 +476,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../keep-alive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keeping agents alive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../slash-commands/" class="md-nav__link">
         
   
@@ -667,6 +694,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#keep-agents-running-when-the-terminal-closes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep agents running when the terminal closes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#register-the-current-machine-first-time-onboarding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -754,10 +792,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
         
           
-          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="">
             
   
   
@@ -775,8 +813,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_13">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1037,6 +1075,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#keep-agents-running-when-the-terminal-closes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep agents running when the terminal closes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#register-the-current-machine-first-time-onboarding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1177,8 +1226,15 @@ future sessions — read them back with <code>/sjrecall</code>, <code>/sjbrowse 
 installed (<code>~/.scrubjay/scrubjay/bin/sj-shell-install.sh</code>, once per machine):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>claude<span class="w"> </span>resume<span class="w"> </span>&lt;sid8&gt;<span class="w">                               </span><span class="c1"># also: claude --resume &lt;sid8&gt;, claude -r &lt;sid8&gt;</span>
 </code></pre></div>
+<h2 id="keep-agents-running-when-the-terminal-closes">Keep agents running when the terminal closes<a class="headerlink" href="#keep-agents-running-when-the-terminal-closes" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s1">': "${SCRUBJAY_KEEP:=ssh}"'</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w">   </span><span class="c1"># needs tmux on this machine</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>claude<span class="w">                                      </span><span class="c1"># runs inside tmux session sj-claude-&lt;folder&gt;</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>~/.scrubjay/scrubjay/bin/sj-keep.sh<span class="w"> </span>ls<span class="w">      </span><span class="c1"># what's running here</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>tmux<span class="w"> </span>attach<span class="w"> </span>-t<span class="w"> </span>sj-claude-&lt;folder&gt;<span class="w">           </span><span class="c1"># back in; Ctrl-b d to detach again</span>
+</code></pre></div>
+<p>Setup, what is and isn't wrapped, and a short tmux primer: <a href="../keep-alive/">Keeping agents alive</a>.</p>
 <h2 id="register-the-current-machine-first-time-onboarding">Register the current machine (first-time onboarding)<a class="headerlink" href="#register-the-current-machine-first-time-onboarding" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>~/.scrubjay/scrubjay/bin/claude-register-host.sh<span class="w"> </span>--host<span class="w"> </span>&lt;name&gt;
 </code></pre></div>
 <h2 id="toggle-behaviour">Toggle behaviour<a class="headerlink" href="#toggle-behaviour" title="Permanent link">&para;</a></h2>
 <p>Set in <code>~/.config/scrubjay/config</code> (persistent) or inline before a command (one-off) — no file
@@ -1220,6 +1276,10 @@ editing needed:</p>
 <td>don't sweep for sessions that ended without a clean exit</td>
 </tr>
 <tr>
+<td><code>SCRUBJAY_KEEP=ssh</code></td>
+<td>run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (<code>always</code>: whenever outside tmux; default <code>off</code>). See <a href="../keep-alive/">Keeping agents alive</a></td>
+</tr>
+<tr>
 <td><code>SCRUBJAY_VIEW_PORT=&lt;n&gt;</code></td>
 <td>the port <code>/sjview</code> listens on (default 7787; the next free one if taken)</td>
 </tr>
@@ -1243,17 +1303,17 @@ editing needed:</p>
 </table>
 <h2 id="re-home-the-scrubjay-clones">Re-home the scrubjay clones<a class="headerlink" href="#re-home-the-scrubjay-clones" title="Permanent link">&para;</a></h2>
 <p>Move the machinery (e.g. out of <code>~/code</code> into <code>~/.scrubjay</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s">: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s">EOF</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.scrubjay
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>mv<span class="w"> </span>~/code/scrubjay<span class="w"> </span>~/code/scrubjay-data<span class="w"> </span>~/code/scrubjay-chats<span class="w"> </span>~/.scrubjay/
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># repoint the machine-local pointer at the new location</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/scrubjay/config<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="s">: "${SCRUBJAY_DATA:=$HOME/.scrubjay/scrubjay-data}"</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="s">: "${SCRUBJAY_CHATS:=$HOME/.scrubjay/scrubjay-chats}"</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="s">: "${SCRUBJAY_TRANSCRIPT_BACKEND:=git}"</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="s">EOF</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>~/.scrubjay/scrubjay/bin/claude-sync.sh<span class="w">   </span><span class="c1"># rebuild the ~/.claude symlinks at the new path</span>
 </code></pre></div>
 <p><code>claude-sync.sh</code> recomputes the app location from its own path and re-links every scope, so
 nothing else needs touching. Confirm with

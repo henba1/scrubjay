@@ -16,7 +16,7 @@
         <link rel="prev" href="../archive-mcp/">
       
       
-        <link rel="next" href="../slash-commands/">
+        <link rel="next" href="../keep-alive/">
       
       
         
@@ -611,6 +611,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../keep-alive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keeping agents alive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../slash-commands/" class="md-nav__link">
         
   
@@ -732,10 +759,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
         
           
-          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="">
             
   
   
@@ -753,8 +780,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_13">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1092,7 +1119,9 @@ and zsh) in <code>bin/sj-shell.sh</code>. It intercepts only <code>resume &lt;id
 <code>-r</code> / <code>--resume=</code> followed by something that looks like a session id (8–36 hex digits and dashes).
 Everything else — <code>claude</code>, <code>claude -p "resume the build"</code>, <code>claude --resume</code> (the picker),
 <code>claude --resume &lt;search words&gt;</code> — goes straight to the binary after one pattern match on the
-arguments, so there is no startup cost.</p>
+arguments, so there is no startup cost. (The same file also defines <code>opencode</code> and <code>codex</code>, for
+<a href="../keep-alive/">keeping agents running</a> when the
+terminal closes; that only runs when you launch one from a terminal outside tmux.)</p>
 <p><strong>Installing it.</strong> Once per machine:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bash<span class="w"> </span>~/.scrubjay/scrubjay/bin/sj-shell-install.sh<span class="w">     </span><span class="c1"># then open a new shell</span>
 </code></pre></div>

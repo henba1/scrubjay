@@ -337,7 +337,7 @@ scrubjay is a pile of `bash` scripts plus a Python MCP server, so "does it run h
 | **macOS**                                     | Should work; not regularly tested. The known GNU-vs-BSD gaps are shimmed in `bin/lib.sh` and pinned by `tests/test_portability.sh`, but no macOS machine runs the suite yet. Reports welcome.                                                                                                       |
 | **Native Windows** (PowerShell/CMD, Git Bash) | Not supported, and not close. `bin/claude-sync.sh` applies your config as a tree of symlinks, which Git Bash emulates by *copying* — that quietly breaks the "edit once, live everywhere" property the whole design rests on. `rsync` is also absent, so the `rsync-wg` relay can't run. Use WSL 2. |
 
-Everywhere: `bash`, `git`, `jq`, an SSH key on GitHub, and ideally [`gh`](https://cli.github.com) and [`uv`](https://docs.astral.sh/uv/) (the latter powers the `sjmcp` archive server behind `/sjrecall` and friends). No root required, except to install a NAS mount for the `local` backend.
+Everywhere: `bash`, `git`, `jq`, an SSH key on GitHub, and ideally [`gh`](https://cli.github.com) and [`uv`](https://docs.astral.sh/uv/) (the latter powers the `sjmcp` archive server behind `/sjrecall` and friends). Optionally [`tmux`](https://henba1.github.io/scrubjay/keep-alive/index.md), on machines where you run agents over SSH, so closing the terminal doesn't kill them. No root required, except to install a NAS mount for the `local` backend (and tmux, a distro package, if it isn't there yet).
 
 ### Windows: use WSL 2, and stay inside it
 
@@ -646,6 +646,17 @@ Or in one step from a terminal, with the [shell integration](https://henba1.gith
 claude resume <sid8>                               # also: claude --resume <sid8>, claude -r <sid8>
 ```
 
+## Keep agents running when the terminal closes
+
+```
+echo ': "${SCRUBJAY_KEEP:=ssh}"' >> ~/.config/scrubjay/config   # needs tmux on this machine
+claude                                      # runs inside tmux session sj-claude-<folder>
+~/.scrubjay/scrubjay/bin/sj-keep.sh ls      # what's running here
+tmux attach -t sj-claude-<folder>           # back in; Ctrl-b d to detach again
+```
+
+Setup, what is and isn't wrapped, and a short tmux primer: [Keeping agents alive](https://henba1.github.io/scrubjay/keep-alive/index.md).
+
 ## Register the current machine (first-time onboarding)
 
 ```
@@ -656,20 +667,21 @@ claude resume <sid8>                               # also: claude --resume <sid8
 
 Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-off) — no file editing needed:
 
-| Env var                                        | Effect                                                                                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SCRUBJAY_TRANSCRIPT_BACKEND=off`              | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                        |
-| `SCRUBJAY_NOSYNC=1`                            | skip the start-of-session pull + sync entirely                                                                                           |
-| `SCRUBJAY_SYNC_NOPULL=1`                       | sync at start but don't `git pull` first                                                                                                 |
-| `SCRUBJAY_NOSHIP=1`                            | end the session without shipping its transcript                                                                                          |
-| `SCRUBJAY_TURN_PUBLISH=0`                      | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                            |
-| `SCRUBJAY_LOG_NOGIT=1`                         | append the log line but don't commit/push it                                                                                             |
-| `SCRUBJAY_NORECONCILE=1`                       | don't sweep for sessions that ended without a clean exit                                                                                 |
-| `SCRUBJAY_VIEW_PORT=<n>`                       | the port `/sjview` listens on (default 7787; the next free one if taken)                                                                 |
-| `SCRUBJAY_VIEW_NEXTCLOUD=<url>`                | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below)                       |
-| `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;`                                           |
-| `SCRUBJAY_VIEW_IDLE=<min>`                     | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never)                                                    |
-| `SCRUBJAY_AI_TOPIC=0`                          | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt |
+| Env var                                        | Effect                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SCRUBJAY_TRANSCRIPT_BACKEND=off`              | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                                                                                                                        |
+| `SCRUBJAY_NOSYNC=1`                            | skip the start-of-session pull + sync entirely                                                                                                                                                                                           |
+| `SCRUBJAY_SYNC_NOPULL=1`                       | sync at start but don't `git pull` first                                                                                                                                                                                                 |
+| `SCRUBJAY_NOSHIP=1`                            | end the session without shipping its transcript                                                                                                                                                                                          |
+| `SCRUBJAY_TURN_PUBLISH=0`                      | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                                                                                                                            |
+| `SCRUBJAY_LOG_NOGIT=1`                         | append the log line but don't commit/push it                                                                                                                                                                                             |
+| `SCRUBJAY_NORECONCILE=1`                       | don't sweep for sessions that ended without a clean exit                                                                                                                                                                                 |
+| `SCRUBJAY_KEEP=ssh`                            | run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (`always`: whenever outside tmux; default `off`). See [Keeping agents alive](https://henba1.github.io/scrubjay/keep-alive/index.md) |
+| `SCRUBJAY_VIEW_PORT=<n>`                       | the port `/sjview` listens on (default 7787; the next free one if taken)                                                                                                                                                                 |
+| `SCRUBJAY_VIEW_NEXTCLOUD=<url>`                | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below)                                                                                                                       |
+| `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;`                                                                                                                                           |
+| `SCRUBJAY_VIEW_IDLE=<min>`                     | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never)                                                                                                                                                    |
+| `SCRUBJAY_AI_TOPIC=0`                          | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt                                                                                                 |
 
 ## Re-home the scrubjay clones
 
@@ -917,7 +929,7 @@ If the session's folder has moved and the [moves ledger](https://henba1.github.i
 
 A session from a different agent (opencode, codex) can't be resumed by `claude`; you get the same carry-over command `/sjresume` prints instead.
 
-**What gets intercepted, and what doesn't.** The integration is a `claude` shell function (bash and zsh) in `bin/sj-shell.sh`. It intercepts only `resume <id>` as the *first* word, or `--resume` / `-r` / `--resume=` followed by something that looks like a session id (8–36 hex digits and dashes). Everything else — `claude`, `claude -p "resume the build"`, `claude --resume` (the picker), `claude --resume <search words>` — goes straight to the binary after one pattern match on the arguments, so there is no startup cost.
+**What gets intercepted, and what doesn't.** The integration is a `claude` shell function (bash and zsh) in `bin/sj-shell.sh`. It intercepts only `resume <id>` as the *first* word, or `--resume` / `-r` / `--resume=` followed by something that looks like a session id (8–36 hex digits and dashes). Everything else — `claude`, `claude -p "resume the build"`, `claude --resume` (the picker), `claude --resume <search words>` — goes straight to the binary after one pattern match on the arguments, so there is no startup cost. (The same file also defines `opencode` and `codex`, for [keeping agents running](https://henba1.github.io/scrubjay/keep-alive/index.md) when the terminal closes; that only runs when you launch one from a terminal outside tmux.)
 
 **Installing it.** Once per machine:
 

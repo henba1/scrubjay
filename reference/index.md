@@ -98,6 +98,17 @@ Or in one step from a terminal, with the [shell integration](https://henba1.gith
 claude resume <sid8>                               # also: claude --resume <sid8>, claude -r <sid8>
 ```
 
+## Keep agents running when the terminal closes
+
+```
+echo ': "${SCRUBJAY_KEEP:=ssh}"' >> ~/.config/scrubjay/config   # needs tmux on this machine
+claude                                      # runs inside tmux session sj-claude-<folder>
+~/.scrubjay/scrubjay/bin/sj-keep.sh ls      # what's running here
+tmux attach -t sj-claude-<folder>           # back in; Ctrl-b d to detach again
+```
+
+Setup, what is and isn't wrapped, and a short tmux primer: [Keeping agents alive](https://henba1.github.io/scrubjay/keep-alive/index.md).
+
 ## Register the current machine (first-time onboarding)
 
 ```
@@ -108,20 +119,21 @@ claude resume <sid8>                               # also: claude --resume <sid8
 
 Set in `~/.config/scrubjay/config` (persistent) or inline before a command (one-off) — no file editing needed:
 
-| Env var                                        | Effect                                                                                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SCRUBJAY_TRANSCRIPT_BACKEND=off`              | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                        |
-| `SCRUBJAY_NOSYNC=1`                            | skip the start-of-session pull + sync entirely                                                                                           |
-| `SCRUBJAY_SYNC_NOPULL=1`                       | sync at start but don't `git pull` first                                                                                                 |
-| `SCRUBJAY_NOSHIP=1`                            | end the session without shipping its transcript                                                                                          |
-| `SCRUBJAY_TURN_PUBLISH=0`                      | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                            |
-| `SCRUBJAY_LOG_NOGIT=1`                         | append the log line but don't commit/push it                                                                                             |
-| `SCRUBJAY_NORECONCILE=1`                       | don't sweep for sessions that ended without a clean exit                                                                                 |
-| `SCRUBJAY_VIEW_PORT=<n>`                       | the port `/sjview` listens on (default 7787; the next free one if taken)                                                                 |
-| `SCRUBJAY_VIEW_NEXTCLOUD=<url>`                | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below)                       |
-| `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;`                                           |
-| `SCRUBJAY_VIEW_IDLE=<min>`                     | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never)                                                    |
-| `SCRUBJAY_AI_TOPIC=0`                          | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt |
+| Env var                                        | Effect                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SCRUBJAY_TRANSCRIPT_BACKEND=off`              | pause session shipping (other values: `local`, `rsync-wg`, `git`)                                                                                                                                                                        |
+| `SCRUBJAY_NOSYNC=1`                            | skip the start-of-session pull + sync entirely                                                                                                                                                                                           |
+| `SCRUBJAY_SYNC_NOPULL=1`                       | sync at start but don't `git pull` first                                                                                                                                                                                                 |
+| `SCRUBJAY_NOSHIP=1`                            | end the session without shipping its transcript                                                                                                                                                                                          |
+| `SCRUBJAY_TURN_PUBLISH=0`                      | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`)                                                                                                                                            |
+| `SCRUBJAY_LOG_NOGIT=1`                         | append the log line but don't commit/push it                                                                                                                                                                                             |
+| `SCRUBJAY_NORECONCILE=1`                       | don't sweep for sessions that ended without a clean exit                                                                                                                                                                                 |
+| `SCRUBJAY_KEEP=ssh`                            | run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (`always`: whenever outside tmux; default `off`). See [Keeping agents alive](https://henba1.github.io/scrubjay/keep-alive/index.md) |
+| `SCRUBJAY_VIEW_PORT=<n>`                       | the port `/sjview` listens on (default 7787; the next free one if taken)                                                                                                                                                                 |
+| `SCRUBJAY_VIEW_NEXTCLOUD=<url>`                | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below)                                                                                                                       |
+| `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;`                                                                                                                                           |
+| `SCRUBJAY_VIEW_IDLE=<min>`                     | minutes without a request before the `/sjview` viewer stops (default 30; `0` = never)                                                                                                                                                    |
+| `SCRUBJAY_AI_TOPIC=0`                          | don't ask Haiku for the session's topic (one `claude -p` call per session end with new prompts, on your own usage); use its first prompt                                                                                                 |
 
 ## Re-home the scrubjay clones
 

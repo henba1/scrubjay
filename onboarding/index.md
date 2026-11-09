@@ -11,7 +11,7 @@ scrubjay is a pile of `bash` scripts plus a Python MCP server, so "does it run h
 | **macOS**                                     | Should work; not regularly tested. The known GNU-vs-BSD gaps are shimmed in `bin/lib.sh` and pinned by `tests/test_portability.sh`, but no macOS machine runs the suite yet. Reports welcome.                                                                                                       |
 | **Native Windows** (PowerShell/CMD, Git Bash) | Not supported, and not close. `bin/claude-sync.sh` applies your config as a tree of symlinks, which Git Bash emulates by *copying* — that quietly breaks the "edit once, live everywhere" property the whole design rests on. `rsync` is also absent, so the `rsync-wg` relay can't run. Use WSL 2. |
 
-Everywhere: `bash`, `git`, `jq`, an SSH key on GitHub, and ideally [`gh`](https://cli.github.com) and [`uv`](https://docs.astral.sh/uv/) (the latter powers the `sjmcp` archive server behind `/sjrecall` and friends). No root required, except to install a NAS mount for the `local` backend.
+Everywhere: `bash`, `git`, `jq`, an SSH key on GitHub, and ideally [`gh`](https://cli.github.com) and [`uv`](https://docs.astral.sh/uv/) (the latter powers the `sjmcp` archive server behind `/sjrecall` and friends). Optionally [`tmux`](https://henba1.github.io/scrubjay/keep-alive/index.md), on machines where you run agents over SSH, so closing the terminal doesn't kill them. No root required, except to install a NAS mount for the `local` backend (and tmux, a distro package, if it isn't there yet).
 
 ### Windows: use WSL 2, and stay inside it
 
