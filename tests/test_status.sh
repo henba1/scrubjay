@@ -46,6 +46,7 @@ cat > "$SANDBOX/bin/faketmux" <<EOF
 case "\$1" in
   list-panes) printf '%s\tsj-claude-widget:0.%%1\n%s\tsj-claude-widget-feat:0.%%2\n%s\tsj-claude-notes:0.%%4\n' $A $B $O ;;
   display-menu) printf '%s\n' "\$@" > "$SANDBOX/menu.args" ;;
+  display) echo "\${FAKE_TMUX_VERSION:-3.3a}" ;;
 esac
 EOF
 chmod +x "$SANDBOX/bin/faketmux"; export SJ_STATUS_TMUX="$SANDBOX/bin/faketmux"
@@ -84,6 +85,24 @@ plain_left="$(bash "$ST" left sj-other %9 200 "" | strip)"
 assert_contains "a pane without an agent: host and tmux session" "$plain_left" "testhost · sj-other"
 assert_contains "a # in a branch is no tmux format" \
   "$(git -C "$wt" checkout -q -b 'fix#7' && bash "$ST" left sj-claude-widget-feat %2 200 '')" "fix##7"
+
+section "a click on a related session (tmux 3.4 and later)"
+raw="$(bash "$ST" left sj-claude-widget %1 200 '')"
+check "tmux 3.3: no click ranges, the menu does it" bash -c '! grep -q "range=" <<<"$1"' _ "$raw"
+raw="$(FAKE_TMUX_VERSION=3.5a bash "$ST" left sj-claude-widget %1 200 '')"
+assert_contains "3.5: the tmux pane's session is a range named by its pane" "$raw" "#[range=user|%2]"
+check "one in a Neovim is not (tmux cannot switch to it)" bash -c '! grep -q "range=user|-" <<<"$1"' _ "$raw"
+assert_contains "a development build counts by its number" "$(FAKE_TMUX_VERSION=next-3.6 bash "$ST" left sj-claude-widget %1 200 '')" "range=user|%2"
+
+section "the config tmux reads"
+if need_cmd tmux "tmux parses tmux/scrubjay.conf"; then
+  # tmux expands ${...} in a double-quoted string itself and knows no ${X:-default}: it must parse
+  err="$(tmux -L "sjstatus$$" -f /dev/null start-server \; source-file -n "$APP/tmux/scrubjay.conf" 2>&1)"
+  assert_eq "tmux parses it without a complaint" "" "$err"
+  tmux -L "sjstatus$$" kill-server 2>/dev/null
+fi
+# what onboard writes into ~/.tmux.conf: a path tmux can expand ($HOME), never ${X:-default}
+check "onboard's source-file line is one tmux can read" bash -c '! grep -q "source-file .*:-" "$1"' _ "$APP/bin/onboard.sh"
 
 section "the menu"
 bash "$ST" menu /dev/pts/1 sj-claude-widget %1 4

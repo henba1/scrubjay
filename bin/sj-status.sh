@@ -159,6 +159,13 @@ list() {
 
 esc() { printf '%s' "${1//#/##}"; }  # tmux formats: a # of the text is ##
 
+# Whether the tmux server draws click ranges of a pane (3.4 and later): 1 or 0
+ranges() {
+  local v; v="$("$TMUX_BIN" display -p '#{version}' 2>/dev/null)"; v="${v#next-}"; v="${v%%[!0-9.]*}"  # 3.5a, next-3.6
+  if [ "${v%%.*}" -gt 3 ] 2>/dev/null || { [ "${v%%.*}" = 3 ] && [ "${v#*.}" -ge 4 ] 2>/dev/null; }
+  then printf 1; else printf 0; fi
+}
+
 vislen() { local t; t="$(printf '%s' "$1" | sed 's/#\[[^]]*\]//g')"; printf '%s' "${#t}"; }
 
 # The right part at width <cols>: title · time · date · host; narrower than 120 columns, the title (a
@@ -181,7 +188,7 @@ case "${1:-}" in
   left)
     tsess="${2:-}" tpane="${3:-}" cols="${4:-200}"
     budget=$(( cols - $(vislen "$(right_str "${5:-}" "$cols")") - 3 ))
-    mine=0 related=() mybranch=""
+    mine=0 related=() mybranch="" rng="$(ranges)"
     while IFS=$'\t' read -r kind h sid st a name branch w; do
       [ "$branch" = - ] && branch=""
       case "$kind" in
@@ -191,7 +198,12 @@ case "${1:-}" in
           item="$(glyph "$st") ${sid:0:8}"
           [ -n "$branch" ] && [ "$branch" != "$mybranch" ] && item+=" $(esc "$branch")"
           case "$w" in gk|nvim) item+=" #[fg=$DIM]$w#[fg=$fg]" ;; esac
-          related+=("$item $(age "$a")") ;;
+          item+=" $(age "$a")"
+          # tmux 3.4 and later: a click on a session in a tmux pane goes there - a user range named by
+          # its pane id (%12), which tmux/scrubjay.conf switches to; before 3.4, the menu. Not a pane
+          # range: its target (=) resolves in the clicked bar's own session, not the pane's.
+          case "$w" in tmux:*) [ "$rng" = 1 ] && item="#[range=user|${w##*.}]$item#[norange]" ;; esac
+          related+=("$item") ;;
       esac
     done < <(list "$tsess" "$tpane")
     if [ "$mine" = 0 ]; then printf '%s' "$(pad "$drift")#[fg=$fg]$(sj_host)$SEP$(esc "$tsess")"; exit 0; fi

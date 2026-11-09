@@ -320,13 +320,16 @@ if have tmux && ! grep -qs 'scrubjay.conf' "$_tmux_conf"; then
        then _bar=on; else _bar=off; fi ;;
   esac
   if [ "$_bar" = on ]; then
-    # shellcheck disable=SC2016  # written verbatim, tmux's shell expands it
+    # tmux expands $HOME in its config but knows no ${X:-default}: a CLAUDE_CONFIG_DIR is written out
+    _bar_conf="${CLAUDE_CONFIG_DIR:-}/hooks/../tmux/scrubjay.conf"
+    # shellcheck disable=SC2016  # $HOME written as it is: tmux expands it
+    [ -n "${CLAUDE_CONFIG_DIR:-}" ] || _bar_conf='$HOME/.claude/hooks/../tmux/scrubjay.conf'
     printf '\n# scrubjay: the agents in the status bar (a click: switch between them, needs mouse on)\nsource-file "%s"\n' \
-      '${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../tmux/scrubjay.conf' >> "$_tmux_conf"
+      "$_bar_conf" >> "$_tmux_conf"
     ok "tmux shows the agents in its bar: $(sj_pretty_path "$_tmux_conf") (reload: tmux source-file ~/.tmux.conf)"
     grep -qs 'mouse on' "$_tmux_conf" || info "to switch with a click: add 'set -g mouse on' to $(sj_pretty_path "$_tmux_conf")"
   else
-    info "Skipped. Later: add 'source-file ~/.claude/hooks/../tmux/scrubjay.conf' to $(sj_pretty_path "$_tmux_conf")"
+    info "Skipped. Later: add 'source-file \"\$HOME/.claude/hooks/../tmux/scrubjay.conf\"' to $(sj_pretty_path "$_tmux_conf")"
   fi
 fi
 
