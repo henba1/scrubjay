@@ -477,6 +477,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -932,6 +943,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1028,6 +1050,21 @@ row rather than editing the original, because <code>logs/*.log</code> are append
 reader takes the newest row for a session id.</p>
 <p>For recall by <em>topic</em> (rather than an exact word you remember typing) from inside a live
 session, use the <a href="../archive-mcp/"><code>sjmcp</code> MCP server</a>.</p>
+<h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
+<p><code>SCRUBJAY_NOTIFY=on</code> in <code>~/.config/scrubjay/config</code> rings your terminal's bell when an agent finishes
+a turn or stops at a permission prompt. Claude Code, opencode and codex all ring it. It costs no
+tokens: a hook writes one byte to the agent's terminal.</p>
+<p>The bell goes to the agent's terminal rather than a sound device, so over SSH it rings on the
+machine you're sitting at. tmux passes it on by default. Your terminal emulator decides what a
+bell sounds like, so turn on its audible bell. A headless run (<code>claude -p</code>, <code>opencode run</code>) has no
+terminal and rings nothing.</p>
+<p><strong>nvim's <code>:terminal</code></strong> swallows the bell under its default <code>belloff=all</code>. Anything that leaves out
+<code>term</code> lets it through:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">vim</span><span class="p">.</span><span class="py">opt</span><span class="p">.</span><span class="py">belloff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"backspace"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cursor"</span><span class="p">,</span><span class="w"> </span><span class="s2">"complete"</span><span class="p">,</span><span class="w"> </span><span class="s2">"copy"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ctrlg"</span><span class="p">,</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span><span class="w"> </span><span class="s2">"esc"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ex"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hangul"</span><span class="p">,</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="s2">"insertmode"</span><span class="p">,</span><span class="w"> </span><span class="s2">"lang"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mess"</span><span class="p">,</span><span class="w"> </span><span class="s2">"showmatch"</span><span class="p">,</span><span class="w"> </span><span class="s2">"operator"</span><span class="p">,</span><span class="w"> </span><span class="s2">"register"</span><span class="p">,</span><span class="w"> </span><span class="s2">"shell"</span><span class="p">,</span><span class="w"> </span><span class="s2">"spell"</span><span class="p">,</span><span class="w"> </span><span class="s2">"wildmode"</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Leave Claude Code's own <code>preferredNotifChannel</code> unset: it alerts only after you've been away for
+a while (about 60 s after a turn), and with both on you'd get a second bell later.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p><strong>Hooks only activate on the <em>next</em> session.</strong> <code>claude-sync.sh</code> (and <code>onboard.sh</code>, which runs
 it) install the hooks — symlinking <code>~/.claude/hooks</code> and registering them in
