@@ -586,6 +586,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-status-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The status bar
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -994,6 +1005,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-status-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The status bar
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1134,6 +1156,33 @@ and tells you how to install, never something it installs as root for you.</p>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s">EOF</span>
 </code></pre></div>
 <p>If Shift+Enter doesn't insert a newline in Claude Code inside tmux, type <code>\</code> then Enter instead.</p>
+<h3 id="the-status-bar">The status bar<a class="headerlink" href="#the-status-bar" title="Permanent link">&para;</a></h3>
+<p>tmux's own bar says little about an agent: <code>[sj-claude-w</code> and <code>0:bash*</code> on bright green. scrubjay
+ships one that says what the agent in the pane is doing, and what else runs in its project:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a> widget ⎇ main · a1b2c3d4 · ● working 2m   ┊  ◐ 9f8e7d6c feat/retry 5s · ○ 77aa0c1e gk 1m      Retry backoff · 18:40 · Mon 9 Nov · henpi
+</code></pre></div>
+<ul>
+<li><strong>left:</strong> this pane's session: its project (the git repository) ⎇ branch · session id · its state
+  and since when. <code>●</code> working, <code>◐</code> waiting for your answer (a permission prompt), <code>○</code> idle.</li>
+<li><strong>then, after <code>┊</code>:</strong> the project's other sessions on this machine, the most recent first. A
+  session in a subfolder or another worktree of the repo is the same project; its branch is shown
+  when it differs. One running in GreyKnight's agent pane says <code>gk</code>, in another Neovim <code>nvim</code>. More
+  than fit: <code>+n</code>.</li>
+<li><strong>right:</strong> the session's title, time, date and host. On a narrow terminal the bar drops things to
+  fit, related sessions first, then the date.</li>
+<li><strong>a click on the left</strong> opens a menu of those sessions; choosing one switches to its tmux pane
+  (one in a Neovim can't be switched to and is shown greyed out). "All tmux sessions" is tmux's own
+  picker. The click needs <code>set -g mouse on</code>.</li>
+</ul>
+<p>It is black and dim, and nothing on it stays put: the text drifts a cell every two minutes and its
+grey breathes slowly, so an OLED screen doesn't burn it in. <code>SCRUBJAY_STATUS_DRIFT=off</code> keeps it
+still; <code>SCRUBJAY_STATUS_MAX</code> (default 3) is how many related sessions it names.</p>
+<p><code>bin/onboard.sh</code> offers to add it; by hand, one line in <code>~/.tmux.conf</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>source-file<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">CLAUDE_CONFIG_DIR</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.claude</span><span class="si">}</span><span class="s2">/hooks/../tmux/scrubjay.conf"</span>
+</code></pre></div>
+<p>Where the information comes from: each harness's own registry of running sessions (Claude Code's
+<code>~/.claude/sessions/</code>, via <code>bin/sj-live.sh</code>), the leases for the waiting state, and the process tree
+for where a session runs. It is read at most every eight seconds, however many clients look.</p>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>It protects against the terminal going away, not the machine.</strong> A reboot, power cut or a
