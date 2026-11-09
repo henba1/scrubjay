@@ -344,7 +344,8 @@ if [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_NOTIFY' "$CFG"; then
   esac
   echo ": \"\${SCRUBJAY_NOTIFY:=$_notify}\"" >> "$CFG"
   if [ "$_notify" = on ]; then
-    ok "agents ring the terminal bell when they want you (SCRUBJAY_NOTIFY=on; in nvim see docs: day-to-day, Notifications)"
+    ok "agents ring the terminal bell when they want you (SCRUBJAY_NOTIFY=on)"
+    info "The sound comes from the terminal you sit at: turn on its audible bell. A softer sound, and nvim: docs, day-to-day → Notifications"
   else
     info "No bell. Later: set SCRUBJAY_NOTIFY=on in $(sj_pretty_path "$CFG")"
   fi
