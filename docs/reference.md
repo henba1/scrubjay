@@ -127,6 +127,17 @@ installed (`~/.scrubjay/scrubjay/bin/sj-shell-install.sh`, once per machine):
 claude resume <sid8>                               # also: claude --resume <sid8>, claude -r <sid8>
 ```
 
+## Keep agents running when the terminal closes
+
+```sh
+echo ': "${SCRUBJAY_KEEP:=ssh}"' >> ~/.config/scrubjay/config   # needs tmux on this machine
+claude                                      # runs inside tmux session sj-claude-<folder>
+~/.scrubjay/scrubjay/bin/sj-keep.sh ls      # what's running here
+tmux attach -t sj-claude-<folder>           # back in; Ctrl-b d to detach again
+```
+
+Setup, what is and isn't wrapped, and a short tmux primer: [Keeping agents alive](keep-alive.md).
+
 ## Register the current machine (first-time onboarding)
 
 ```sh
@@ -148,6 +159,7 @@ editing needed:
 | `SCRUBJAY_TURN_PUBLISH=0` | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
+| `SCRUBJAY_KEEP=ssh` | run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (`always`: whenever outside tmux; default `off`). See [Keeping agents alive](keep-alive.md) |
 | `SCRUBJAY_VIEW_PORT=<n>` | the port `/sjview` listens on (default 7787; the next free one if taken) |
 | `SCRUBJAY_VIEW_NEXTCLOUD=<url>` | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below) |
 | `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;` |

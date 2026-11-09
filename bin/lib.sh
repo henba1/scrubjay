@@ -19,6 +19,19 @@ sj_load_config() {
 
 sj_has() { command -v "$1" >/dev/null 2>&1; }
 
+# The command that installs a distro package here, for a message — never run by scrubjay: package
+# installs need root, and root is the user's to use. `sj_install_hint tmux` → "sudo apt install tmux".
+sj_install_hint() {
+  local pkg="$1"
+  if   sj_has brew;    then printf 'brew install %s' "$pkg"
+  elif sj_has apt-get; then printf 'sudo apt install %s' "$pkg"
+  elif sj_has dnf;     then printf 'sudo dnf install %s' "$pkg"
+  elif sj_has pacman;  then printf 'sudo pacman -S %s' "$pkg"
+  elif sj_has zypper;  then printf 'sudo zypper install %s' "$pkg"
+  elif sj_has apk;     then printf 'sudo apk add %s' "$pkg"
+  else printf "install '%s' with this system's package manager" "$pkg"; fi
+}
+
 # Canonical absolute path, existing paths only (GNU `realpath -e` semantics), with every symlink
 # component resolved.
 #

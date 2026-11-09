@@ -39,7 +39,7 @@ section_desc() {
     data)      printf 'the scrubjay-data clone: readable, reachable, nothing unpushed' ;;
     memory)    printf 'the memory clone: right remote, right branch, nothing unpublished' ;;
     relay)     printf 'the transcript relay for this backend is reachable' ;;
-    harnesses) printf 'each configured harness has an adapter and a config dir' ;;
+    harnesses) printf 'each configured harness has an adapter and a config dir; shell integration, keep' ;;
     sessions)  printf 'sessions on this disk that never reached the catalogue' ;;
     outcomes)  printf 'what the last ship / memory sync actually did' ;;
   esac
@@ -218,6 +218,15 @@ doctor_harnesses() {
       else
         note "shell integration not in your rc — for 'claude resume <sid>' from any machine: bash $(sj_pretty_path "$APP")/bin/sj-shell-install.sh"
       fi ;;
+  esac
+  # Keeping agents alive past the terminal (bin/sj-keep.sh): a setting, and tmux to do it with.
+  local keep="${SCRUBJAY_KEEP:-off}" tmux_bin="${SJ_KEEP_TMUX:-tmux}"
+  case "$keep" in
+    off|'') note "agents end with the terminal that started them — to keep them over SSH, set SCRUBJAY_KEEP=ssh (needs tmux)" ;;
+    ssh|always)
+      if sj_has "$tmux_bin"; then ok "keep: SCRUBJAY_KEEP=$keep, agents run inside tmux ($("$tmux_bin" -V 2>/dev/null))"
+      else bad "keep: SCRUBJAY_KEEP=$keep but tmux is not installed, so agents still end with the terminal" "$(sj_install_hint tmux)"; fi ;;
+    *) bad "keep: SCRUBJAY_KEEP='$keep' is not off, ssh or always" "set SCRUBJAY_KEEP=ssh in ~/.config/scrubjay/config" ;;
   esac
   # A bell when an agent finishes a turn or asks for a permission (bin/sj-notify.sh).
   case "${SCRUBJAY_NOTIFY:-off}" in
