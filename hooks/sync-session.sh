@@ -122,7 +122,13 @@ fi
 #    later ship succeeds (the breadcrumb is rewritten to result=ok).
 sfile="$(sj_ship_status_file 2>/dev/null || echo "$HOME/.config/scrubjay/last-ship")"
 if [ -s "$sfile" ] && grep -q '^result=fail' "$sfile" 2>/dev/null; then
-  printf 'scrubjay: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. Check the relay SSH key / authorized_keys on the receiver, then re-ship. Breadcrumb: %s\n' "$(cat "$sfile")"
+  # rc=255 is ssh itself failing (connection or key). Anything else means ssh got in and rsync
+  # failed on the receiver — pointing the user at authorized_keys then sends them the wrong way.
+  case " $(cat "$sfile") " in
+    *" rc=255 "*) hint="Check the relay SSH key / authorized_keys on the receiver, then re-ship." ;;
+    *) hint="The receiver accepted the key but the transfer failed — run bin/sj-doctor.sh relay, which tries a real upload, then re-ship." ;;
+  esac
+  printf 'scrubjay: the last transcript relay from this machine FAILED — recent sessions may not have reached the archive. %s Breadcrumb: %s\n' "$hint" "$(cat "$sfile")"
 fi
 
 # 3a) finish onboarding if the receiver has been authorized since last time. A p2p host cannot
@@ -134,6 +140,13 @@ pfile="$(sj_pending_file 2>/dev/null || echo "$HOME/.config/scrubjay/pending-aut
 if [ -s "$pfile" ]; then
   while IFS="$(printf '\t')" read -r sub kind tgt; do
     [ -n "${sub:-}" ] || continue
+    # Probe what the host is configured to use NOW, not what onboarding recorded: an entry written
+    # by an earlier (or mis-answered) onboarding run otherwise names a target nobody will ever
+    # authorize, and this would report "NOT yet authorized" forever for a relay that works.
+    case "$sub" in
+      relay)  [ -n "${SCRUBJAY_WG_TARGET:-}" ] && tgt="$SCRUBJAY_WG_TARGET" ;;
+      memory) [ -n "${SCRUBJAY_MEMORY_REMOTE:-}" ] && tgt="$SCRUBJAY_MEMORY_REMOTE" ;;
+    esac
     if sj_pending_authorized "$kind" "$tgt"; then
       case "$sub" in
         memory)

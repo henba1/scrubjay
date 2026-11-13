@@ -36,7 +36,21 @@ transport_ship() {  # transport_ship <src> <relpath> [mirror]   (src may be a fi
   if [ -d "$src" ]; then                       # directory: trailing slashes mirror contents into <relpath>/
     rsync -a --no-perms --mkpath $del -e "$ssh" "$src/" "$SCRUBJAY_WG_TARGET:$relpath/" 2>/dev/null || rc=$?
   else
-    rsync -a --no-perms --mkpath -e "$ssh" "$src" "$SCRUBJAY_WG_TARGET:$relpath" 2>/dev/null || rc=$?
+    # A single file is sent INTO its destination directory, never file-to-file. Observed with an
+    #   rsync 3.5.0 sender against an older receiver behind `rrsync -wo`: file-to-file can CREATE a
+    #   file but not REPLACE one — the receiver's generator fails with "delete_file: unlink(4)
+    #   failed: Operation not permitted / could not make way for new regular file: 4" and exits 23,
+    #   whatever the file's mode. So the first ship of each session succeeds and every later one
+    #   fails. The file-into-directory form replaces cleanly in the same setup.
+    #   That form takes the file's own basename, so a source named differently (a mktemp file for
+    #   readable/*.md) is staged under its destination name first.
+    local dir="${relpath%/*}" base="${relpath##*/}" send="$src" stage=""
+    [ "$dir" = "$relpath" ] && dir="."
+    if [ "${src##*/}" != "$base" ]; then
+      stage="$(mktemp -d)" && cp -p "$src" "$stage/$base" && send="$stage/$base" || rc=1
+    fi
+    [ "$rc" -eq 0 ] && { rsync -a --no-perms --mkpath -e "$ssh" "$send" "$SCRUBJAY_WG_TARGET:$dir/" 2>/dev/null || rc=$?; }
+    [ -n "$stage" ] && rm -rf "$stage"
   fi
   [ "$mode" = mirror ] && rc=0
   return $rc

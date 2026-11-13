@@ -148,7 +148,14 @@ BACKEND="$SCRUBJAY_BACKEND"
 ok "backend: $BACKEND"
 
 # backend-specific settings
-WG_TARGET=""; WG_KEY=""; LOCAL_CHATS=""; RECV_HOST=""; RECV_USER=""; RECV_PORT=""; RECV_PATH=""; GEN_KEY=0
+# The answers below are prompted with `ask`, which keeps a value already in the environment — that
+# is how the documented presets (RECV_USER=… RECV_HOST=… bin/onboard.sh, and /sjonboard driving it
+# unattended) reach the prompts. So only DEFAULT them to empty here; assigning "" would wipe every
+# preset and silently onboard against the built-in defaults (wrong receiver user, wrong root).
+# WG_TARGET and GEN_KEY are derived, never preset, so they do start clean.
+WG_TARGET=""; GEN_KEY=0
+WG_KEY="${WG_KEY:-}"; LOCAL_CHATS="${LOCAL_CHATS:-}"
+RECV_HOST="${RECV_HOST:-}"; RECV_USER="${RECV_USER:-}"; RECV_PORT="${RECV_PORT:-}"; RECV_PATH="${RECV_PATH:-}"
 case "$BACKEND" in
   rsync-wg)
     # The receiver is a role, not a prerequisite you must have solved elsewhere: bin/onboard-receiver.sh

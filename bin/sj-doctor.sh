@@ -77,6 +77,29 @@ git_reachable() {  # git_reachable <remote>
     sj_timeout 20 git ls-remote "$1" HEAD >/dev/null 2>&1
 }
 relay_ssh() { sj_timeout 20 ssh -o BatchMode=yes -o ConnectTimeout=8 "$1" true >/dev/null 2>&1; }
+# A key that authenticates says nothing about whether rsync can WRITE: the receiver may run another
+# rsync version, refuse an option, or lack permission. So ship a tiny probe file the real way, twice —
+# the first call creates it, the second must REPLACE it, which is what every session after the first
+# does (the case that broke silently for a newer rsync sender against an older receiver). Same transport
+# code as session-end. Leaves one small file, <host>/.sj-doctor-probe, in the archive.
+# Only run once the key is known to authenticate (the transport's ssh has no BatchMode), and under a
+# timeout, so a slow or hung receiver cannot stall the doctor.
+relay_write() {
+  local d rc=0; d="$(mktemp -d)" || return 1
+  date -u +%FT%TZ > "$d/.sj-doctor-probe"
+  # The second ship must carry a CHANGED file: an identical one passes rsync's size+mtime quick
+  # check and is skipped, so nothing would be replaced and the probe would prove nothing.
+  # The config's `: "${VAR:=…}"` lines do not export, so hand the target and key to the child shell
+  # explicitly — without them transport_ship reports "backend inactive" and returns 0 (a false pass).
+  SCRUBJAY_WG_TARGET="${SCRUBJAY_WG_TARGET:-}" SCRUBJAY_WG_SSHKEY="${SCRUBJAY_WG_SSHKEY:-}" \
+  sj_timeout 60 bash -c '[ -n "$SCRUBJAY_WG_TARGET" ] || exit 1
+    . "$1/hooks/transports/rsync-wg.sh" || exit 1
+    transport_ship "$2" "$3" || exit $?
+    echo replaced >> "$2"; touch -d "@$(( $(date +%s) + 2 ))" "$2"
+    transport_ship "$2" "$3"' _ "$APP" "$d/.sj-doctor-probe" "$(sj_host)/.sj-doctor-probe" \
+    </dev/null >/dev/null 2>&1 || rc=$?
+  rm -rf "$d"; return $rc
+}
 
 # Each network probe is a full round-trip and none depends on another, so they all start together
 # in the background (see "start the network probes" below) and each section collects its own
@@ -182,7 +205,12 @@ doctor_relay() {
         # forced command did its job.
         probed relay relay_ssh "$tgt"
         if [ "$?" = 255 ]; then bad "cannot authenticate to $tgt" "add this host's relay key to the receiver's authorized_keys (a human with root on the receiver must do this)"
-        else ok "receiver reachable and key accepted: $tgt"; fi
+        else
+          ok "receiver reachable and key accepted: $tgt"
+          relay_write; wrc=$?
+          if [ "$wrc" = 0 ]; then ok "receiver accepts uploads (create + replace)"
+          else bad "key accepted, but a real upload failed (exit $wrc)" "run the rsync from hooks/transports/rsync-wg.sh by hand to see the receiver's error; a different rsync version or permissions on the receiver are the usual causes"; fi
+        fi
       fi
       [ -n "${SCRUBJAY_MCP_REMOTE:-}" ] && ok "read channel configured (${SCRUBJAY_MCP_REMOTE})" \
         || note "no SCRUBJAY_MCP_REMOTE — write-only host: /sjresume and archive search cannot read back (bin/onboard-mcp-client.sh)"
