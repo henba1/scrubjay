@@ -292,6 +292,28 @@ case " $SCRUBJAY_HARNESSES " in
       "$APP/bin/sj-shell-install.sh" || warn "shell integration not installed — later: bash $APP/bin/sj-shell-install.sh"
     else
       info "Skipped. Later:  bash $APP/bin/sj-shell-install.sh"
+    fi
+    # The Claude Code mod (mods/scrubjay-ui): /sj* commands in blue, a row per archive lookup, live
+    # sync steps. Only README mentioned it, so new machines went without it. Needs the `claude`
+    # CLI; skipped silently when it is absent or the plugin is already there. Preset
+    # SCRUBJAY_UI_PLUGIN=1 (or 0) to answer it unattended.
+    if have claude && ! claude plugin list 2>/dev/null | grep -q 'scrubjay-ui@scrubjay'; then
+      case "${SCRUBJAY_UI_PLUGIN:-}" in
+        1) _ui=1 ;;
+        0) _ui=0 ;;
+        *) if confirm "install the Claude Code UI mod (scrubjay commands and lookups shown in Claude Code's own interface)?" Y
+           then _ui=1; else _ui=0; fi ;;
+      esac
+      _ui_later="claude plugin marketplace add henba1/scrubjay && claude plugin install scrubjay-ui@scrubjay"
+      if [ "$_ui" = 1 ]; then
+        { claude plugin marketplace list 2>/dev/null | grep -q 'scrubjay' \
+            || claude plugin marketplace add henba1/scrubjay >/dev/null 2>&1; } \
+          && claude plugin install scrubjay-ui@scrubjay >/dev/null 2>&1 \
+          && ok "Claude Code UI mod installed (shows from the next session)" \
+          || warn "UI mod not installed — later: $_ui_later"
+      else
+        info "Skipped. Later:  $_ui_later"
+      fi
     fi ;;
 esac
 
@@ -334,7 +356,23 @@ if have tmux && ! grep -qs 'scrubjay.conf' "$_tmux_conf"; then
     printf '\n# scrubjay: the agents in the status bar (a click: switch between them, needs mouse on)\nsource-file "%s"\n' \
       "$_bar_conf" >> "$_tmux_conf"
     ok "tmux shows the agents in its bar: $(sj_pretty_path "$_tmux_conf") (reload: tmux source-file ~/.tmux.conf)"
-    grep -qs 'mouse on' "$_tmux_conf" || info "to switch with a click: add 'set -g mouse on' to $(sj_pretty_path "$_tmux_conf")"
+    # The click-to-switch needs tmux's mouse mode, which is a user-wide tmux setting (it also makes
+    # clicks select panes and the wheel scroll history), so it is asked for, not assumed — and a
+    # printed hint alone was easy to miss, leaving a bar that ignores clicks. Preset
+    # SCRUBJAY_TMUX_MOUSE (on|off) to answer it unattended.
+    if ! grep -qsE '^[[:space:]]*set(-option)?[[:space:]]+(-g[[:space:]]+)?mouse[[:space:]]' "$_tmux_conf"; then
+      case "${SCRUBJAY_TMUX_MOUSE:-}" in
+        on|off) _mouse="$SCRUBJAY_TMUX_MOUSE" ;;
+        *) if confirm "turn on tmux mouse mode, so a click on the bar switches sessions (also: click selects panes, wheel scrolls)?" Y
+           then _mouse=on; else _mouse=off; fi ;;
+      esac
+      if [ "$_mouse" = on ]; then
+        printf '# scrubjay: clicks on the status bar (needs mouse mode)\nset -g mouse on\n' >> "$_tmux_conf"
+        ok "tmux mouse mode on (hold Shift to select text with the terminal's own selection)"
+      else
+        info "Skipped. To switch with a click later: add 'set -g mouse on' to $(sj_pretty_path "$_tmux_conf")"
+      fi
+    fi
   else
     info "Skipped. Later: add 'source-file \"\$HOME/.claude/hooks/../tmux/scrubjay.conf\"' to $(sj_pretty_path "$_tmux_conf")"
   fi
