@@ -151,7 +151,7 @@ yourself. No root required. Full walkthrough:
 
 - **The Claude Code mod** shows scrubjay in Claude Code's own interface: `/sj*` commands in blue, a
   named row per archive lookup, and live sync steps above the prompt. (opencode gets its version
-  automatically.)
+  automatically.) The onboarder offers to install it; on an already-onboarded machine:
 
   ```sh
   claude plugin marketplace add henba1/scrubjay

@@ -126,6 +126,12 @@ that `claude resume <sid>` in a terminal resumes a session recorded on *any* mac
 answer it unattended. On a machine that is already onboarded, add it on its own with
 `bin/sj-shell-install.sh`.
 
+For Claude Code it also offers the **UI mod** (`scrubjay-ui`: `/sj*` commands in blue, a row per
+archive lookup, live sync steps); preset `SCRUBJAY_UI_PLUGIN=1` or `0`. And when it adds the agents'
+bar to `~/.tmux.conf`, it asks whether to turn on **tmux mouse mode**, which the bar's
+click-to-switch needs; preset `SCRUBJAY_TMUX_MOUSE=on` or `off`. A `mouse` line already in your
+`~/.tmux.conf` is left alone.
+
 !!! warning "One manual step the script can't do for you — authorize the new host on the receiver."
     For the peer-to-peer backends, `onboard.sh` (transcripts) and `onboard-memory.sh` (memory) each
     **print an `authorized_keys` line**; you must paste it into the receiver account's
