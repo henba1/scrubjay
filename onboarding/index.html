@@ -1255,6 +1255,11 @@ that <code>claude resume &lt;sid&gt;</code> in a terminal resumes a session reco
 <a href="../handoff/#from-a-terminal-claude-resume-sid">hand-off</a>). Preset <code>SCRUBJAY_SHELL_HOOK=1</code> or <code>0</code> to
 answer it unattended. On a machine that is already onboarded, add it on its own with
 <code>bin/sj-shell-install.sh</code>.</p>
+<p>For Claude Code it also offers the <strong>UI mod</strong> (<code>scrubjay-ui</code>: <code>/sj*</code> commands in blue, a row per
+archive lookup, live sync steps); preset <code>SCRUBJAY_UI_PLUGIN=1</code> or <code>0</code>. And when it adds the agents'
+bar to <code>~/.tmux.conf</code>, it asks whether to turn on <strong>tmux mouse mode</strong>, which the bar's
+click-to-switch needs; preset <code>SCRUBJAY_TMUX_MOUSE=on</code> or <code>off</code>. A <code>mouse</code> line already in your
+<code>~/.tmux.conf</code> is left alone.</p>
 <div class="admonition warning">
 <p class="admonition-title">One manual step the script can't do for you — authorize the new host on the receiver.</p>
 <p>For the peer-to-peer backends, <code>onboard.sh</code> (transcripts) and <code>onboard-memory.sh</code> (memory) each
