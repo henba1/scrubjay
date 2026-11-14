@@ -47,6 +47,7 @@ sj_sandbox() {
   export SCRUBJAY_LOG_NOGIT=1          # never git-commit from a test
   export SCRUBJAY_AI_TOPIC=0           # never call a real model from a test
   unset CLAUDE_CODE_SESSION_ID SCRUBJAY_SESSION_ID   # run inside Claude Code, the outer session leaks in
+  unset SCRUBJAY_NTFY_URL SCRUBJAY_NTFY_TOPIC SCRUBJAY_NTFY_TOKEN SCRUBJAY_PUSH   # never push from a test
   export SCRUBJAY_MEMORY="$SANDBOX/memory"
   export SCRUBJAY_MEMORY_REMOTE=""     # never clone/push a memory repo from a test
   export CLAUDE_CONFIG_DIR="$SANDBOX/home/.claude"

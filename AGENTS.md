@@ -56,6 +56,11 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `bin/sj-claude-resume.sh`. It also routes interactive `claude`/`opencode`/`codex` launches through
   `bin/sj-keep.sh`, which runs them inside tmux when `SCRUBJAY_KEEP` says so, so a closed terminal
   detaches the agent instead of killing it. Tests: `tests/test_keep.sh`.
+- `hooks/dupe-guard.sh` — SessionStart: when the same conversation is already live in another process
+  (from the harness registry via `sjh_live_sessions`), it prints Claude Code hook JSON: `systemMessage`
+  for the human (where the copy runs, how to attach), `additionalContext` telling the model to raise
+  it first. Silent otherwise; its own hook because a hook's stdout is JSON only when all of it is.
+  Registered by `bin/claude-sync.sh`. Tests: `tests/test_dupe_guard.sh`.
 - `bin/sj-reap.sh` — the other half of keeping agents: stray ones (detached and idle 24 h, a duplicate
   copy of one conversation quiet 30 min, or idle 12 h under memory pressure) get their screen saved as
   `<sid>/reaped-*.txt` beside the transcript and are published, then stopped. A detached pane whose
@@ -81,7 +86,14 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
 - `bin/sj-notify.sh` — notifications: a terminal bell when an agent finishes a turn or stops at a
   permission prompt, with `SCRUBJAY_NOTIFY=on`. Called by `bin/sj-live.sh` on the lease's state change,
   so every harness rings through the same path. Writes BEL to the agent's own terminal, so the sound
-  reaches the human through tmux and SSH. Tests: `tests/test_notify.sh`.
+  reaches the human through tmux and SSH. Alongside it, a push to the user's own ntfy server
+  (`SCRUBJAY_NTFY_URL`/`_TOPIC`/`_TOKEN`, `SCRUBJAY_PUSH=off|detached|always`) when nobody is attached:
+  a permission prompt, or a turn ending after `SCRUBJAY_PUSH_MIN_TURN` seconds, with the start of the
+  last reply. Sent detached with curl (wget as fallback), deduped per session and kind for 10 min.
+  The topic is a capability: it lives only in the user's config, travels in the request body, and is
+  never printed (sj-doctor masks it; it posts a test push only with `--push`). `sj-notify.sh test-push`
+  sends one. Which tmux pane an agent is in, and whether it is attached, is `sj_tmux_pane_of` in
+  `bin/lib.sh`, shared with `bin/sj-reap.sh`. Tests: `tests/test_notify.sh`, `tests/test_push.sh`.
 - `bin/sj-moves.sh` — the moves ledger (`<data>/moves/<host>.tsv`): where a path went after a session
   recorded it. Applied at read time by the viewer, told to a resumed agent by `hooks/sync-session.sh`,
   and fed to `bin/sj-resume.sh`'s rewrite map. Transcripts are a record and are not edited. Tests:
@@ -131,7 +143,9 @@ Steps:
    `bin/sj-mount.sh` — see below); which coding harnesses to sync config into (`SCRUBJAY_HARNESSES` — onboard
    auto-detects installed ones via each adapter's PATH-based `sjh_present`, so you usually only
    set this to override, e.g. an opencode that isn't on PATH yet); whether to ring the terminal bell
-   when an agent finishes a turn (`SCRUBJAY_NOTIFY=on|off`); and whether to enable
+   when an agent finishes a turn (`SCRUBJAY_NOTIFY=on|off`); an ntfy server and topic for phone pushes
+   (`SCRUBJAY_NTFY_URL`, `SCRUBJAY_NTFY_TOPIC` — the user's own choice of topic, which is a secret: ask
+   them to put it in the config themselves rather than pasting it into chat); and whether to enable
    cross-machine memory (on the `git` backend this puts real filesystem paths in a private GitHub
    repo — surface that trade-off, don't just enable it).
 2. **Confirm, then run non-interactively** from the clone, e.g.:

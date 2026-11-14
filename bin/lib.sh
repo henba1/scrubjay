@@ -717,6 +717,27 @@ sj_session_last_reply() {  # sj_session_last_reply <transcript.jsonl>
     | tail -c 1500
 }
 
+# Which tmux pane a process runs in, and whether anyone is looking at it: bin/sj-reap.sh (never reap
+# an attached agent) and bin/sj-notify.sh (push to the phone only when nobody is). SJ_KEEP_TMUX names
+# the tmux binary, which tests point at a stub.
+sj_tmux_panes() {  # TSV <pane_pid> <pane_id> <session> <attached clients>
+  local t="${SJ_KEEP_TMUX:-tmux}"
+  sj_has "$t" || return 0
+  "$t" list-panes -a -F "#{pane_pid}$(printf '\t')#{pane_id}$(printf '\t')#{session_name}$(printf '\t')#{session_attached}" 2>/dev/null
+}
+
+sj_tmux_pane_of() {  # sj_tmux_pane_of <pid> [panes-tsv] — the pane line whose process is <pid> or an ancestor
+  local p="$1" panes line
+  if [ $# -ge 2 ]; then panes="$2"; else panes="$(sj_tmux_panes)"; fi
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null || return 1
+    line="$(awk -F '\t' -v p="$p" '$1 == p {print; exit}' <<<"$panes")"
+    [ -n "$line" ] && { printf '%s' "$line"; return 0; }
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+  done
+  return 1
+}
+
 # Hand-off marks: sj-resume.sh leaves one when it stages a session here, and the first catalogue row
 # written for the session that continues it records where it came from (`resumed_from=`). A native
 # resume keeps the session id, so the mark is keyed by it. A carry-over into another harness starts a

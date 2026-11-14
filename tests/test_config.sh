@@ -182,6 +182,9 @@ bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "a second sync adds no second one" bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$stops" "$settings"
 perms='[.hooks.PermissionRequest[]?.hooks[]? | select(.command | test("live-session")) | select(.async == true)] | length'
 check "PermissionRequest -> live-session registered once, async" bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$perms" "$settings"
+dupes='[.hooks.SessionStart[]?.hooks[]? | select(.command | test("dupe-guard")) | select(.async != true)] | length'
+check "SessionStart -> dupe-guard registered once, not async" bash -c 'jq -e "$0 == 1" "$1" >/dev/null' "$dupes" "$settings"
+check "next to sync-session, not instead of it" bash -c 'jq -e "[.hooks.SessionStart[].hooks[].command] | map(test(\"sync-session\")) | any" "$1" >/dev/null' _ "$settings"
 SCRUBJAY_TURN_PUBLISH=0 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
 check "SCRUBJAY_TURN_PUBLISH=0 leaves it out" bash -c 'jq -e "$0 == 0" "$1" >/dev/null' "$stops" "$settings"
 bash "$APP/bin/claude-sync.sh" >/dev/null 2>&1 || true
