@@ -256,6 +256,19 @@ doctor_harnesses() {
       else bad "keep: SCRUBJAY_KEEP=$keep but tmux is not installed, so agents still end with the terminal" "$(sj_install_hint tmux)"; fi ;;
     *) bad "keep: SCRUBJAY_KEEP='$keep' is not off, ssh or always" "set SCRUBJAY_KEEP=ssh in ~/.config/scrubjay/config" ;;
   esac
+  # Stray kept agents (bin/sj-reap.sh): only matters while agents are kept.
+  if [ "$keep" = ssh ] || [ "$keep" = always ]; then
+    case "${SCRUBJAY_REAP:-on}" in
+      off)  note "reap: SCRUBJAY_REAP=off, so kept agents nobody returns to hold their memory until stopped by hand" ;;
+      on|warn)
+        if "${SJ_REAP_CRONTAB:-crontab}" -l 2>/dev/null | grep -qF "scrubjay sj-reap"; then
+          ok "reap: SCRUBJAY_REAP=${SCRUBJAY_REAP:-on}, stray kept agents checked every 15 min (sj-reap.sh ls)"
+        else
+          bad "reap: SCRUBJAY_REAP=${SCRUBJAY_REAP:-on} but nothing runs it" "bash $(sj_pretty_path "$APP")/bin/sj-reap.sh install"
+        fi ;;
+      *) bad "reap: SCRUBJAY_REAP='$SCRUBJAY_REAP' is not on, warn or off" "set SCRUBJAY_REAP=on in ~/.config/scrubjay/config" ;;
+    esac
+  fi
   # A bell when an agent finishes a turn or asks for a permission (bin/sj-notify.sh).
   case "${SCRUBJAY_NOTIFY:-off}" in
     on)

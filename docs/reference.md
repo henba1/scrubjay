@@ -159,6 +159,7 @@ editing needed:
 | `SCRUBJAY_TURN_PUBLISH=0` | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
+| `SCRUBJAY_REAP=on` | stop stray kept agents after saving their screen and publishing them: detached and idle 24 h (warned at 12 h), a duplicate copy of one conversation quiet 30 min, idle 12 h under memory pressure. `warn` only logs, `off` never runs. Thresholds `SCRUBJAY_REAP_WARN`/`_AFTER`/`_DUP_AFTER` (seconds). See [Keeping agents alive](keep-alive.md#stray-agents-are-reaped) |
 | `SCRUBJAY_KEEP=ssh` | run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (`always`: whenever outside tmux; default `off`). See [Keeping agents alive](keep-alive.md) |
 | `SCRUBJAY_VIEW_PORT=<n>` | the port `/sjview` listens on (default 7787; the next free one if taken) |
 | `SCRUBJAY_VIEW_NEXTCLOUD=<url>` | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below) |
