@@ -403,6 +403,33 @@ if [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_NOTIFY' "$CFG"; then
   fi
 fi
 
+# ---- 7g) a push to the phone when an agent waits and nobody is attached --------------------------
+# bin/sj-notify.sh, through the user's own ntfy server. Asked once: any SCRUBJAY_NTFY line, the
+# commented example included, means it was. Preset SCRUBJAY_NTFY_URL and SCRUBJAY_NTFY_TOPIC to answer
+# it unattended. The topic is a capability (whoever knows it reads and publishes), so it goes to this
+# machine's config alone, is read without echo, and is never printed.
+if [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_NTFY' "$CFG"; then
+  _ntfy_url="${SCRUBJAY_NTFY_URL:-}"; _ntfy_topic="${SCRUBJAY_NTFY_TOPIC:-}"
+  if [ -z "$_ntfy_url" ] && [ -t 0 ] && confirm "push to your phone (ntfy) when an agent waits for you and nobody is attached?" N; then
+    read -r -p "  ntfy server URL (e.g. http://192.168.1.10:8080): " _ntfy_url || _ntfy_url=""
+    if [ -n "$_ntfy_url" ]; then read -r -s -p "  topic (hidden): " _ntfy_topic || _ntfy_topic=""; echo; fi
+  fi
+  # Written into a `: "${VAR:=…}"` line the config sources, so nothing that could end the quotes.
+  case "$_ntfy_url" in http://*|https://*) case "$_ntfy_url" in *[\"\'\`\$\\\ ]*) _ntfy_url="" ;; esac ;; *) _ntfy_url="" ;; esac
+  case "$_ntfy_topic" in ''|*[!A-Za-z0-9_-]*) _ntfy_topic="" ;; esac
+  if [ -n "$_ntfy_url" ] && [ -n "$_ntfy_topic" ]; then
+    # shellcheck disable=SC2016  # the config's own ${VAR:=…} form, written as it is
+    printf ': "${SCRUBJAY_NTFY_URL:=%s}"\n: "${SCRUBJAY_NTFY_TOPIC:=%s}"\n' "$_ntfy_url" "$_ntfy_topic" >> "$CFG"
+    chmod 600 "$CFG" 2>/dev/null
+    ok "agents push to your phone when they wait and nobody is attached (SCRUBJAY_PUSH=detached)"
+    info "Check it: bash $(sj_pretty_path "$APP")/bin/sj-notify.sh test-push. The phone has to reach the server: one behind a VPN needs the VPN always on"
+  else
+    # shellcheck disable=SC2016
+    printf '# phone push (bin/sj-notify.sh, docs: day-to-day, Push to your phone): uncomment, with your ntfy\n# server and a topic of your own — whoever knows the topic can read and send your pushes.\n# : "${SCRUBJAY_NTFY_URL:=http://ntfy.example:8080}"\n# : "${SCRUBJAY_NTFY_TOPIC:=<a-long-random-topic>}"\n# : "${SCRUBJAY_NTFY_TOKEN:=<an ntfy access token, if the server wants one>}"\n' >> "$CFG"
+    info "No phone push. Later: the commented SCRUBJAY_NTFY_* lines in $(sj_pretty_path "$CFG")"
+  fi
+fi
+
 # ---- 8) offer to push the new host dir------------------------------------------------
 if confirm "commit + push the new hosts/$HOST entry to scrubjay-data?" Y; then
   ( cd "$DATA_DIR" && git add -A && git commit -q -m "host $HOST" \

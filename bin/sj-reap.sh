@@ -90,24 +90,6 @@ pressure() {
           exit 1 }' "$MEMINFO"
 }
 
-# panes — TSV <pane_pid> <pane_id> <session> <attached 0|1>
-panes() {
-  sj_has "$TMUX_BIN" || return 0
-  "$TMUX_BIN" list-panes -a -F "#{pane_pid}${TAB}#{pane_id}${TAB}#{session_name}${TAB}#{session_attached}" 2>/dev/null
-}
-
-# pane_of <pid> <panes-tsv> — the pane line whose process is <pid> or one of its ancestors
-pane_of() {
-  local p="$1" line
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null || return 1
-    line="$(awk -F '\t' -v p="$p" '$1 == p {print; exit}' <<<"$2")"
-    [ -n "$line" ] && { printf '%s' "$line"; return 0; }
-    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
-  done
-  return 1
-}
-
 # shell_child <pid> — 0 when a shell runs under the agent (a background command; MCP servers are
 # uv/python/node and do not count)
 shell_child() {
@@ -137,7 +119,7 @@ started() { ps -o etimes= -p "$1" 2>/dev/null | tr -d ' ' || true; }   # seconds
 # one copy of a conversation from another (they share the transcript).
 rows() {
   local p h sid pid state epoch cwd line session pane attached t sdir last act rec
-  p="$(panes)"
+  p="$(sj_tmux_panes)"
   for h in $(sj_harnesses); do
     [ "$h" = claude ] || continue   # the only adapter whose registry lists processes, for now
     ( sj_load_adapter "$h" 2>/dev/null || exit 0
@@ -145,7 +127,7 @@ rows() {
       sjh_live_sessions 2>/dev/null | while IFS="$TAB" read -r sid pid state epoch cwd; do
         kill -0 "$pid" 2>/dev/null || continue
         session="" pane="" attached=0
-        if line="$(pane_of "$pid" "$p")"; then
+        if line="$(sj_tmux_pane_of "$pid" "$p")"; then
           IFS="$TAB" read -r _ pane session attached <<<"$line"
           [ "$attached" -gt 0 ] 2>/dev/null && attached=1 || attached=0
         fi

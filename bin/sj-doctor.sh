@@ -11,7 +11,7 @@
 # (sj_record_ship / sj_record_memory_sync) tell you about the LAST attempt; this tells you whether
 # the wiring is sound BEFORE you rely on it.
 #
-#   usage: bin/sj-doctor.sh [--quiet] [--list] [section…]
+#   usage: bin/sj-doctor.sh [--quiet] [--list] [--push] [section…]
 #   exit:  0 = everything checked is healthy, 1 = at least one FAIL, 2 = bad usage
 #
 # With no section names it checks everything. Name one or more to check just those — the same
@@ -21,6 +21,9 @@
 #   bin/sj-doctor.sh                 # everything
 #   bin/sj-doctor.sh memory          # just cross-machine memory
 #   bin/sj-doctor.sh memory relay    # the two that talk to the receiver
+#
+# --push also sends a test push to the phone (SCRUBJAY_NTFY_*); without it the push server is only
+# asked for its health, so a doctor run never buzzes anyone.
 #
 # Read-only by contract: it inspects config, git refs and reachability. It never writes to a repo,
 # never pushes, never installs, never edits authorized_keys. Safe to run at any time, and safe for
@@ -45,10 +48,11 @@ section_desc() {
   esac
 }
 
-QUIET=0; WANT=""
+QUIET=0; WANT=""; PUSH_TEST=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --quiet) QUIET=1 ;;
+    --push)  PUSH_TEST=1 ;;
     --list)  for s in $SECTIONS; do printf '%-10s %s\n' "$s" "$(section_desc "$s")"; done; exit 0 ;;
     -h|--help)
       awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "${BASH_SOURCE[0]}"; exit 0 ;;
@@ -282,6 +286,49 @@ doctor_harnesses() {
     off) note "notify: off — for a bell when an agent finishes a turn: set SCRUBJAY_NOTIFY=on in ~/.config/scrubjay/config" ;;
     *)   bad "SCRUBJAY_NOTIFY='$SCRUBJAY_NOTIFY' is not on or off" "set SCRUBJAY_NOTIFY=on or off in ~/.config/scrubjay/config" ;;
   esac
+  doctor_push
+}
+
+# A push to the phone when an agent waits and nobody is attached (bin/sj-notify.sh, ntfy). The topic
+# is a capability, so it is never shown: only that it is set, and how long it is.
+doctor_push() {
+  local url="${SCRUBJAY_NTFY_URL:-}" topic="${SCRUBJAY_NTFY_TOPIC:-}" mode shown last
+  if [ -z "$url" ] && [ -z "$topic" ]; then
+    case "${SCRUBJAY_PUSH:-}" in
+      detached|always) bad "push: SCRUBJAY_PUSH=$SCRUBJAY_PUSH but no server" "set SCRUBJAY_NTFY_URL and SCRUBJAY_NTFY_TOPIC in ~/.config/scrubjay/config" ;;
+      *) note "push: off — for a phone push when an agent waits and nobody is attached: set SCRUBJAY_NTFY_URL and SCRUBJAY_NTFY_TOPIC (docs: day-to-day, Push to your phone)" ;;
+    esac
+    return 0
+  fi
+  if [ -z "$url" ] || [ -z "$topic" ]; then
+    bad "push: SCRUBJAY_NTFY_URL and SCRUBJAY_NTFY_TOPIC go together, and $([ -z "$url" ] && echo SCRUBJAY_NTFY_URL || echo SCRUBJAY_NTFY_TOPIC) is not set" \
+        "set both in ~/.config/scrubjay/config"
+    return 0
+  fi
+  mode="${SCRUBJAY_PUSH:-detached}"
+  case "$mode" in
+    off) note "push: SCRUBJAY_PUSH=off, so nothing is pushed although a server is set"; return 0 ;;
+    detached|always) ;;
+    *) bad "push: SCRUBJAY_PUSH='$mode' is not off, detached or always" "set SCRUBJAY_PUSH=detached in ~/.config/scrubjay/config"; return 0 ;;
+  esac
+  shown="$(printf '%s' "${url%/}" | sed -E 's#(//)[^/@]*@#\1***@#')"
+  shown="$shown, topic hidden (${#topic} chars)${SCRUBJAY_NTFY_TOKEN:+, with a token}"
+  if [ "$PUSH_TEST" = 1 ]; then
+    if bash "$APP/bin/sj-notify.sh" test-push >/dev/null 2>&1; then
+      ok "push: $mode, to $shown — a test push went out; check the phone"
+    else
+      bad "push: $mode, to $shown — the server did not take a test push" "check the URL, topic and token; bash $(sj_pretty_path "$APP")/bin/sj-notify.sh test-push"
+    fi
+  elif probed push bash "$APP/bin/sj-notify.sh" health; then
+    ok "push: $mode, to $shown — the server answers (a test push: sj-doctor.sh --push harnesses)"
+  else
+    bad "push: $mode, to $shown — the server does not answer its health check" "is ntfy running, and reachable from here? then: bash $(sj_pretty_path "$APP")/bin/sj-notify.sh test-push"
+  fi
+  last="$(cat "$(sj_progress_dir)/notify/last" 2>/dev/null)"
+  case "$last" in
+    *" fail "*) note "push: the last push ($(echo "$last" | cut -d' ' -f3), $(sj_epoch_stamp "${last%% *}")) did not reach the server" ;;
+  esac
+  return 0
 }
 
 # ── last recorded outcomes ─────────────────────────────────────────────────────────────────────
@@ -348,6 +395,9 @@ for s in $WANT; do
              [ -n "$d" ] && [ -d "$d/.git" ] && r="$(git -C "$d" remote get-url origin 2>/dev/null)" \
                && probe relay git_reachable "$r" ;;
       esac ;;
+    harnesses)
+      [ -n "${SCRUBJAY_NTFY_URL:-}" ] && [ -n "${SCRUBJAY_NTFY_TOPIC:-}" ] && [ "$PUSH_TEST" = 0 ] &&
+        case "${SCRUBJAY_PUSH:-detached}" in detached|always) probe push bash "$APP/bin/sj-notify.sh" health ;; esac ;;
   esac
 done
 
