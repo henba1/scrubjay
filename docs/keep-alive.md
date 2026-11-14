@@ -56,6 +56,13 @@ Things that are worth knowing:
 - **Session names.** A session is named `sj-<harness>-<folder>`. A second agent in the same folder
   gets `-2`, `-3` …, never the first one's session. After a detach, the reattach command is
   printed.
+- **Resuming offers the agent that is still running.** `claude -c`/`--continue`/`-r`/`--resume`,
+  `opencode -c`/`--session` and `codex resume` first look for a detached session of that harness
+  started in this folder. That is usually the agent you left, still working, so you are asked
+  `attach to it instead of starting a second copy? [Y/n]`. Enter attaches. `n`, or no answer at
+  all, starts a new session as before. A second copy would reload the conversation from disk,
+  missing whatever the first one did after you left, and both would keep writing to the same
+  transcript.
 - **Only interactive launches are wrapped.** `claude -p`, `claude --bg`, `claude mcp …`,
   `opencode serve`, `opencode run`, `codex exec`, `--version` and other subcommands run directly.
   So does anything launched without a terminal (scripts, pipes, cron) or from inside tmux, so an

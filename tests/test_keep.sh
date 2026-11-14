@@ -6,7 +6,8 @@
 # What must hold: only interactive TUI launches are wrapped (never -p, --bg, serve, exec,
 # --version …); it is off unless configured; it never wraps inside tmux or without a terminal; a
 # missing tmux runs the command anyway; the caller's environment reaches the agent even when the tmux
-# server's is different; the environment file is private and gone once read.
+# server's is different; the environment file is private and gone once read; a resume offers the
+# agent still running detached in this folder instead of starting a second copy of it.
 set -uo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 sj_sandbox
@@ -22,7 +23,19 @@ cat > "$SANDBOX/stubbin/faketmux" <<'EOF'
 db="$SANDBOX/tmux.sessions"; touch "$db"
 case "$1" in
   has-session) grep -qx "${3#=}" "$db" ;;
-  list-sessions) while read -r n; do printf '%s\tdetached\t/w\n' "$n"; done < "$db" ;;
+  list-sessions)
+    # the resume offer asks for created/name/state/path; ls for name/state/path. Created = line
+    # number, path from tmux.paths ("name<TAB>path", default /w), attached if in tmux.attached.
+    i=0
+    while read -r n; do
+      i=$((i + 1)); st=detached; grep -qx "$n" "$SANDBOX/tmux.attached" 2>/dev/null && st=attached
+      p="$(awk -F '\t' -v n="$n" '$1 == n {print $2}' "$SANDBOX/tmux.paths" 2>/dev/null)"; p="${p:-/w}"
+      case "$3" in
+        *session_created*) printf '%s\t%s\t%s\t%s\n' "$i" "$n" "$st" "$p" ;;
+        *)                 printf '%s\t%s\t%s\n' "$n" "$st" "$p" ;;
+      esac
+    done < "$db" ;;
+  attach-session) printf '%s\n' "$3" >> "$SANDBOX/tmux.attach" ;;
   new-session)
     shift; name="" dir=""
     while [ $# -gt 0 ]; do case "$1" in -s) name="$2"; shift 2 ;; -c) dir="$2"; shift 2 ;; *) break ;; esac; done
@@ -132,6 +145,47 @@ chmod +x "$SANDBOX/stubbin/brokentmux"
 out="$(SJ_KEEP_TMUX=brokentmux ex bash "$KEEP" -- agent y 2>&1)"
 assert_contains "tmux failing: says so" "$out" "tmux could not start a session"
 assert_contains "and runs the command anyway" "$(cat "$SANDBOX/agent.calls")" "args=y"
+
+section "a resume offers the agent still running here"
+# here <name>… : these sessions exist, detached, started in this folder
+here() { : > "$SANDBOX/tmux.sessions"; : > "$SANDBOX/tmux.paths"; : > "$SANDBOX/tmux.attached"
+         for n in "$@"; do printf '%s\n' "$n" >> "$SANDBOX/tmux.sessions"; printf '%s\t%s\n' "$n" "$work" >> "$SANDBOX/tmux.paths"; done; }
+here sj-claude-my-project
+out="$(dec --as claude -- claude -c)"
+assert_contains "claude -c: offers the detached session" "$out" "offer sj-claude-my-project"
+assert_contains "and would otherwise start the next one" "$out" "wrap sj-claude-my-project-2"
+for a in "claude --continue" "claude -r" "claude --resume" "claude --resume=abc" "opencode -c" "opencode --session x" "codex resume"; do
+  read -r h rest <<<"$a"; here "sj-$h-my-project"
+  # shellcheck disable=SC2086
+  assert_contains "offers on: $a" "$(dec --as "$h" -- $a)" "offer sj-$h-my-project"
+done
+here sj-claude-my-project
+case "$(dec --as claude -- claude)" in *offer*) _no "a plain launch is a second agent, no offer" "offered" ;; *) _ok "a plain launch is a second agent, no offer" ;; esac
+echo sj-claude-my-project > "$SANDBOX/tmux.attached"
+case "$(dec --as claude -- claude -c)" in *offer*) _no "not when it is attached elsewhere" "offered" ;; *) _ok "not when it is attached elsewhere" ;; esac
+here sj-claude-my-project; printf 'sj-claude-my-project\t/elsewhere\n' > "$SANDBOX/tmux.paths"
+case "$(dec --as claude -- claude -c)" in *offer*) _no "not when it was started in another folder" "offered" ;; *) _ok "not when it was started in another folder" ;; esac
+here sj-opencode-my-project
+case "$(dec --as claude -- claude -c)" in *offer*) _no "not another harness's session" "offered" ;; *) _ok "not another harness's session" ;; esac
+here sj-claude-my-project-old
+case "$(dec --as claude -- claude -c)" in *offer*) _no "not a name that merely starts the same" "offered" ;; *) _ok "not a name that merely starts the same" ;; esac
+here sj-claude-my-project sj-claude-my-project-3
+assert_contains "the newest of several" "$(dec --as claude -- claude -c)" "offer sj-claude-my-project-3"
+
+here sj-claude-my-project; : > "$SANDBOX/agent.calls"; rm -f "$SANDBOX/tmux.new" "$SANDBOX/tmux.attach"
+out="$(echo | ex bash "$KEEP" --as claude -- agent -c 2>&1)"
+assert_eq "Enter attaches to it" "=sj-claude-my-project" "$(cat "$SANDBOX/tmux.attach" 2>/dev/null)"
+assert_eq "and starts nothing new" "" "$(cat "$SANDBOX/tmux.new" 2>/dev/null)$(cat "$SANDBOX/agent.calls")"
+assert_contains "says why it asks" "$out" "still running in this folder, detached"
+here sj-claude-my-project; rm -f "$SANDBOX/tmux.new" "$SANDBOX/tmux.attach"
+out="$(echo n | ex bash "$KEEP" --as claude -- agent -c 2>&1)"
+assert_eq "n starts the new session" "sj-claude-my-project-2" "$(cat "$SANDBOX/tmux.new" 2>/dev/null)"
+assert_contains "and says the old one keeps running" "$out" "'sj-claude-my-project' keeps running"
+here sj-claude-my-project; rm -f "$SANDBOX/tmux.new" "$SANDBOX/tmux.attach"
+ex bash "$KEEP" --as claude -- agent -c </dev/null >/dev/null 2>&1
+assert_eq "no answer at all: never blocks, starts the new one" "sj-claude-my-project-2" "$(cat "$SANDBOX/tmux.new" 2>/dev/null)"
+assert_eq "without attaching" "" "$(cat "$SANDBOX/tmux.attach" 2>/dev/null)"
+: > "$SANDBOX/tmux.sessions"; : > "$SANDBOX/tmux.paths"; : > "$SANDBOX/tmux.attached"; : > "$SANDBOX/agent.calls"
 
 section "ls"
 printf 'sj-claude-a\nother\n' > "$SANDBOX/tmux.sessions"
