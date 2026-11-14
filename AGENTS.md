@@ -83,6 +83,8 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   sjmcp's readers; `artefacts.py`, which reads what a session changed (files, repos, PRs, commits)
   from its readable transcript; and `index.html`, its one self-contained page. Started and stopped by
   `bin/sj-view.sh`; never left running. Its only writes are a line in the moves ledger or the project links. Tests: `tests/test_view.sh`.
+- `sounds/` — `wood.wav`, the notification bell users point their terminal at (docs: day-to-day →
+  Notifications), and `make-wood.py`, its source. Nothing runs the script.
 - `commands/` — the generic `/dc*` slash commands shipped with the app.
 - `mods/scrubjay-ui/` — the optional Claude Code mod (TypeScript hooks module) that draws scrubjay
   in the native interface; listed by `.claude-plugin/marketplace.json`. Tests:
