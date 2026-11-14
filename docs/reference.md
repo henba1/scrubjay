@@ -156,6 +156,10 @@ editing needed:
 | `SCRUBJAY_SYNC_NOPULL=1` | sync at start but don't `git pull` first |
 | `SCRUBJAY_NOSHIP=1` | end the session without shipping its transcript |
 | `SCRUBJAY_NOTIFY=on` | ring the terminal bell when an agent finishes a turn or asks for a permission ([Notifications](day-to-day.md#notifications)) |
+| `SCRUBJAY_NTFY_URL=<url>`, `SCRUBJAY_NTFY_TOPIC=<topic>` | your ntfy server and topic: push to your phone when an agent waits and nobody is attached. The topic is a secret, so keep it in the config file ([Push to your phone](day-to-day.md#push-to-your-phone)) |
+| `SCRUBJAY_NTFY_TOKEN=<token>` | an ntfy access token, sent as a bearer token (optional) |
+| `SCRUBJAY_PUSH=detached` | when to push: `detached` (the default once URL and topic are set) only for agents in a tmux session nobody is attached to, `always` wherever they run, `off` never |
+| `SCRUBJAY_PUSH_MIN_TURN=<secs>` | a turn ending is pushed only after this much work (default 300). A permission prompt is always pushed |
 | `SCRUBJAY_TURN_PUBLISH=0` | publish only at session end, not after every turn (takes effect at the next `claude-sync.sh`) |
 | `SCRUBJAY_LOG_NOGIT=1` | append the log line but don't commit/push it |
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
