@@ -70,6 +70,41 @@ machine you're sitting at. tmux passes it on by default. Your terminal emulator 
 bell sounds like, so turn on its audible bell. A headless run (`claude -p`, `opencode run`) has no
 terminal and rings nothing.
 
+**Check the whole path** from the machine the agent runs on, over SSH and inside tmux if that's how
+you work:
+
+```sh
+bash ~/.claude/hooks/../bin/sj-notify.sh test
+```
+
+### The sound
+
+scrubjay ships a soft wooden bell, [`sounds/wood.wav`](https://github.com/henba1/scrubjay/blob/main/sounds/wood.wav)
+(two marimba strikes; `sounds/make-wood.py` is its source). Download it on the computer you sit at:
+
+```powershell
+# Windows
+Invoke-WebRequest https://raw.githubusercontent.com/henba1/scrubjay/main/sounds/wood.wav -OutFile "$env:USERPROFILE\Music\scrubjay-wood.wav"
+```
+
+```sh
+# macOS, Linux
+curl -fLo ~/.local/share/scrubjay-wood.wav https://raw.githubusercontent.com/henba1/scrubjay/main/sounds/wood.wav
+```
+
+Then point your terminal at it:
+
+| Terminal | Setting |
+|---|---|
+| Windows Terminal | in `settings.json` under `profiles.defaults`: `"bellStyle": ["audible", "taskbar"]`, `"bellSound": "C:\\Users\\<you>\\Music\\scrubjay-wood.wav"` |
+| kitty | `bell_path ~/.local/share/scrubjay-wood.wav` (and `enable_audio_bell yes`, the default) |
+| Ghostty | `bell-features = audio` and `bell-audio-path = ~/.local/share/scrubjay-wood.wav` (1.2 on Linux, 1.3 on macOS) |
+| iTerm2, WezTerm | no custom sound: they play the system alert sound. iTerm2: untick *Silence bell* (Profiles → Terminal); WezTerm: `audible_bell = "SystemBeep"`, the default |
+
+Windows Terminal: if the bell is silent without `bellSound`, Windows' own sound for it is set to none,
+which a sound file sidesteps. It keeps the file open while it runs, so save a new version under a
+new name.
+
 **nvim's `:terminal`** swallows the bell under its default `belloff=all`. Anything that leaves out
 `term` lets it through:
 
