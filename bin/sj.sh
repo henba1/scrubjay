@@ -98,7 +98,7 @@ leases() {
   local f
   for f in "$1"/*.lease; do [ -f "$f" ] && { cat "$f"; echo; }; done |
     jq -rR 'fromjson? | select(type == "object" and (.sid | type) == "string" and .sid != "")
-      | [.sid, (.state // "idle"), (.ts // 0 | tostring), (.cwd // "" | if . == "" then "-" else . end),
+      | [.sid, (.state // "idle"), (.ts | if type == "number" then floor else 0 end | tostring), (.cwd // "" | if . == "" then "-" else . end),
          (.pid // "" | tostring | if . == "" then "-" else . end), (.start // "" | if . == "" then "-" else . end)]
       | @tsv' 2>/dev/null
 }
@@ -202,8 +202,9 @@ cmd_ls() {
 
 # ── resolving what the user typed ────────────────────────────────────────────────────────────────
 # Every session id sj could mean: the ones in <rows>, this machine's transcripts, the catalogue.
-# A prefix (the 8-character handle sj_session_handle gives, or more) matches like it does for
-# bin/sj-claude-resume.sh; several distinct sessions are listed, never guessed between.
+# A prefix (the 8-character handle sj_session_handle gives a Claude id, or more) matches the way it
+# does for bin/sj-claude-resume.sh; several distinct sessions are listed, never guessed between.
+# What nobody here knows is passed on whole: sj_archive_resolve, behind sj-resume.sh, asks the archive.
 resolve() {  # resolve <want> <rows> — the matching full ids, one per line
   local want="$1" proj
   proj="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
