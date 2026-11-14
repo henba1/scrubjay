@@ -26,6 +26,10 @@
 # runs inside a named tmux session (bin/sj-keep.sh), so closing the SSH connection detaches it
 # instead of killing it mid-turn. Inside tmux, or with no terminal, nothing extra runs at all.
 
+# And `sj`, the front door to every session on every machine: `sj ls`, `sj attach <name|sid8>`, `sj
+# resume <sid8>` (bin/sj.sh). Only when nothing else answers to `sj` already: a command, alias or
+# function of yours of that name wins, and bin/sj.sh is still there to run by path.
+
 # No helper name starts with "_": Claude Code's shell snapshot drops those, which breaks `claude` in
 # its Bash tool. tests/test_keep.sh checks.
 sjsh_is_sid() {  # sjsh_is_sid <arg> — 0 when it looks like a session id or an 8+ hex prefix of one
@@ -76,3 +80,14 @@ function claude {
   if [ -z "$sid" ]; then sjsh_keep --as claude -- claude "$@"; return; fi
   sjsh_keep --as claude --force -- bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj-claude-resume.sh" "$sid" "${rest[@]}"
 }
+
+# `command -v` says "sj" for any function, ours (this file sourced twice) or yours; the body tells.
+case "$(command -v sj 2>/dev/null)" in
+  '') sjsh_own_sj=1 ;;
+  sj) case "$(typeset -f sj 2>/dev/null)" in *bin/sj.sh*) sjsh_own_sj=1 ;; *) sjsh_own_sj=0 ;; esac ;;
+  *)  sjsh_own_sj=0 ;;
+esac
+if [ "$sjsh_own_sj" = 1 ]; then
+  function sj { bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/../bin/sj.sh" "$@"; }
+fi
+unset sjsh_own_sj

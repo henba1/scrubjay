@@ -19,6 +19,11 @@ with its full history — subagents, task list and file history included.
 
 ## From a terminal: `claude resume <sid>`
 
+> Not sure where the session is, or whether it still runs? `sj resume <sid8>` picks for you: it
+> attaches when it is still running (here, or over ssh), resumes it in its folder when it stopped
+> here, and does the hand-off below when it isn't here. `sj ls` lists every machine's sessions. See
+> [Finding and resuming sessions](keep-alive.md#finding-and-resuming-sessions-sj).
+
 Outside a session, skip the slash command. With scrubjay's shell integration installed, this works
 for a session recorded on **any** machine:
 

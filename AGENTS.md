@@ -67,6 +67,13 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   agent already exited is closed after 1 h, its screen saved to `<run>/reaped/`. Only agents inside sj-*
   tmux sessions; never attached, mid-turn or with a background shell. Cron every 15 min
   (`sj-reap.sh install`, done by onboarding with SCRUBJAY_KEEP on). Tests: `tests/test_reap.sh`.
+- `bin/sj.sh` — **the front door for finding and resuming sessions** (`sj`, a function from
+  `bin/sj-shell.sh`): `sj ls` lists every agent on every machine (here: `sj-reap.sh rows`, the registry
+  joined with tmux; elsewhere: the relayed `<host>/live/*.lease`, shown "as of"; plus what sj-reap
+  stopped); `sj attach` goes to the tmux session here or over `ssh -t <alias>`; `sj resume` attaches to
+  a live copy, else `claude --resume` in its folder, else the `sj-claude-resume.sh` hand-off, and never
+  starts a second live copy without `--force`. It wraps the older commands rather than replacing them.
+  Tests: `tests/test_sj.sh`.
 - `bin/sj-live.sh` — session leases: which sessions a harness process holds open. Marked from
   lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to
   `<host>/live/*.lease`, judged in `view/sj_view.py`. Never `.json`: the archive walkers would take it
