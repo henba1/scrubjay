@@ -22,6 +22,13 @@
 # It never blocks a launch: already inside tmux, no terminal, or no tmux installed (one line on
 # stderr) and the command simply runs as it would have. The session is named sj-<harness>-<folder>,
 # -2, -3 … when taken: a second agent in the same folder gets its own session, never the first's.
+#
+# A RESUME is the exception (claude -c/--continue/-r/--resume, opencode -c/--continue/-s/--session,
+# codex resume). When this harness still has a detached session that was started in this folder,
+# that is almost always the agent you are coming back to, still running. A fresh resume would load
+# the same conversation into a second process: it misses whatever the first one did after you left,
+# and both keep writing to one transcript. So it asks first, "attach to it instead? [Y/n]". Enter
+# attaches; n (or no answer, e.g. a closed stdin) starts the new session as before.
 set -uo pipefail
 
 SELF="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -126,23 +133,69 @@ decide() {  # prints "wrap" or "direct: <why>"
   echo wrap
 }
 
-session_name() {  # sj-<harness>-<folder>, unique among this server's sessions
-  local h="${as:-$(basename "$1")}" d base n i=2
+session_base() {  # sj-<harness>-<folder>, before any -2, -3 …
+  local h="${as:-$(basename "$1")}" d
   d="$(basename "$PWD")"; [ "$PWD" = / ] && d=root
   # tmux reserves . and : in target names
-  base="$(printf 'sj-%s-%s' "$h" "$d" | tr -c 'A-Za-z0-9_-' '-' | cut -c1-48)"
+  printf 'sj-%s-%s' "$h" "$d" | tr -c 'A-Za-z0-9_-' '-' | cut -c1-48
+}
+
+session_name() {  # sj-<harness>-<folder>, unique among this server's sessions
+  local base n i=2
+  base="$(session_base "$@")"
   n="$base"
   while "$TMUX_BIN" has-session -t "=$n" 2>/dev/null; do n="$base-$i"; i=$((i + 1)); done
   printf '%s' "$n"
+}
+
+# resume_launch <cmd> <args…> — 0 when the launch continues an earlier conversation
+resume_launch() {
+  local h="${as:-$(basename "$1")}" a; shift
+  case "$h" in
+    claude)
+      for a in "$@"; do case "$a" in -c|--continue|-r|--resume|--resume=*) return 0 ;; esac; done ;;
+    opencode)
+      for a in "$@"; do case "$a" in -c|--continue|-s|--session|--session=*) return 0 ;; esac; done ;;
+    codex)
+      [ "${1:-}" = resume ] && return 0 ;;
+  esac
+  return 1
+}
+
+# detached_here <base> — this harness's detached sessions started in this folder, newest first
+detached_here() {
+  "$TMUX_BIN" list-sessions -F '#{session_created}	#{session_name}	#{?session_attached,attached,detached}	#{session_path}' 2>/dev/null |
+    awk -F '\t' -v b="$1" -v d="$PWD" '
+      $3 == "detached" && $4 == d {
+        n = $2
+        if (n == b || (index(n, b "-") == 1 && substr(n, length(b) + 2) ~ /^[0-9]+$/)) print
+      }' |
+    sort -t "$(printf '\t')" -k1,1nr | cut -f2
 }
 
 # Asked out here: inside $(decide) stdout is a pipe, never the terminal.
 on_tty=0
 if [ "${SJ_KEEP_ASSUME_TTY:-0}" = 1 ] || { [ -t 0 ] && [ -t 1 ]; }; then on_tty=1; fi
 verdict="$(decide "$@")"
+# A resume with the agent still running here, detached: offer that session (see the header).
+left=""
+if [ "$verdict" = wrap ] && resume_launch "$@"; then left="$(detached_here "$(session_base "$@")")"; fi
 if [ "$explain" = 1 ]; then
+  [ -n "$left" ] && echo "offer $(printf '%s\n' "$left" | head -n 1)"
   if [ "$verdict" = wrap ]; then echo "wrap $(session_name "$@")"; else echo "$verdict"; fi
   exit 0
+fi
+if [ -n "$left" ]; then
+  first="$(printf '%s\n' "$left" | head -n 1)"
+  others="$(printf '%s\n' "$left" | sed 1d | tr '\n' ' ')"
+  echo "scrubjay: '$first' is still running in this folder, detached: most likely the agent you are resuming." >&2
+  [ -n "$others" ] && echo "scrubjay: also detached here: $others" >&2
+  printf 'scrubjay: attach to it instead of starting a second copy? [Y/n] ' >&2
+  ans=n; read -r ans || ans=n
+  case "$ans" in
+    ''|y|Y|yes|Yes) exec "$TMUX_BIN" attach-session -t "=$first" ;;
+  esac
+  echo "scrubjay: starting a new session; '$first' keeps running (sj-keep.sh ls)" >&2
 fi
 
 if [ "$verdict" != wrap ]; then
