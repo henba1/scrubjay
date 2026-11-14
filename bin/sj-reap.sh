@@ -29,6 +29,11 @@
 # SCRUBJAY_REAP_TERM_WAIT seconds, and the pane closed; (4) a line in <run>/reap.log naming the resume
 # command, and SCRUBJAY_REAP_NOTIFY (a command, given the line as $1) when set.
 #
+# Empty panes too: an sj-* session whose agent already exited (killed from outside, e.g. by an OOM
+# killer, or failed) is held open by sj-keep's "press Enter to close" so its last screen can be read.
+# After SCRUBJAY_REAP_EMPTY_AFTER of no output (default 1 h) that screen is saved to
+# <run>/reaped/<session>-<time>.txt and the pane closed. Detached ones only.
+#
 # SCRUBJAY_REAP (env or ~/.config/scrubjay/config): on (default) | warn (log, never stop) | off.
 # Thresholds in seconds: SCRUBJAY_REAP_WARN=43200 (12 h), SCRUBJAY_REAP_AFTER=86400 (24 h),
 # SCRUBJAY_REAP_DUP_AFTER=1800 (30 min).
@@ -45,6 +50,7 @@ DUP_AFTER="${SCRUBJAY_REAP_DUP_AFTER:-1800}"
 MEM_MIN="${SCRUBJAY_REAP_MEM_MIN:-15}"
 SWAP_MAX="${SCRUBJAY_REAP_SWAP_MAX:-70}"
 TERM_WAIT="${SCRUBJAY_REAP_TERM_WAIT:-30}"
+EMPTY_AFTER="${SCRUBJAY_REAP_EMPTY_AFTER:-3600}"
 TMUX_BIN="${SJ_KEEP_TMUX:-tmux}"            # tests point these at stubs
 MEMINFO="${SJ_REAP_MEMINFO:-/proc/meminfo}"
 CRONTAB="${SJ_REAP_CRONTAB:-crontab}"
@@ -240,6 +246,35 @@ reap() {  # reap <sid> <pid> <session> <pane> <cwd> <transcript> <reason> <idle>
   tell "reaped $sid pid $pid ($session, $reason) — resume: cd $cwd && claude --resume $sid${cap:+ — screen: $cap}"
 }
 
+# empties — TSV <pane_id> <session> <idle> <exit line>: detached sj-* panes where sj-keep outlived its
+# agent (the pane's process has no children left), oldest first
+empties() {
+  sj_has "$TMUX_BIN" || return 0
+  local ppid pane session att start act kids line
+  "$TMUX_BIN" list-panes -a -F "#{pane_pid}${TAB}#{pane_id}${TAB}#{session_name}${TAB}#{session_attached}${TAB}#{window_activity}${TAB}#{pane_start_command}" 2>/dev/null |
+    while IFS="$TAB" read -r ppid pane session att act start; do
+      case "$session" in sj-*) ;; *) continue ;; esac
+      case "$start" in *sj-keep.sh*--inner*) ;; *) continue ;; esac
+      [ "${att:-0}" = 0 ] || continue
+      kids="$(ps -eo ppid= 2>/dev/null | awk -v p="$ppid" '$1 == p' | wc -l | tr -d ' ')"
+      [ "$kids" = 0 ] || continue
+      line="$("$TMUX_BIN" capture-pane -p -t "$pane" 2>/dev/null | grep -F '[scrubjay]' | tail -n 1)"
+      [ -n "$line" ] || continue        # still starting, or not sj-keep's own wait
+      line="${line%% Press Enter*}"
+      printf '%s\t%s\t%s\t%s\n' "$pane" "$session" "$((NOW - ${act:-NOW}))" "$line"
+    done | sort -t "$TAB" -k3,3nr
+}
+
+close_empty() {  # close_empty <pane> <session> <idle> <exit line>
+  local d cap
+  d="$RUN/reaped"; mkdir -p "$d" 2>/dev/null
+  cap="$d/$2-$(date -u +%Y%m%dT%H%M%SZ).txt"
+  { printf 'scrubjay sj-reap: host %s, tmux %s, agent gone, no output for %s\n\n' "$(sj_host)" "$2" "$(age "$3")"
+    "$TMUX_BIN" capture-pane -p -J -S -10000 -t "$1" 2>/dev/null; } > "$cap"
+  "$TMUX_BIN" kill-pane -t "$1" 2>/dev/null
+  log "closed empty $2 (${4#\[scrubjay\] }) — screen: $cap"
+}
+
 run() {  # run [--dry-run]
   local dry=0 all sid pid state last session pane attached cwd t reg verdict reason idle
   [ "${1:-}" = --dry-run ] && dry=1
@@ -275,6 +310,12 @@ run() {  # run [--dry-run]
         else warn_once "$sid" "$pid" "stray $sid pid $pid ($session, $reason) — attach: tmux attach -t $session"; fi ;;
     esac
   done <<<"$all"
+  local epane esession eidle eline
+  while IFS="$TAB" read -r epane esession eidle eline; do
+    [ -n "$epane" ] && [ "$eidle" -ge "$EMPTY_AFTER" ] || continue
+    if [ "$dry" = 1 ] || [ "$MODE" = warn ]; then echo "would close empty $esession (${eline#\[scrubjay\] })"
+    else close_empty "$epane" "$esession" "$eidle" "$eline"; fi
+  done < <(empties)
 }
 
 warn_once() {  # warn_once <sid> <pid> <line> — once per process, not every 15 minutes
@@ -285,15 +326,21 @@ warn_once() {  # warn_once <sid> <pid> <line> — once per process, not every 15
 }
 
 ls_cmd() {
-  local all sid pid state last session pane attached cwd t reg idle verdict reason
+  local all sid pid state last session pane attached cwd t reg idle verdict reason v
   all="$(judge "$(rows)")"
-  [ -n "$all" ] || { echo "no agent processes on $(sj_host)"; return 0; }
+  [ -n "$all" ] || [ -n "$(empties)" ] || { echo "no agent processes on $(sj_host)"; return 0; }
   printf '%-8s %-8s %-30s %-8s %-7s %s\n' SESSION PID TMUX STATE IDLE VERDICT
   while IFS="$TAB" read -r sid pid state last session pane attached cwd t reg idle verdict reason; do
     [ -n "$sid" ] || continue
     [ "$attached" = 1 ] && session="$session*"
     printf '%-8s %-8s %-30s %-8s %-7s %s\n' "${sid:0:8}" "$pid" "$session" "$state" "$(age "$idle")" "$verdict: $reason"
   done <<<"$all"
+  local epane esession eidle eline
+  while IFS="$TAB" read -r epane esession eidle eline; do
+    [ -n "$epane" ] || continue
+    if [ "$eidle" -ge "$EMPTY_AFTER" ]; then v="close"; else v="keep (closes at $(age "$EMPTY_AFTER"))"; fi
+    printf '%-8s %-8s %-30s %-8s %-7s %s\n' "-" "-" "$esession" "exited" "$(age "$eidle")" "$v: ${eline#\[scrubjay\] }"
+  done < <(empties)
   pressure && echo "memory pressure: idle sessions go at $(age "$WARN") instead of $(age "$AFTER")"
   echo "mode: SCRUBJAY_REAP=$MODE   (* = attached)"
 }
