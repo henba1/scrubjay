@@ -7,7 +7,8 @@
 # a background shell running; a duplicate copy of a conversation goes early, judged by its own status
 # and not the shared transcript; a transcript's last record counts, not its mtime; before a stop, the
 # screen is saved beside the transcript and the session published; warn and off stop nothing; a run
-# never overlaps another.
+# never overlaps another; a detached sj-* pane whose agent already exited is closed after an hour,
+# its screen saved first.
 set -uo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 sj_sandbox
@@ -26,9 +27,11 @@ cat > "$SANDBOX/stubbin/faketmux" <<'EOF'
 #!/usr/bin/env bash
 db="$SANDBOX/tmux.panes"; touch "$db"
 case "$1" in
-  list-panes) cat "$db" ;;
+  list-panes) case "$*" in *pane_start_command*) cat "$SANDBOX/tmux.empty" 2>/dev/null ;; *) cat "$db" ;; esac ;;
   capture-pane) shift; while [ $# -gt 0 ]; do [ "$1" = -t ] && t="$2"; shift; done
-                printf 'screen of %s\n> an unsent draft\n' "$t" ;;
+                printf 'screen of %s\n> an unsent draft\n' "$t"
+                grep -q "	$t	" "$SANDBOX/tmux.empty" 2>/dev/null &&
+                  echo '[scrubjay] claude exited with status 143. Press Enter to close this session.' ;;
   display-message) [ -f "$SANDBOX/tmux.attach-now" ] && echo 1 || echo 0 ;;
   kill-pane) printf '%s\n' "$3" >> "$SANDBOX/tmux.killed" ;;
 esac
@@ -174,6 +177,38 @@ mkdir "$SANDBOX/run/reap.lock"
 bash "$REAP" run
 check "another run holding the lock: this one does nothing" kill -0 "$p"
 rmdir "$SANDBOX/run/reap.lock"; reset
+
+section "empty panes (the agent already exited)"
+# empty <pid> <session> <attached> <age> [start command] — a pane where sj-keep outlived its agent
+empty() { printf '%s\t%%e%s\t%s\t%s\t%s\t%s\n' "$1" "$1" "$2" "$3" "$((NOW - $4))" \
+            "${5:-/x/bin/sj-keep.sh --inner /run/f -- claude}" >> "$SANDBOX/tmux.empty"; }
+sleep 600 >/dev/null 2>&1 & e1=$!
+sleep 600 >/dev/null 2>&1 & e2=$!
+sleep 600 >/dev/null 2>&1 & e3=$!
+sleep 600 >/dev/null 2>&1 & e4=$!
+bash -c 'sleep 600; :' >/dev/null 2>&1 & e5=$!; sleep 0.3
+empty "$e1" sj-claude-old 0 $((2 * H))
+empty "$e2" sj-claude-recent 0 600
+empty "$e3" sj-claude-looking 1 $((2 * H))
+empty "$e4" sj-claude-other 0 $((2 * H)) "bash -l"
+empty "$e5" sj-claude-busy 0 $((2 * H))
+out="$(bash "$REAP" ls)"
+assert_contains "listed, with why it ended" "$out" "close: claude exited with status 143."
+case "$out" in *"Press Enter"*) _no "without sj-keep's prompt text" "$out" ;; *) _ok "without sj-keep's prompt text" ;; esac
+assert_contains "quiet 10 min: kept for now" "$out" "keep (closes at 1h0m)"
+for n in looking other busy; do
+  case "$out" in *"sj-claude-$n "*) _no "never listed: $n" "$out" ;; *) _ok "never listed: $n" ;; esac
+done
+bash "$REAP" run --dry-run >/dev/null
+assert_no_file "a dry run closes nothing" "$SANDBOX/tmux.killed"
+bash "$REAP" run
+assert_eq "run closes only the old one" "%e$e1" "$(cat "$SANDBOX/tmux.killed" 2>/dev/null)"
+cap="$(ls "$SANDBOX/run/reaped/"sj-claude-old-*.txt 2>/dev/null | head -1)"
+assert_file "its last screen is saved first" "$cap"
+assert_contains "the screen and the exit line" "$(cat "$cap" 2>/dev/null)" "exited with status 143"
+assert_contains "and logged" "$(cat "$SANDBOX/run/reap.log")" "closed empty sj-claude-old (claude exited with status 143.)"
+kill "$e1" "$e2" "$e3" "$e4" 2>/dev/null; pkill -P "$e5" 2>/dev/null; kill "$e5" 2>/dev/null
+rm -f "$SANDBOX/tmux.empty" "$SANDBOX/tmux.killed"
 
 section "cron"
 echo "0 1 * * * keep-me" > "$SANDBOX/crontab"

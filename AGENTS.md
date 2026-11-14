@@ -58,7 +58,8 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   detaches the agent instead of killing it. Tests: `tests/test_keep.sh`.
 - `bin/sj-reap.sh` — the other half of keeping agents: stray ones (detached and idle 24 h, a duplicate
   copy of one conversation quiet 30 min, or idle 12 h under memory pressure) get their screen saved as
-  `<sid>/reaped-*.txt` beside the transcript and are published, then stopped. Only agents inside sj-*
+  `<sid>/reaped-*.txt` beside the transcript and are published, then stopped. A detached pane whose
+  agent already exited is closed after 1 h, its screen saved to `<run>/reaped/`. Only agents inside sj-*
   tmux sessions; never attached, mid-turn or with a background shell. Cron every 15 min
   (`sj-reap.sh install`, done by onboarding with SCRUBJAY_KEEP on). Tests: `tests/test_reap.sh`.
 - `bin/sj-live.sh` — session leases: which sessions a harness process holds open. Marked from

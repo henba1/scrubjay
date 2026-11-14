@@ -84,6 +84,7 @@ a small box that runs out of memory resets. So `bin/sj-reap.sh` runs from cron e
 | detached and idle | warned at 12 h (`reap.log`, once), stopped at 24 h |
 | a duplicate copy of one conversation (a resume while the first copy ran on) | 30 min after that copy's last own activity; the attached copy, else one outside tmux, else the newest, is kept |
 | idle while memory is short (RAM available < 15 % or swap > 70 % used) | at 12 h, oldest first, until it isn't |
+| an empty pane: the agent already exited (an OOM killer, a crash) and sj-keep holds its last screen open for you to read | after 1 h without output (`SCRUBJAY_REAP_EMPTY_AFTER`); the screen goes to `~/.scrubjay/run/reaped/<session>-<time>.txt` first |
 
 Before it stops one, it saves what only the running process holds:
 
