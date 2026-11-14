@@ -1115,6 +1115,12 @@ with its full history — subagents, task list and file history included.</p>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>/resume<span class="w">                       </span><span class="c1"># and pick it out of the list</span>
 </code></pre></div>
 <h2 id="from-a-terminal-claude-resume-sid">From a terminal: <code>claude resume &lt;sid&gt;</code><a class="headerlink" href="#from-a-terminal-claude-resume-sid" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>Not sure where the session is, or whether it still runs? <code>sj resume &lt;sid8&gt;</code> picks for you: it
+attaches when it is still running (here, or over ssh), resumes it in its folder when it stopped
+here, and does the hand-off below when it isn't here. <code>sj ls</code> lists every machine's sessions. See
+<a href="../keep-alive/#finding-and-resuming-sessions-sj">Finding and resuming sessions</a>.</p>
+</blockquote>
 <p>Outside a session, skip the slash command. With scrubjay's shell integration installed, this works
 for a session recorded on <strong>any</strong> machine:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>~/code/widget-api<span class="w">          </span><span class="c1"># the folder to continue it in, on this machine</span>
