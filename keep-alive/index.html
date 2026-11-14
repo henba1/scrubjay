@@ -576,6 +576,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#stray-agents-are-reaped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stray agents are reaped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#optional-a-friendlier-tmux" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1022,6 +1033,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#stray-agents-are-reaped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stray agents are reaped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#optional-a-friendlier-tmux" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1182,18 +1204,61 @@ and tells you how to install, never something it installs as root for you.</p>
   get one line on stderr and the agent runs unprotected, as before.</li>
 <li><strong>Any other agent, by hand:</strong> <code>~/.scrubjay/scrubjay/bin/sj-keep.sh -- pi</code>.</li>
 </ul>
+<h3 id="stray-agents-are-reaped">Stray agents are reaped<a class="headerlink" href="#stray-agents-are-reaped" title="Permanent link">&para;</a></h3>
+<p>A kept agent costs a few hundred MB for as long as it runs, also when you never come back to it, and
+a small box that runs out of memory resets. So <code>bin/sj-reap.sh</code> runs from cron every 15 minutes
+(onboarding installs it with <code>SCRUBJAY_KEEP</code> on; by hand: <code>sj-reap.sh install</code>) and stops strays:</p>
+<table>
+<thead>
+<tr>
+<th>Stray</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>detached and idle</td>
+<td>warned at 12 h (<code>reap.log</code>, once), stopped at 24 h</td>
+</tr>
+<tr>
+<td>a duplicate copy of one conversation (a resume while the first copy ran on)</td>
+<td>30 min after that copy's last own activity; the attached copy, else one outside tmux, else the newest, is kept</td>
+</tr>
+<tr>
+<td>idle while memory is short (RAM available &lt; 15 % or swap &gt; 70 % used)</td>
+<td>at 12 h, oldest first, until it isn't</td>
+</tr>
+</tbody>
+</table>
+<p>Before it stops one, it saves what only the running process holds:</p>
+<ol>
+<li>The tmux pane's screen and scrollback, including a prompt you typed but never sent. It goes to
+   <code>&lt;sid&gt;/reaped-&lt;time&gt;.txt</code> beside the transcript, so the relay carries it with the session.</li>
+<li>It publishes the session the way <code>/sjlog</code> does, since SessionEnd won't fire.</li>
+<li>It sends SIGTERM, then SIGKILL after 30 s, and closes the pane.</li>
+<li>It writes a line to <code>~/.scrubjay/run/reap.log</code> with the command to resume. With
+   <code>SCRUBJAY_REAP_NOTIFY=&lt;command&gt;</code> set, that command gets the same line.</li>
+</ol>
+<p>Never stopped: anything outside an <code>sj-*</code> session, an attached session, a turn in progress, a
+permission prompt, a background shell still running, or a session whose transcript, subagents or
+background tasks were written to recently. Idle time counts from the transcript's last <em>record</em>, not
+the file's mtime, which other tools touch.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>~/.scrubjay/scrubjay/bin/sj-reap.sh<span class="w"> </span>ls<span class="w">             </span><span class="c1"># every agent here: idle age and verdict</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>~/.scrubjay/scrubjay/bin/sj-reap.sh<span class="w"> </span>run<span class="w"> </span>--dry-run<span class="w">  </span><span class="c1"># what the next run would do</span>
+</code></pre></div>
+<p><code>SCRUBJAY_REAP=warn</code> only logs. <code>off</code> turns it off.</p>
 <h3 id="optional-a-friendlier-tmux">Optional: a friendlier tmux<a class="headerlink" href="#optional-a-friendlier-tmux" title="Permanent link">&para;</a></h3>
 <p>tmux works without a config file. Two settings make it feel more like a normal terminal:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.tmux.conf<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s">set -g mouse on              # scroll wheel and click-to-select, instead of Ctrl-b [</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s">set -g history-limit 50000   # more scroll-back than the 2000-line default</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s">EOF</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.tmux.conf<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s">set -g mouse on              # scroll wheel and click-to-select, instead of Ctrl-b [</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="s">set -g history-limit 50000   # more scroll-back than the 2000-line default</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s">EOF</span>
 </code></pre></div>
 <p>If Shift+Enter doesn't insert a newline in Claude Code inside tmux, type <code>\</code> then Enter instead.</p>
 <h3 id="the-status-bar">The status bar<a class="headerlink" href="#the-status-bar" title="Permanent link">&para;</a></h3>
 <p>tmux's own bar says little about an agent: <code>[sj-claude-w</code> and <code>0:bash*</code> on bright green. scrubjay
 ships one that says what the agent in the pane is doing, and what else runs in its project:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a> widget ⎇ main · a1b2c3d4 · ● working 2m   ┊  ◐ 9f8e7d6c feat/retry 5s · ○ 77aa0c1e gk 1m      Retry backoff · 18:40 · Mon 9 Nov · henpi
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a> widget ⎇ main · a1b2c3d4 · ● working 2m   ┊  ◐ 9f8e7d6c feat/retry 5s · ○ 77aa0c1e gk 1m      Retry backoff · 18:40 · Mon 9 Nov · henpi
 </code></pre></div>
 <ul>
 <li><strong>left:</strong> this pane's session: its project (the git repository) ⎇ branch · session id · its state
@@ -1213,7 +1278,7 @@ ships one that says what the agent in the pane is doing, and what else runs in i
 grey breathes slowly, so an OLED screen doesn't burn it in. <code>SCRUBJAY_STATUS_DRIFT=off</code> keeps it
 still; <code>SCRUBJAY_STATUS_MAX</code> (default 3) is how many related sessions it names.</p>
 <p><code>bin/onboard.sh</code> offers to add it; by hand, one line in <code>~/.tmux.conf</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>source-file<span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.claude/hooks/../tmux/scrubjay.conf"</span><span class="w">   </span><span class="c1"># tmux expands $HOME; with CLAUDE_CONFIG_DIR, its path</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>source-file<span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.claude/hooks/../tmux/scrubjay.conf"</span><span class="w">   </span><span class="c1"># tmux expands $HOME; with CLAUDE_CONFIG_DIR, its path</span>
 </code></pre></div>
 <p>Where the information comes from: each harness's own registry of running sessions (Claude Code's
 <code>~/.claude/sessions/</code>, via <code>bin/sj-live.sh</code>), the leases for the waiting state, and the process tree

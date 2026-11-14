@@ -1307,6 +1307,10 @@ editing needed:</p>
 <td>don't sweep for sessions that ended without a clean exit</td>
 </tr>
 <tr>
+<td><code>SCRUBJAY_REAP=on</code></td>
+<td>stop stray kept agents after saving their screen and publishing them: detached and idle 24 h (warned at 12 h), a duplicate copy of one conversation quiet 30 min, idle 12 h under memory pressure. <code>warn</code> only logs, <code>off</code> never runs. Thresholds <code>SCRUBJAY_REAP_WARN</code>/<code>_AFTER</code>/<code>_DUP_AFTER</code> (seconds). See <a href="../keep-alive/#stray-agents-are-reaped">Keeping agents alive</a></td>
+</tr>
+<tr>
 <td><code>SCRUBJAY_KEEP=ssh</code></td>
 <td>run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (<code>always</code>: whenever outside tmux; default <code>off</code>). See <a href="../keep-alive/">Keeping agents alive</a></td>
 </tr>
