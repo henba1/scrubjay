@@ -30,6 +30,7 @@ Diagram source: [`overview.dot`](https://henba1.github.io/scrubjay/overview.dot)
 - **[Day-to-day](https://henba1.github.io/scrubjay/day-to-day/index.md)** — the hooks that keep it hands-off, finding a past chat, and troubleshooting.
 - **[Query the archive (MCP)](https://henba1.github.io/scrubjay/archive-mcp/index.md)** — recall a past session by *topic* from inside a live Claude session via the read-only `sjmcp` server.
 - **[Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md)** — the `/sj*` command reference.
+- **[Session viewer](https://henba1.github.io/scrubjay/session-viewer/index.md)** — `/sjview`: your sessions as a map and a timeline.
 - **[Transcripts: relay + NAS](https://henba1.github.io/scrubjay/transports/index.md)** — how sessions ride peer-to-peer to your own NAS, and the two P2P paths (WireGuard / SSH).
 - **[Reference](https://henba1.github.io/scrubjay/reference/index.md)** — the by-hand command cheatsheet and environment toggles.
 
@@ -546,6 +547,37 @@ For recall by *topic* (rather than an exact word you remember typing) from insid
 
 The bell goes to the agent's terminal rather than a sound device, so over SSH it rings on the machine you're sitting at. tmux passes it on by default. Your terminal emulator decides what a bell sounds like, so turn on its audible bell. A headless run (`claude -p`, `opencode run`) has no terminal and rings nothing.
 
+**Check the whole path** from the machine the agent runs on, over SSH and inside tmux if that's how you work:
+
+```
+bash ~/.claude/hooks/../bin/sj-notify.sh test
+```
+
+### The sound
+
+scrubjay ships a soft wooden bell, [`sounds/wood.wav`](https://github.com/henba1/scrubjay/blob/main/sounds/wood.wav) (two marimba strikes; `sounds/make-wood.py` is its source). Download it on the computer you sit at:
+
+```
+# Windows
+Invoke-WebRequest https://raw.githubusercontent.com/henba1/scrubjay/main/sounds/wood.wav -OutFile "$env:USERPROFILE\Music\scrubjay-wood.wav"
+```
+
+```
+# macOS, Linux
+curl -fLo ~/.local/share/scrubjay-wood.wav https://raw.githubusercontent.com/henba1/scrubjay/main/sounds/wood.wav
+```
+
+Then point your terminal at it:
+
+| Terminal         | Setting                                                                                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows Terminal | in `settings.json` under `profiles.defaults`: `"bellStyle": ["audible", "taskbar"]`, `"bellSound": "C:\\Users\\<you>\\Music\\scrubjay-wood.wav"`            |
+| kitty            | `bell_path ~/.local/share/scrubjay-wood.wav` (and `enable_audio_bell yes`, the default)                                                                     |
+| Ghostty          | `bell-features = audio` and `bell-audio-path = ~/.local/share/scrubjay-wood.wav` (1.2 on Linux, 1.3 on macOS)                                               |
+| iTerm2, WezTerm  | no custom sound: they play the system alert sound. iTerm2: untick *Silence bell* (Profiles → Terminal); WezTerm: `audible_bell = "SystemBeep"`, the default |
+
+Windows Terminal: if the bell is silent without `bellSound`, Windows' own sound for it is set to none, which a sound file sidesteps. It keeps the file open while it runs, so save a new version under a new name.
+
 **nvim's `:terminal`** swallows the bell under its default `belloff=all`. Anything that leaves out `term` lets it through:
 
 ```
@@ -850,50 +882,8 @@ All scrubjay commands live in `commands/*.md` and are symlinked into `~/.claude/
 | `/sjmemory`                                  | —            | Enable/repair cross-machine memory on **this** machine (idempotent — runs `bin/onboard-memory.sh`). First-time memory setup, or when memory sync looks broken.                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `/sjnote [what to capture \| /path/to/file]` | —            | **Keep a written artefact** — an analysis, a briefing, a design rationale (runs `bin/sj-note.sh`). Writes it to `<memory>/<project>/notes/` and publishes immediately, so it survives the session and reaches every machine. Invoke it *before* the work too: it stands for the rest of the session, so durable output goes there instead of the scratchpad. Notes are **not** loaded into future sessions — read them back with `/sjrecall` or `/sjbrowse note`.                                                                                                    |
 | `/sjpaste [name]`                            | —            | **Put the clipboard into this project's assets and read it.** For the thing a terminal can't do: a screenshot, a copied PDF, a diagram. Writes to `$SCRUBJAY_ASSETS/<project-slug>/` (machine-local, not synced) and hands the path straight to the session. Needs a clipboard on the machine running the session — over SSH use `cat <file> \| bin/sj-paste.sh -` instead.                                                                                                                                                                                          |
-| `/sjview [project\|stop\|status]`            | —            | **See your sessions as a map** in the browser (runs `bin/sj-view.sh`). One lane per project, newest on the right, forks drawn as arrows; click a session for everything scrubjay holds on it, its transcript, and the command that continues it. Nothing runs until you ask: it starts a small local server and stops on `/sjview stop`, the page's Stop button, or after 30 minutes unused. See [The session map](#the-session-map).                                                                                                                                |
+| `/sjview [project\|stop\|status]`            | —            | **See every session in your browser** (runs `bin/sj-view.sh`), as a map or a timeline: what ran, what is still running, what it changed, and the command that continues it. Nothing runs until you ask: it starts a small local server and stops on `/sjview stop`, the page's Stop button, or after 30 minutes unused. See [The session viewer](https://henba1.github.io/scrubjay/session-viewer/index.md).                                                                                                                                                         |
 | `/sjdoctor [section…]`                       | —            | **Check that this machine's sync actually works** (runs `bin/sj-doctor.sh`). With no argument it verifies everything: config, the data repo, the memory clone, relay reachability, adapters and the last recorded outcomes. Name sections — `config`, `data`, `memory`, `relay`, `harnesses`, `outcomes` — to check just those, which skips the slow network probes for the rest. Read-only and safe to run any time; reach for it when something *should* have synced and didn't.                                                                                   |
-
-## The session map
-
-`/sjview` opens the catalogue as a map: one lane per project, one column per day, and a card per session. A card shows the session id and topic, then where it ran (host and folder) and with which agent and model, then its summary and when, how long and how big. Each agent has its own colour: Claude's clay, opencode's grey, codex's green. Forks are arrows from the session they branched off. A session handed off to another machine with `/sjresume` stays one card, showing both machines (`laptop → henpi`); one carried over to another agent is joined to its source by a dashed "carried over" line. Sessions that recorded nothing are hidden unless you tick **show empty**.
-
-Right of the timeline, under **where the work landed**, are the things the sessions changed, each a pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo with no remote, a local folder, or scrubjay's own memory and plans. A line joins each session to what it changed; hover either end to see what the session did there ("PR #42 merged · 3 commits · 2 files"). Click a repo for its **milestones**: per session, newest first, the PRs opened and merged, issues, releases, branches, pushes, commits and files written, each PR and issue linked to the forge.
-
-These come from the archived transcripts: the files the agent wrote and the `git`, `gh` and `glab` commands it ran, with their output. A repo is named by the remote that output shows (a PR's URL, a push's `To …`); failing that, on this machine, by the folder's `origin`. A fork's transcript repeats its parent's history, so a fork shows only what it did after branching. The map reads the archive in the background on start and caches the result, so a later start reads only new transcripts.
-
-**Timeline.** **Timeline** in the header shows the same sessions in time: a lane per project, now at the right edge, opening on the last two weeks. Filters and the selected session carry over, and the page remembers which view you left it on. Each bar is a burst of work read from the raw transcript, on a thin line for the session's whole span, so a session left open for a week reads as the few hours it was busy. A ◇ is a session with no raw transcript on this machine: only its start is known, and it gets no made-up length. Drag to pan, Ctrl+wheel to zoom, `0` for the last two weeks and `F` for everything. Shift+drag along a lane gathers that stretch into a context pack.
-
-**Connecting projects.** A lane is a folder's name, so a rename, a merge or a subfolder reads as separate projects until you say otherwise. Drag the ○ by a lane's name onto another lane: where you drop it is the date it joined, and dropping on the other's name means it was always the same project. Clicking the ○ lets you pick both from a form instead. The form says what the link will look like before anything is written, and one link gives one of three shapes, decided by the record:
-
-| What the record shows                          | How it looks                                            |
-| ---------------------------------------------- | ------------------------------------------------------- |
-| The other project had work before that date    | A merge: a stream beside it that curves in on the date  |
-| The other project had nothing before that date | A rename or move: one lane with a seam at the date      |
-| You said it was always one project             | One lane all along, with `+ name` under the lane's name |
-
-Sessions keep the project they recorded, and sit in the lane their project stood in that day. The map and the project filter treat linked projects as one. Links are kept in `<data>/projects/<host>.tsv`, beside the catalogue rather than in it, so click a join to change or undo it. **Suggested** in the corner lists pairs that look like one: a folder directly inside another project, work landing on a repo named after another project, or two projects on the same remote. Nothing is linked until you confirm it.
-
-**Context packs.** Shift+click cards, or use **Add to context pack** in a panel, to gather up to 12 archived sessions from any machine or agent. **Build** writes them into one primer, oldest first and condensed, and gives you the command that starts a new session on it, in the agent you choose. It holds about 240K characters shared between the sessions; a long one loses its middle and is named. Packs stay in `~/.scrubjay/run/packs` for 7 days, readable only by you.
-
-A dot in a card's title says whether the session is alive. Active means a harness process holds it open, not that something happened lately: a filled green dot is working, orange is waiting on you, a hollow green ring is open and idle. A red square means its process went mid-turn. A dashed grey ring means recent: a turn ended within 15 minutes, with no process to confirm it. Only this machine's processes can be asked, so a session on another machine is at best recent. The status menu in the header filters by any of these, or by all sessions open here, and counts each. It looks past the date and empty filters, so a live session is never hidden by its age. Lanes with an open session come first, and dots and counts refresh every 10 seconds.
-
-Each relation has its own look. A fork is a solid arrow: made the same day, it sits indented under its parent; made later, it starts level with it. A carry-over to another agent is a dashed arrow naming that agent. A reference, a session you named by id or the agent pulled from the archive, is a dotted line shown only on hover or selection. Selecting a session fades everything unrelated and tags each relative with how it is related.
-
-Click a card for everything scrubjay holds on it: every catalogue row (so you see how the topic moved), its forks, where its transcript is archived, and the command that continues it. That is the harness's own resume command for a session from this machine, or `sj-resume.sh` first for one from another machine ([hand-off](https://henba1.github.io/scrubjay/handoff/index.md)). **Read transcript** shows the archived conversation, condensed or in full. A link ending in `#sid=<id>` opens that session's panel.
-
-**A path that moved.** A folder that no longer exists on this machine shows **⚠ gone** on its card. In a session's or an artefact's panel, **✎ moved?** records where it went, offering folders from the catalogue with the same name or the same git remote. The move covers everything under the path, on that machine, in every session: cards, lanes and artefacts show the new place, and **undo** takes it back. Transcripts are never edited. A resumed session is told instead, in its first context, of each move its history touches; a session whose own folder moved is staged there on resume, because the harness files sessions by folder. Moves live in `moves/` in your data repo, so they reach every machine; `bin/sj-moves.sh` does the same from a terminal. Claude Code gets the note; opencode does not yet, and Codex only if its SessionStart payload says `source: resume`.
-
-`/sjview <project>` opens the map on one project's lane. The name need not be exact: `widget`, `WIDGET_API` or `widgt-api` all find `widget-api`. Case and punctuation are ignored, part of a name is enough, and a misspelling finds the closest name. When several projects fit, the newest wins and the others are listed. With no likely match, it shows every project and says so.
-
-The menu beside **Stop viewer** sets the colours: your system's light or dark, or a preset (Light, Dark, Nord, Solarized, Gruvbox, High contrast, Colour-blind safe). This browser remembers the choice.
-
-**Loose ends** in the header lists work from the last 30 days that shows no sign of finishing: sessions that died mid-turn, PRs still open, branches pushed with no PR, commits not pushed, and files not committed. Each links to the session behind it. A transcript cannot see a PR merged later by hand, so GitHub candidates are checked with one read-only `gh pr list` per repo, and the last two come from this machine's repos. What could not be checked, including every GitLab candidate, is marked **not checked**.
-
-To move around, drag the map (or hold Space and drag, which works over cards too). The wheel scrolls, and Shift+wheel scrolls sideways. Ctrl+wheel or a pinch zooms at the pointer. The arrow keys or WASD pan, `+` `−` `0` zoom, `F` fits everything on screen, and `/` jumps to the search box. The buttons at the bottom right do the same. Only the cards near the view are drawn, so a large catalogue stays quick.
-
-The viewer runs only while you use it. It listens on `127.0.0.1` alone and answers only requests carrying the token in the address it prints. It stops on `/sjview stop`, on the page's **Stop viewer** button, or by itself after `SCRUBJAY_VIEW_IDLE` minutes without a request (default 30; `0` keeps it running). `/sjview status` says whether it runs, and where. On a machine you reach over SSH, forward the port it prints: `ssh -L 7787:127.0.0.1:7787 <host>`. A machine with no archive (`rsync-wg`) shows the map but cannot open transcripts.
-
-If the same folders are in a Nextcloud, set `SCRUBJAY_VIEW_NEXTCLOUD` to its address and `SCRUBJAY_VIEW_NEXTCLOUD_MAP` to which local folder it shows as which (`/mnt/nas=/NAS`) in `~/.config/scrubjay/config`. Every path under that folder then gets an **☁ open** link: a session's folder, its archived transcript, a local repo or folder, each file written. A folder opens in Nextcloud's Files app; a file opens its folder with the file picked out. The link is checked when you click it: a file deleted since, or a folder renamed, opens the deepest folder of its path that still exists.
 
 ## What the commands show while they run
 
@@ -909,6 +899,217 @@ claude plugin install scrubjay-ui@scrubjay
 `/sjsync` keeps a plugin installed this way: it rebuilds `~/.claude/settings.json` from the data repo but carries `enabledPlugins` and `extraKnownMarketplaces` over. To have the mod on every machine, add both keys to `settings/settings.base.json` in your data repo.
 
 Both draw scrubjay in one blue, so an `/sj*` command stands apart from an ordinary turn. The mod paints `/sj…` blue as you type it and draws the sent prompt in blue under a `◆ scrubjay` tag. opencode's TUI plugin API cannot restyle the transcript, so there `hooks/opencode/scrubjay-tui.tsx` (registered in `tui.json` by `/sjsync`) shows a blue `◆ scrubjay /sj…` badge beside the prompt while the command runs, and lists the session's `/sj*` commands in the sidebar.
+
+# The session viewer
+
+`/sjview` opens every session from every machine and agent in one browser page. See what ran, what is still running, what each session changed and how your projects fit together, then pick up any of it.
+
+| You want to…                                          | Use                                             |
+| ----------------------------------------------------- | ----------------------------------------------- |
+| See what is running or waiting on you                 | The [status menu](#which-sessions-are-alive)    |
+| See when work happened, and what ran in parallel      | The [timeline](#the-timeline)                   |
+| Find which session changed a repo, and how            | [Where the work landed](#where-the-work-landed) |
+| Continue a session, even one from another machine     | A [session's panel](#a-sessions-panel)          |
+| Start a new session that knows about several old ones | A [context pack](#context-packs)                |
+| Tie together a renamed, merged or nested project      | [Connecting projects](#connecting-projects)     |
+| Fix a folder that moved                               | [A path that moved](#a-path-that-moved)         |
+| Find work you never finished                          | [Loose ends](#loose-ends)                       |
+
+## Start and stop
+
+| Command             | What it does                             |
+| ------------------- | ---------------------------------------- |
+| `/sjview`           | Starts the viewer and prints its address |
+| `/sjview <project>` | Opens on one project                     |
+| `/sjview status`    | Says whether it runs, and where          |
+| `/sjview stop`      | Stops it                                 |
+
+The project name need not be exact: `widget`, `WIDGET_API` or `widgt-api` all find `widget-api`. When several fit, the newest wins and the others are listed. With no likely match, it shows every project.
+
+The viewer runs only while you use it. It stops on `/sjview stop`, on the page's **Stop viewer** button, or after 30 minutes without a request. On a machine you reach over SSH, forward the port it prints:
+
+```
+ssh -L 7787:127.0.0.1:7787 <host>
+```
+
+`bin/sj-view.sh` also takes `--port N`, `--idle MIN` (`0` keeps it running) and `--no-open`. `SCRUBJAY_VIEW_PORT` and `SCRUBJAY_VIEW_IDLE` set the defaults ([reference](https://henba1.github.io/scrubjay/reference/index.md)).
+
+## Two views of the same sessions
+
+**Map** and **Timeline** in the header switch views. Filters, the selected session and the context pack carry over, and the page remembers which view you left it on.
+
+|            | Map                                   | Timeline                                     |
+| ---------- | ------------------------------------- | -------------------------------------------- |
+| Reads as   | A card per session, a column per day  | A bar per burst of work, on a true time axis |
+| Shows best | What a session is and what it changed | When work happened, and how projects joined  |
+| Empty days | Left out                              | Kept, so gaps show                           |
+
+### The map
+
+A card shows the session id and topic, where it ran, the agent and model, its summary, and when, how long and how big. Each agent has its own colour: Claude's clay, opencode's grey, codex's green.
+
+Lanes with an open session come first, then the most recently active. Only the cards near the view are drawn, so a large catalogue stays quick.
+
+### The timeline
+
+A lane per project, with now at the right edge. It opens on the last two weeks. Each lane is as tall as the time in view needs, so quiet projects stay thin.
+
+| Mark                   | Meaning                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| Solid bar              | A burst of work, from the raw transcript's timestamps. 20 minutes of silence ends a burst |
+| Thin line between bars | The session's whole span, so one left open for a week reads as the hours it was busy      |
+| ◇                      | No raw transcript on this machine: only the start is known, so it gets no made-up length  |
+| Shaded band            | The project's life, from its first session to its last                                    |
+| Blue line and `now`    | The present. Open sessions run up to it                                                   |
+
+Shift+drag along a lane to gather that stretch of sessions into a [context pack](#context-packs).
+
+## Which sessions are alive
+
+Active means a harness process holds the session open, not that something happened lately. Marks sit in a card's title, or at the end of a timeline bar.
+
+| Mark              | State                                                                 |
+| ----------------- | --------------------------------------------------------------------- |
+| Filled green dot  | Working                                                               |
+| Orange dot        | Waiting on you                                                        |
+| Hollow green ring | Open and idle                                                         |
+| Red square        | Died mid-turn: its process went while it was working                  |
+| Dashed grey ring  | Recent: a turn ended within 15 minutes, with no process to confirm it |
+
+Only this machine's processes can be asked, so a session on another machine is at best recent.
+
+The status menu filters by any state, or by all sessions open here, and counts each. It looks past the date and **show empty** filters, so a live session is never hidden by its age. Marks and counts refresh every 10 seconds.
+
+## How sessions relate
+
+| Relation   | Looks like                         | Means                                                             |
+| ---------- | ---------------------------------- | ----------------------------------------------------------------- |
+| Fork       | Solid arrow                        | Branched off another session. Same day: indented under its parent |
+| Carry-over | Dashed arrow naming the agent      | Continued in a different agent as a new session                   |
+| Reference  | Dotted line, on hover or selection | A session you named by id, or the agent pulled from the archive   |
+| Hand-off   | One card, `laptop → desk`          | The same session continued on another machine with `/sjresume`    |
+
+Selecting a session fades everything unrelated and tags each relative with how it is related.
+
+## Where the work landed
+
+Right of the map are the things sessions changed, each a pill in its kind's colour: a GitHub repo, a GitLab repo, another git remote, a local repo, a local folder, or scrubjay's memory and plans. A line joins each session to what it changed. Hover either end to see what happened there ("PR #42 merged · 3 commits · 2 files").
+
+Click a repo for its **milestones**: per session, newest first, the PRs, issues, releases, branches, pushes, commits and files written, with PRs and issues linked to the forge.
+
+This comes from the archived transcripts: the files the agent wrote and the `git`, `gh` and `glab` commands it ran, with their output. A repo is named by the remote that output shows or, failing that, on this machine, by the folder's `origin`. A fork shows only what it did after branching. The archive is read in the background on start and cached, so a later start reads only new transcripts.
+
+## A session's panel
+
+Click a session for everything scrubjay holds on it:
+
+- every catalogue row, so you see how the topic moved
+- its forks, relatives and artefacts
+- where its transcript is archived
+- **Read transcript**, condensed or in full
+- the command that continues it: the harness's own resume for a session from this machine, or `sj-resume.sh` first for one from another machine ([hand-off](https://henba1.github.io/scrubjay/handoff/index.md))
+
+## Connecting projects
+
+A lane is a folder's name, so a rename, a merge or a subfolder reads as separate projects until you say otherwise. A link says one project flows into another on a date, or always did. Make one in the timeline:
+
+1. Drag the ○ beside a lane's name onto another lane. Where you drop it is the date it joined. Dropping on the other's name means it was always the same project.
+1. Read what the form says will happen. **⇄** swaps which flows into which.
+1. Press **Connect**.
+
+Clicking the ○ opens the same form, for picking both projects by name. The record decides the shape:
+
+| What the record shows                         | Shape                                            | Typical case           |
+| --------------------------------------------- | ------------------------------------------------ | ---------------------- |
+| The other project had work before the date    | A stream beside it, curving in on the date       | Two projects merged    |
+| The other project had nothing before the date | One lane with a seam at the date                 | A rename or a move     |
+| No date                                       | One lane all along, with `+ name` under its name | A subfolder or a clone |
+
+Sessions keep the project they recorded, and sit in the lane their project stood in that day. The map and the project filter treat linked projects as one. Click a join, or a name under a lane, to change or undo it.
+
+**Suggested** in the corner lists pairs that look like one, and a filled ○ marks them. Nothing is linked until you confirm it, and **Not these** hides a pair in this browser. It looks for:
+
+- a folder directly inside another project
+- work landing on a repo named after another project
+- two projects whose work lands on the same remote
+
+A folder holding three or more projects counts as a shelf, not a project, so `~/code` suggests nothing.
+
+Links are kept in `projects/` in your data repo, so they reach every machine, and transcripts are never edited. `bin/sj-projects.sh` does the same from a terminal. A project can flow into only one other, and linking works on names, so one name cannot be split: home folders on different machines share a lane.
+
+## A path that moved
+
+A folder missing from this machine shows **⚠ gone** on its card. In a session's or an artefact's panel, **✎ moved?** records where it went, offering folders from the catalogue with the same name or git remote. The move covers everything under the path, on that machine, in every session, and **undo** takes it back.
+
+Transcripts are never edited. A resumed session is told instead, in its first context, of each move its history touches. A session whose own folder moved is staged there on resume, because the harness files sessions by folder. Claude Code gets the note; opencode does not yet, and Codex only if its SessionStart payload says `source: resume`.
+
+Moves are kept in `moves/` in your data repo, so they reach every machine. `bin/sj-moves.sh` does the same from a terminal. A move changes a path; a [link](#connecting-projects) says two projects are one.
+
+## Context packs
+
+A context pack starts a new session already briefed on old ones, from any machine or agent.
+
+1. Gather up to 12 archived sessions: Shift+click them, use **Add to context pack** in a panel, or Shift+drag along a timeline lane.
+1. Pick the agent and press **Build**.
+1. Copy the command it gives you.
+
+The primer runs oldest first and condensed. It holds about 240K characters shared between the sessions; a long one loses its middle and is named. Packs stay in `~/.scrubjay/run/packs` for 7 days, readable only by you.
+
+## Loose ends
+
+**Loose ends** in the header lists work from the last 30 days that shows no sign of finishing, each linked to the session behind it:
+
+- sessions that died mid-turn
+- PRs still open
+- branches pushed with no PR
+- commits not pushed
+- files not committed
+
+A transcript cannot see a PR merged later by hand, so GitHub candidates are checked with one read-only `gh pr list` per repo, and the last two come from this machine's repos. What could not be checked, including every GitLab candidate, is marked **not checked**.
+
+## Finding your way around
+
+The search box matches topic, folder, session id, host, model and repo. The menus filter by project, host, agent, age, artefacts and status. Sessions that recorded nothing stay hidden until you tick **show empty**.
+
+| Action                | Map                          | Timeline                                  |
+| --------------------- | ---------------------------- | ----------------------------------------- |
+| Pan                   | Drag, or hold Space and drag | Drag                                      |
+| Scroll                | Wheel; Shift+wheel sideways  | Wheel for lanes; Shift+wheel through time |
+| Zoom                  | Ctrl+wheel or pinch          | Ctrl+wheel                                |
+| Pan by keys           | Arrows or WASD               | Arrows or WASD                            |
+| Zoom by keys          | `+` `−`                      | `+` `−`                                   |
+| Reset                 | `0`: actual size             | `0`: the last two weeks                   |
+| Show everything       | `F`                          | `F`                                       |
+| Go to search          | `/`                          | `/`                                       |
+| Add to a context pack | Shift+click                  | Shift+click, or Shift+drag along a lane   |
+
+Addresses you can keep end in `#sid=<id>` (a session's panel), `#read=<id>` (its transcript), `#art=<id>` (an artefact's milestones), `#project=<name>` (one project) or `#view=timeline`.
+
+The menu beside **Stop viewer** sets the colours: your system's light or dark, or a preset (Light, Dark, Nord, Solarized light and dark, Gruvbox, High contrast, Colour-blind safe). This browser remembers it.
+
+## What it reads and writes
+
+The viewer reads the archive and never changes it. It listens on `127.0.0.1` alone and answers only requests carrying the token in the address it prints.
+
+| It writes      | Where                                | Reaches other machines |
+| -------------- | ------------------------------------ | ---------------------- |
+| A moved path   | `moves/` in your data repo           | Yes                    |
+| A project link | `projects/` in your data repo        | Yes                    |
+| A context pack | `~/.scrubjay/run/packs`, kept 7 days | No                     |
+| Its caches     | `~/.scrubjay/run`                    | No                     |
+
+A machine with no archive (`rsync-wg`) shows the map but cannot open transcripts or show bursts of work.
+
+## Nextcloud links
+
+If the same folders are in a Nextcloud, set these in `~/.config/scrubjay/config`:
+
+```
+SCRUBJAY_VIEW_NEXTCLOUD=https://cloud.example
+SCRUBJAY_VIEW_NEXTCLOUD_MAP=/mnt/nas=/NAS
+```
+
+Every path under that folder then gets an **☁ open** link: a session's folder, its transcript, a local repo or folder, each file written. A folder opens in the Files app; a file opens its folder with the file picked out. The link is checked when you click it, so a path that has gone opens the deepest folder of it that still exists.
 
 # Session hand-off — continue a chat on another machine
 
@@ -943,7 +1144,7 @@ It finds the session, stages it here exactly as `/sjresume` would, and then runs
 1. **Already here?** Then it is simply resumed. A session that belongs to another folder on this machine is resumed *from that folder* (Claude Code only looks in the current folder's project dir), as long as the folder still exists.
 1. **Otherwise it is handed off** with `bin/sj-resume.sh` into the folder you are standing in — the other host's paths rewritten to it, the source host and folder printed — with `--no-clobber`: a local transcript is never replaced by a different one, not even with a backup. If the folder it was recorded in exists here too and you're somewhere else, it says so: `cd` there and re-run if that's where you meant to continue.
 
-If the session's folder has moved and the [moves ledger](https://henba1.github.io/scrubjay/slash-commands/#the-session-map) knows where, it continues there, wherever you are standing. A hand-off on the machine that recorded the session also rewrites any other moved path it finds.
+If the session's folder has moved and the [moves ledger](https://henba1.github.io/scrubjay/session-viewer/#a-path-that-moved) knows where, it continues there, wherever you are standing. A hand-off on the machine that recorded the session also rewrites any other moved path it finds.
 
 A session from a different agent (opencode, codex) can't be resumed by `claude`; you get the same carry-over command `/sjresume` prints instead.
 

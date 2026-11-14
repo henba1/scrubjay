@@ -22,5 +22,6 @@ Diagram source: [`overview.dot`](https://henba1.github.io/scrubjay/overview.dot)
 - **[Day-to-day](https://henba1.github.io/scrubjay/day-to-day/index.md)** — the hooks that keep it hands-off, finding a past chat, and troubleshooting.
 - **[Query the archive (MCP)](https://henba1.github.io/scrubjay/archive-mcp/index.md)** — recall a past session by *topic* from inside a live Claude session via the read-only `sjmcp` server.
 - **[Slash commands](https://henba1.github.io/scrubjay/slash-commands/index.md)** — the `/sj*` command reference.
+- **[Session viewer](https://henba1.github.io/scrubjay/session-viewer/index.md)** — `/sjview`: your sessions as a map and a timeline.
 - **[Transcripts: relay + NAS](https://henba1.github.io/scrubjay/transports/index.md)** — how sessions ride peer-to-peer to your own NAS, and the two P2P paths (WireGuard / SSH).
 - **[Reference](https://henba1.github.io/scrubjay/reference/index.md)** — the by-hand command cheatsheet and environment toggles.

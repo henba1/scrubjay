@@ -655,6 +655,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../session-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../transports/" class="md-nav__link">
         
   
@@ -749,10 +776,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
         
           
-          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="">
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="">
             
   
   
@@ -770,8 +797,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_14">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1138,6 +1165,13 @@ and tells you how to install, never something it installs as root for you.</p>
 <li><strong>Session names.</strong> A session is named <code>sj-&lt;harness&gt;-&lt;folder&gt;</code>. A second agent in the same folder
   gets <code>-2</code>, <code>-3</code> …, never the first one's session. After a detach, the reattach command is
   printed.</li>
+<li><strong>Resuming offers the agent that is still running.</strong> <code>claude -c</code>/<code>--continue</code>/<code>-r</code>/<code>--resume</code>,
+  <code>opencode -c</code>/<code>--session</code> and <code>codex resume</code> first look for a detached session of that harness
+  started in this folder. That is usually the agent you left, still working, so you are asked
+  <code>attach to it instead of starting a second copy? [Y/n]</code>. Enter attaches. <code>n</code>, or no answer at
+  all, starts a new session as before. A second copy would reload the conversation from disk,
+  missing whatever the first one did after you left, and both would keep writing to the same
+  transcript.</li>
 <li><strong>Only interactive launches are wrapped.</strong> <code>claude -p</code>, <code>claude --bg</code>, <code>claude mcp …</code>,
   <code>opencode serve</code>, <code>opencode run</code>, <code>codex exec</code>, <code>--version</code> and other subcommands run directly.
   So does anything launched without a terminal (scripts, pipes, cron) or from inside tmux, so an

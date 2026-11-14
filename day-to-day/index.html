@@ -485,6 +485,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-sound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The sound
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -621,6 +638,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../session-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../transports/" class="md-nav__link">
         
   
@@ -715,10 +759,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_15" >
         
           
-          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="">
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="">
             
   
   
@@ -736,8 +780,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_14">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -951,6 +995,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Notifications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-sound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The sound
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1058,10 +1119,53 @@ tokens: a hook writes one byte to the agent's terminal.</p>
 machine you're sitting at. tmux passes it on by default. Your terminal emulator decides what a
 bell sounds like, so turn on its audible bell. A headless run (<code>claude -p</code>, <code>opencode run</code>) has no
 terminal and rings nothing.</p>
+<p><strong>Check the whole path</strong> from the machine the agent runs on, over SSH and inside tmux if that's how
+you work:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bash<span class="w"> </span>~/.claude/hooks/../bin/sj-notify.sh<span class="w"> </span><span class="nb">test</span>
+</code></pre></div>
+<h3 id="the-sound">The sound<a class="headerlink" href="#the-sound" title="Permanent link">&para;</a></h3>
+<p>scrubjay ships a soft wooden bell, <a href="https://github.com/henba1/scrubjay/blob/main/sounds/wood.wav"><code>sounds/wood.wav</code></a>
+(two marimba strikes; <code>sounds/make-wood.py</code> is its source). Download it on the computer you sit at:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c"># Windows</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">Invoke-WebRequest</span> <span class="n">https</span><span class="p">://</span><span class="n">raw</span><span class="p">.</span><span class="n">githubusercontent</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">henba1</span><span class="p">/</span><span class="n">scrubjay</span><span class="p">/</span><span class="n">main</span><span class="p">/</span><span class="n">sounds</span><span class="p">/</span><span class="n">wood</span><span class="p">.</span><span class="n">wav</span> <span class="n">-OutFile</span> <span class="s2">"$env:USERPROFILE\Music\scrubjay-wood.wav"</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># macOS, Linux</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>curl<span class="w"> </span>-fLo<span class="w"> </span>~/.local/share/scrubjay-wood.wav<span class="w"> </span>https://raw.githubusercontent.com/henba1/scrubjay/main/sounds/wood.wav
+</code></pre></div>
+<p>Then point your terminal at it:</p>
+<table>
+<thead>
+<tr>
+<th>Terminal</th>
+<th>Setting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows Terminal</td>
+<td>in <code>settings.json</code> under <code>profiles.defaults</code>: <code>"bellStyle": ["audible", "taskbar"]</code>, <code>"bellSound": "C:\\Users\\&lt;you&gt;\\Music\\scrubjay-wood.wav"</code></td>
+</tr>
+<tr>
+<td>kitty</td>
+<td><code>bell_path ~/.local/share/scrubjay-wood.wav</code> (and <code>enable_audio_bell yes</code>, the default)</td>
+</tr>
+<tr>
+<td>Ghostty</td>
+<td><code>bell-features = audio</code> and <code>bell-audio-path = ~/.local/share/scrubjay-wood.wav</code> (1.2 on Linux, 1.3 on macOS)</td>
+</tr>
+<tr>
+<td>iTerm2, WezTerm</td>
+<td>no custom sound: they play the system alert sound. iTerm2: untick <em>Silence bell</em> (Profiles → Terminal); WezTerm: <code>audible_bell = "SystemBeep"</code>, the default</td>
+</tr>
+</tbody>
+</table>
+<p>Windows Terminal: if the bell is silent without <code>bellSound</code>, Windows' own sound for it is set to none,
+which a sound file sidesteps. It keeps the file open while it runs, so save a new version under a
+new name.</p>
 <p><strong>nvim's <code>:terminal</code></strong> swallows the bell under its default <code>belloff=all</code>. Anything that leaves out
 <code>term</code> lets it through:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">vim</span><span class="p">.</span><span class="py">opt</span><span class="p">.</span><span class="py">belloff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"backspace"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cursor"</span><span class="p">,</span><span class="w"> </span><span class="s2">"complete"</span><span class="p">,</span><span class="w"> </span><span class="s2">"copy"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ctrlg"</span><span class="p">,</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span><span class="w"> </span><span class="s2">"esc"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ex"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hangul"</span><span class="p">,</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="s2">"insertmode"</span><span class="p">,</span><span class="w"> </span><span class="s2">"lang"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mess"</span><span class="p">,</span><span class="w"> </span><span class="s2">"showmatch"</span><span class="p">,</span><span class="w"> </span><span class="s2">"operator"</span><span class="p">,</span><span class="w"> </span><span class="s2">"register"</span><span class="p">,</span><span class="w"> </span><span class="s2">"shell"</span><span class="p">,</span><span class="w"> </span><span class="s2">"spell"</span><span class="p">,</span><span class="w"> </span><span class="s2">"wildmode"</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">vim</span><span class="p">.</span><span class="py">opt</span><span class="p">.</span><span class="py">belloff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"backspace"</span><span class="p">,</span><span class="w"> </span><span class="s2">"cursor"</span><span class="p">,</span><span class="w"> </span><span class="s2">"complete"</span><span class="p">,</span><span class="w"> </span><span class="s2">"copy"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ctrlg"</span><span class="p">,</span><span class="w"> </span><span class="s2">"error"</span><span class="p">,</span><span class="w"> </span><span class="s2">"esc"</span><span class="p">,</span><span class="w"> </span><span class="s2">"ex"</span><span class="p">,</span><span class="w"> </span><span class="s2">"hangul"</span><span class="p">,</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="s2">"insertmode"</span><span class="p">,</span><span class="w"> </span><span class="s2">"lang"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mess"</span><span class="p">,</span><span class="w"> </span><span class="s2">"showmatch"</span><span class="p">,</span><span class="w"> </span><span class="s2">"operator"</span><span class="p">,</span><span class="w"> </span><span class="s2">"register"</span><span class="p">,</span><span class="w"> </span><span class="s2">"shell"</span><span class="p">,</span><span class="w"> </span><span class="s2">"spell"</span><span class="p">,</span><span class="w"> </span><span class="s2">"wildmode"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <p>Leave Claude Code's own <code>preferredNotifChannel</code> unset: it alerts only after you've been away for
 a while (about 60 s after a turn), and with both on you'd get a second bell later.</p>
