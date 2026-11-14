@@ -56,6 +56,11 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
   `bin/sj-claude-resume.sh`. It also routes interactive `claude`/`opencode`/`codex` launches through
   `bin/sj-keep.sh`, which runs them inside tmux when `SCRUBJAY_KEEP` says so, so a closed terminal
   detaches the agent instead of killing it. Tests: `tests/test_keep.sh`.
+- `hooks/dupe-guard.sh` — SessionStart: when the same conversation is already live in another process
+  (from the harness registry via `sjh_live_sessions`), it prints Claude Code hook JSON: `systemMessage`
+  for the human (where the copy runs, how to attach), `additionalContext` telling the model to raise
+  it first. Silent otherwise; its own hook because a hook's stdout is JSON only when all of it is.
+  Registered by `bin/claude-sync.sh`. Tests: `tests/test_dupe_guard.sh`.
 - `bin/sj-reap.sh` — the other half of keeping agents: stray ones (detached and idle 24 h, a duplicate
   copy of one conversation quiet 30 min, or idle 12 h under memory pressure) get their screen saved as
   `<sid>/reaped-*.txt` beside the transcript and are published, then stopped. A detached pane whose

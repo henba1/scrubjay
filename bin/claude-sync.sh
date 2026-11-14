@@ -306,6 +306,12 @@ jq -n --argjson keep "$KEEPJSON" --argjson base "$(cat "$BASE")" --argjson host 
   | if ([.hooks.UserPromptSubmit[]?.hooks[]?.command] | map(test("live-session")) | any) then .
     else .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/live-session.sh\"", async: true}]}])
     end
+  # A resume while the same conversation still runs in another process (hooks/dupe-guard.sh): the
+  # human and the model hear it at once, before the two copies diverge. Not async: its JSON output is
+  # the message. Fast (a registry read, one tmux call) and silent when there is no other copy.
+  | if ([.hooks.SessionStart[]?.hooks[]?.command] | map(test("dupe-guard")) | any) then .
+    else .hooks.SessionStart = ((.hooks.SessionStart // []) + [{hooks: [{type: "command", command: "\"$HOME/.claude/hooks/dupe-guard.sh\""}]}])
+    end
   # The agent stopping at a permission prompt: the lease says waiting, and bin/sj-notify.sh can ring.
   # Async and silent, so it never answers the prompt itself.
   | if ([.hooks.PermissionRequest[]?.hooks[]?.command] | map(test("live-session")) | any) then .
