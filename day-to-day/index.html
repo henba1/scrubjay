@@ -499,6 +499,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#push-to-your-phone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push to your phone
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1009,6 +1020,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#push-to-your-phone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Push to your phone
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1169,6 +1191,38 @@ new name.</p>
 </code></pre></div>
 <p>Leave Claude Code's own <code>preferredNotifChannel</code> unset: it alerts only after you've been away for
 a while (about 60 s after a turn), and with both on you'd get a second bell later.</p>
+<h3 id="push-to-your-phone">Push to your phone<a class="headerlink" href="#push-to-your-phone" title="Permanent link">&para;</a></h3>
+<p>A bell reaches nobody when you've walked away from an agent running detached in tmux. With an
+<a href="https://ntfy.sh">ntfy</a> server of your own, scrubjay also pushes to your phone. Put this in
+<code>~/.config/scrubjay/config</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>:<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SCRUBJAY_NTFY_URL</span><span class="p">:=http://192.168.1.10:</span><span class="nv">8080</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>:<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SCRUBJAY_NTFY_TOPIC</span><span class="p">:=&lt;a-long-random-topic&gt;</span><span class="si">}</span><span class="s2">"</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>:<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SCRUBJAY_NTFY_TOKEN</span><span class="p">:=&lt;an access token, if your server wants one&gt;</span><span class="si">}</span><span class="s2">"</span><span class="w">   </span><span class="c1"># optional</span>
+</code></pre></div>
+<p>Then subscribe to the same topic in the ntfy app on your phone. A push goes out when:</p>
+<ul>
+<li><strong>An agent stops at a permission prompt</strong> (priority high).</li>
+<li><strong>A turn ends after at least <code>SCRUBJAY_PUSH_MIN_TURN</code> seconds of work</strong> (default 300). The push
+  carries the first 200 or so characters of the agent's last reply, so you can tell a question from
+  a "please run this" handoff.</li>
+</ul>
+<p>By default (<code>SCRUBJAY_PUSH=detached</code>) it pushes only for an agent inside a tmux session that no
+client is attached to. If you're attached, the bell is enough. Set <code>SCRUBJAY_PUSH=always</code> to push
+wherever the agent runs, or <code>off</code> to stop pushing. Each push names the host, the project folder,
+the short session id and the command to get back to it (<code>tmux attach -t &lt;session&gt;</code>). A session gets
+one push per change, and a second push of the same kind within 10 minutes is dropped. The push is
+sent in the background with a short timeout, so a slow or missing server never holds up the agent.</p>
+<p><strong>The topic is a password.</strong> Anyone who knows it can read your pushes and send you their own. Pick a
+long random one, keep it in your config only, and use an access token if your server supports
+them. scrubjay sends the topic in the request body, never on a command line, and never prints it:
+<code>sj-doctor</code> shows only its length.</p>
+<p><strong>Your phone has to reach the server.</strong> If the server is only reachable over a VPN (WireGuard, say),
+the VPN on the phone has to be always on, or pushes wait until it next connects.</p>
+<p>Check it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>bash<span class="w"> </span>~/.claude/hooks/../bin/sj-notify.sh<span class="w"> </span>test-push<span class="w">   </span><span class="c1"># sends one now</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>bash<span class="w"> </span>~/.claude/hooks/../bin/sj-doctor.sh<span class="w"> </span>--push<span class="w"> </span>harnesses
+</code></pre></div>
+<p>Without <code>--push</code>, <code>sj-doctor</code> only asks the server whether it's up, and doesn't send anything.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <p><strong>Hooks only activate on the <em>next</em> session.</strong> <code>claude-sync.sh</code> (and <code>onboard.sh</code>, which runs
 it) install the hooks — symlinking <code>~/.claude/hooks</code> and registering them in

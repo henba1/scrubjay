@@ -1295,6 +1295,22 @@ editing needed:</p>
 <td>ring the terminal bell when an agent finishes a turn or asks for a permission (<a href="../day-to-day/#notifications">Notifications</a>)</td>
 </tr>
 <tr>
+<td><code>SCRUBJAY_NTFY_URL=&lt;url&gt;</code>, <code>SCRUBJAY_NTFY_TOPIC=&lt;topic&gt;</code></td>
+<td>your ntfy server and topic: push to your phone when an agent waits and nobody is attached. The topic is a secret, so keep it in the config file (<a href="../day-to-day/#push-to-your-phone">Push to your phone</a>)</td>
+</tr>
+<tr>
+<td><code>SCRUBJAY_NTFY_TOKEN=&lt;token&gt;</code></td>
+<td>an ntfy access token, sent as a bearer token (optional)</td>
+</tr>
+<tr>
+<td><code>SCRUBJAY_PUSH=detached</code></td>
+<td>when to push: <code>detached</code> (the default once URL and topic are set) only for agents in a tmux session nobody is attached to, <code>always</code> wherever they run, <code>off</code> never</td>
+</tr>
+<tr>
+<td><code>SCRUBJAY_PUSH_MIN_TURN=&lt;secs&gt;</code></td>
+<td>a turn ending is pushed only after this much work (default 300). A permission prompt is always pushed</td>
+</tr>
+<tr>
 <td><code>SCRUBJAY_TURN_PUBLISH=0</code></td>
 <td>publish only at session end, not after every turn (takes effect at the next <code>claude-sync.sh</code>)</td>
 </tr>

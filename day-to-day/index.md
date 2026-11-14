@@ -82,6 +82,36 @@ vim.opt.belloff = { "backspace", "cursor", "complete", "copy", "ctrlg", "error",
 
 Leave Claude Code's own `preferredNotifChannel` unset: it alerts only after you've been away for a while (about 60 s after a turn), and with both on you'd get a second bell later.
 
+### Push to your phone
+
+A bell reaches nobody when you've walked away from an agent running detached in tmux. With an [ntfy](https://ntfy.sh) server of your own, scrubjay also pushes to your phone. Put this in `~/.config/scrubjay/config`:
+
+```
+: "${SCRUBJAY_NTFY_URL:=http://192.168.1.10:8080}"
+: "${SCRUBJAY_NTFY_TOPIC:=<a-long-random-topic>}"
+: "${SCRUBJAY_NTFY_TOKEN:=<an access token, if your server wants one>}"   # optional
+```
+
+Then subscribe to the same topic in the ntfy app on your phone. A push goes out when:
+
+- **An agent stops at a permission prompt** (priority high).
+- **A turn ends after at least `SCRUBJAY_PUSH_MIN_TURN` seconds of work** (default 300). The push carries the first 200 or so characters of the agent's last reply, so you can tell a question from a "please run this" handoff.
+
+By default (`SCRUBJAY_PUSH=detached`) it pushes only for an agent inside a tmux session that no client is attached to. If you're attached, the bell is enough. Set `SCRUBJAY_PUSH=always` to push wherever the agent runs, or `off` to stop pushing. Each push names the host, the project folder, the short session id and the command to get back to it (`tmux attach -t <session>`). A session gets one push per change, and a second push of the same kind within 10 minutes is dropped. The push is sent in the background with a short timeout, so a slow or missing server never holds up the agent.
+
+**The topic is a password.** Anyone who knows it can read your pushes and send you their own. Pick a long random one, keep it in your config only, and use an access token if your server supports them. scrubjay sends the topic in the request body, never on a command line, and never prints it: `sj-doctor` shows only its length.
+
+**Your phone has to reach the server.** If the server is only reachable over a VPN (WireGuard, say), the VPN on the phone has to be always on, or pushes wait until it next connects.
+
+Check it:
+
+```
+bash ~/.claude/hooks/../bin/sj-notify.sh test-push   # sends one now
+bash ~/.claude/hooks/../bin/sj-doctor.sh --push harnesses
+```
+
+Without `--push`, `sj-doctor` only asks the server whether it's up, and doesn't send anything.
+
 ## Troubleshooting
 
 **Hooks only activate on the *next* session.** `claude-sync.sh` (and `onboard.sh`, which runs it) install the hooks — symlinking `~/.claude/hooks` and registering them in `~/.claude/settings.json`. But Claude reads its hooks **at session start**, so a `claude` instance that was *already running* when you onboarded won't see them: its `SessionStart` already fired, with no hooks to load. **Quit and reopen `claude`** after onboarding — only sessions started afterwards run `SessionEnd` (the transcript/subagents/plans relay + log/index push). This is the usual reason a freshly-onboarded machine "ships nothing".
