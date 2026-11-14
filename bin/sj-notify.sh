@@ -144,7 +144,7 @@ push() {  # push <sid> <state> <pid|-> <cwd|-> <turn-seconds>
   proj="$(basename "${cwd:-?}")"
   # The front door's own way back, once there is one (bin/sj.sh); tmux's otherwise.
   if [ -z "$session" ]; then how="not in tmux (pid ${pid:-?})"
-  elif [ -f "$APP/bin/sj.sh" ] && grep -q 'attach' "$APP/bin/sj.sh" 2>/dev/null; then how="sj attach $sid"
+  elif [ -f "$APP/bin/sj.sh" ] && grep -q 'attach' "$APP/bin/sj.sh" 2>/dev/null; then how="sj attach ${sid:0:8}"
   else how="tmux attach -t $session"; fi
   if [ "$kind" = waiting ]; then
     title="$proj on $(sj_host): waiting for a permission"

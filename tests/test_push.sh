@@ -94,7 +94,7 @@ assert_eq "to the topic" "$TOPIC" "$(jq -r .topic <<<"$b")"
 assert_eq "priority high" 4 "$(jq -r .priority <<<"$b")"
 assert_contains "the title says what it waits for" "$(jq -r .title <<<"$b")" "w on testhost: waiting for a permission"
 assert_contains "names the session" "$(jq -r .message <<<"$b")" "session: ${S:0:8} · tmux sj-w"
-assert_contains "and how to get to it" "$(jq -r .message <<<"$b")" "attach: tmux attach -t sj-w"
+assert_contains "and how to get to it: the front door, sj, now that it exists" "$(jq -r .message <<<"$b")" "attach: sj attach 11111111"
 assert_contains "and the folder" "$(jq -r .message <<<"$b")" "folder: /w"
 assert_contains "POSTed to the server's root" "$(cat "$SANDBOX/pushes/args.1")" "http://ntfy.example:8080/"
 case "$(cat "$SANDBOX/pushes/args.1")" in *"$TOPIC"*) _no "the topic is not on the command line" "it was" ;; *) _ok "the topic is not on the command line" ;; esac
