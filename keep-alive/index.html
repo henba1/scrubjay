@@ -1228,6 +1228,10 @@ a small box that runs out of memory resets. So <code>bin/sj-reap.sh</code> runs 
 <td>idle while memory is short (RAM available &lt; 15 % or swap &gt; 70 % used)</td>
 <td>at 12 h, oldest first, until it isn't</td>
 </tr>
+<tr>
+<td>an empty pane: the agent already exited (an OOM killer, a crash) and sj-keep holds its last screen open for you to read</td>
+<td>after 1 h without output (<code>SCRUBJAY_REAP_EMPTY_AFTER</code>); the screen goes to <code>~/.scrubjay/run/reaped/&lt;session&gt;-&lt;time&gt;.txt</code> first</td>
+</tr>
 </tbody>
 </table>
 <p>Before it stops one, it saves what only the running process holds:</p>
