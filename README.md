@@ -81,6 +81,14 @@ right conversation into your current one.
 /sjrecall that auth timeout fix
 ```
 
+**See everything at once.** Every session from every machine and agent, in one browser page. See
+what is still running, what each session changed, and when the work happened, then continue any of
+it or brief a new session on several old ones.
+
+```sh
+/sjview
+```
+
 **Move between agents.** You started in opencode and want to continue in Claude Code (or the other
 way round). `/sjresume` carries the whole conversation across and seeds a fresh session with it.
 Be clear on what this is: same-agent hand-off resumes the *actual* session, id and tool history
@@ -188,6 +196,7 @@ Full docs — [**henba1.github.io/scrubjay**](https://henba1.github.io/scrubjay/
 - [**Day-to-day**](https://henba1.github.io/scrubjay/day-to-day/) — the hooks that keep it hands-off, finding a past chat, troubleshooting.
 - [**Query the archive (MCP)**](https://henba1.github.io/scrubjay/archive-mcp/) — recall a past session by *topic* from inside a live Claude session.
 - [**Slash commands**](https://henba1.github.io/scrubjay/slash-commands/) — the `/sj*` command reference.
+- [**Session viewer**](https://henba1.github.io/scrubjay/session-viewer/) — `/sjview`: your sessions as a map and a timeline.
 - [**Transcripts: relay + NAS**](https://henba1.github.io/scrubjay/transports/) — the peer-to-peer paths (WireGuard / SSH) to your own NAS.
 - [**Reference**](https://henba1.github.io/scrubjay/reference/) — the by-hand command cheatsheet and environment toggles.
 

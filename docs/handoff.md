@@ -43,7 +43,7 @@ It finds the session, stages it here exactly as `/sjresume` would, and then runs
    it was recorded in exists here too and you're somewhere else, it says so: `cd` there and re-run
    if that's where you meant to continue.
 
-If the session's folder has moved and the [moves ledger](slash-commands.md#the-session-map) knows
+If the session's folder has moved and the [moves ledger](session-viewer.md#a-path-that-moved) knows
 where, it continues there, wherever you are standing. A hand-off on the machine that recorded the
 session also rewrites any other moved path it finds.
 

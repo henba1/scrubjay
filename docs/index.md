@@ -42,6 +42,7 @@ including inside your company, just don't resell it as a competing product. See
 - **[Query the archive (MCP)](archive-mcp.md)** — recall a past session by *topic* from
   inside a live Claude session via the read-only `sjmcp` server.
 - **[Slash commands](slash-commands.md)** — the `/sj*` command reference.
+- **[Session viewer](session-viewer.md)** — `/sjview`: your sessions as a map and a timeline.
 - **[Transcripts: relay + NAS](transports.md)** — how sessions ride peer-to-peer to
   your own NAS, and the two P2P paths (WireGuard / SSH).
 - **[Reference](reference.md)** — the by-hand command cheatsheet and environment toggles.
