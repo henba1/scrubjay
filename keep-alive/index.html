@@ -1198,6 +1198,12 @@ and tells you how to install, never something it installs as root for you.</p>
   <code>opencode serve</code>, <code>opencode run</code>, <code>codex exec</code>, <code>--version</code> and other subcommands run directly.
   So does anything launched without a terminal (scripts, pipes, cron) or from inside tmux, so an
   existing tmux habit is left alone.</li>
+<li><strong>A second copy of a conversation is flagged at once.</strong> Whenever a session starts, the
+  SessionStart hook <code>hooks/dupe-guard.sh</code> checks whether the same conversation is still running in
+  another process (a resume while the first copy ran on). If it is, you see where it runs and how to
+  attach to it, and the agent is told to raise it before doing any work, because two copies diverge
+  and redo each other's work. This covers every launch path, including plain terminals and IDEs, not
+  only <code>sj-keep</code>'s own offer.</li>
 <li><strong>Your environment comes along.</strong> The agent sees the variables of the shell you launched it
   from, even when the tmux server was started days earlier with different ones.</li>
 <li><strong>It never blocks a launch.</strong> With no tmux installed, or a tmux that can't start a session, you
