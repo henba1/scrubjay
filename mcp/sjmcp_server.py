@@ -151,7 +151,57 @@ def _turns(md: Path) -> int | None:
 # ── enumeration ────────────────────────────────────────────────────────────────────────────
 
 
+def _first_line(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.readline().strip()
+    except OSError:
+        return ""
+
+
+def _split_superseded(arts: list[Artifact]) -> tuple[list[Artifact], set[str]]:
+    """One readable per session: (kept, paths of stale copies).
+
+    A readable file's NAME can move while its session grows: the topic in it falls back to the first
+    slash command until the session has a prose prompt (bin/lib.sh sj_session_topic), so a session
+    that opened with `/clear` is first filed as `…_clear__<sid8>.md` and later under its real topic.
+    The receiver is write-only for every relay key, so the shipper cannot delete the old name, and
+    it lingers as a truncated copy under the same handle. resolve_ref then returned whichever copy
+    it iterated onto first — the stale one, here — and list/recall showed both.
+
+    Two copies are the same session when they share host + handle AND their first line, which is
+    the rendering's `# <first user prompt>` title: a session's first turn never changes as it grows,
+    while two different sessions that happen to share an 8-char prefix will not share it. Of such a
+    group the most recently written copy is kept. Anything without a handle is never grouped.
+    """
+    groups: dict[tuple[str, str], list[Artifact]] = {}
+    for a in arts:
+        if a.sid:
+            groups.setdefault((a.host, a.sid), []).append(a)
+    stale: set[str] = set()
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        by_title: dict[str, list[Artifact]] = {}
+        for a in members:
+            by_title.setdefault(_first_line(a.path), []).append(a)
+        for title, same in by_title.items():
+            if not title or len(same) < 2:
+                continue
+            newest = max(same, key=lambda a: os.path.getmtime(a.path))
+            stale.update(a.path for a in same if a is not newest)
+    return [a for a in arts if a.path not in stale], stale
+
+
 def _iter_transcripts(r: Roots) -> list[Artifact]:
+    return _split_superseded(_iter_transcripts_raw(r))[0]
+
+
+def _superseded_transcripts(r: Roots) -> set[str]:
+    return _split_superseded(_iter_transcripts_raw(r))[1]
+
+
+def _iter_transcripts_raw(r: Roots) -> list[Artifact]:
     out: list[Artifact] = []
     if not r.chats:
         return out
@@ -389,9 +439,12 @@ def resolve_ref(ref: str, r: Roots) -> Path | None:
     # On a miss we still fall through rather than return: a bare word is a plausible relative path.
     if _SID8.fullmatch(ref) or _SID_FULL.fullmatch(ref):
         want = {ref.lower(), _handle(ref)}
-        for a in _iter_transcripts(r):
-            if a.sid.lower() in want:
-                return Path(a.path)
+        # Stale copies of a session are already gone (_split_superseded). What can remain is a real
+        # collision — two sessions sharing an 8-char handle — and then the most recent one is the
+        # better guess than whichever sorts first; the full id is how to ask for the other.
+        hits = [a for a in _iter_transcripts(r) if a.sid.lower() in want]
+        if hits:
+            return Path(max(hits, key=lambda a: os.path.getmtime(a.path)).path)
     p = Path(ref).expanduser()
     if p.is_absolute():
         return _confined(p, r) if p.exists() else None
@@ -944,6 +997,11 @@ def core_recall(query, host=None, project=None, since=None, k=8, r=None):
                 hit["terms"].add(term.lower())
             elif len(f["hits"]) < _MAX_TRACKED_LINES:
                 f["hits"][lineno] = {"text": text.strip()[:240], "terms": {term.lower()}}
+
+    # A stale copy of a session (see _split_superseded) is not a separate result: drop its hits,
+    # the current copy carries its own.
+    for path in _superseded_transcripts(r) & per_file.keys():
+        del per_file[path]
 
     # Fold in the session-log catalogue. A topic match in the log keys onto the *transcript* when
     # one exists here (so a session surfaces even if only its first-prompt/topic matched, not its

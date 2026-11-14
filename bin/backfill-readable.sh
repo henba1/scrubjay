@@ -21,7 +21,14 @@
 # project is the session's origin (sj_session_origin), and a same-topic, same-handle copy under any
 # other project of the same host is a stale duplicate too.
 #
-# Nothing else is ever removed — a name that does not match on BOTH topic and handle is left alone.
+# And the TOPIC part. Until a session has a prose prompt its topic falls back to the first slash
+# command (sj_session_topic), so a session that opened with `/clear` was first shipped as
+# `…_clear__<sid8>.md` and later under its real topic — a third name for one session. A copy with a
+# DIFFERENT topic is pruned only when it is provably the same session: same host, same handle, and
+# the same first line, which is the rendering's `# <first user prompt>` title. A session's first turn
+# never changes as it grows; two sessions that merely share an 8-char prefix will not share it.
+#
+# Nothing else is ever removed — a file that matches neither rule is left alone.
 # --no-prune renders without deleting anything.
 set -uo pipefail
 APP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; . "$APP/bin/lib.sh"; sj_load_config
@@ -52,8 +59,17 @@ while IFS= read -r f; do
     [ "$old" = "$out" ] && continue
     rm -f -- "$old" && pruned=$((pruned+1))
   done
+  # Topic drift: same handle, other topic, but the same first line (title) as what was just rendered.
+  handle="${stem##*__}"; title="$(head -n 1 "$out")"
+  [ -n "$title" ] || continue
+  for old in "$root/$host/readable"/*/*__"$handle".md; do
+    [ -e "$old" ] || continue
+    [ "$old" = "$out" ] && continue
+    [ "$(head -n 1 "$old")" = "$title" ] || continue
+    rm -f -- "$old" && pruned=$((pruned+1))
+  done
 done < <(find "$root" -type f -name '*.jsonl' \
               ! -path '*/readable/*' ! -path '*/subagents/*' ! -name 'agent-*')
 printf 'rendered %d transcript(s) into */readable/ under %s' "$n" "$root"
-[ "$pruned" -gt 0 ] && printf ' (pruned %d stale duplicate(s) left by an earlier date or project in the name)' "$pruned"
+[ "$pruned" -gt 0 ] && printf ' (pruned %d stale duplicate(s) left by an earlier date, project or topic in the name)' "$pruned"
 printf '\n'
