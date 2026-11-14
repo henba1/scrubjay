@@ -73,6 +73,39 @@ Things that are worth knowing:
   get one line on stderr and the agent runs unprotected, as before.
 - **Any other agent, by hand:** `~/.scrubjay/scrubjay/bin/sj-keep.sh -- pi`.
 
+### Stray agents are reaped
+
+A kept agent costs a few hundred MB for as long as it runs, also when you never come back to it, and
+a small box that runs out of memory resets. So `bin/sj-reap.sh` runs from cron every 15 minutes
+(onboarding installs it with `SCRUBJAY_KEEP` on; by hand: `sj-reap.sh install`) and stops strays:
+
+| Stray | When |
+|---|---|
+| detached and idle | warned at 12 h (`reap.log`, once), stopped at 24 h |
+| a duplicate copy of one conversation (a resume while the first copy ran on) | 30 min after that copy's last own activity; the attached copy, else one outside tmux, else the newest, is kept |
+| idle while memory is short (RAM available < 15 % or swap > 70 % used) | at 12 h, oldest first, until it isn't |
+
+Before it stops one, it saves what only the running process holds:
+
+1. The tmux pane's screen and scrollback, including a prompt you typed but never sent. It goes to
+   `<sid>/reaped-<time>.txt` beside the transcript, so the relay carries it with the session.
+2. It publishes the session the way `/sjlog` does, since SessionEnd won't fire.
+3. It sends SIGTERM, then SIGKILL after 30 s, and closes the pane.
+4. It writes a line to `~/.scrubjay/run/reap.log` with the command to resume. With
+   `SCRUBJAY_REAP_NOTIFY=<command>` set, that command gets the same line.
+
+Never stopped: anything outside an `sj-*` session, an attached session, a turn in progress, a
+permission prompt, a background shell still running, or a session whose transcript, subagents or
+background tasks were written to recently. Idle time counts from the transcript's last *record*, not
+the file's mtime, which other tools touch.
+
+```sh
+~/.scrubjay/scrubjay/bin/sj-reap.sh ls             # every agent here: idle age and verdict
+~/.scrubjay/scrubjay/bin/sj-reap.sh run --dry-run  # what the next run would do
+```
+
+`SCRUBJAY_REAP=warn` only logs. `off` turns it off.
+
 ### Optional: a friendlier tmux
 
 tmux works without a config file. Two settings make it feel more like a normal terminal:

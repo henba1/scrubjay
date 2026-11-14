@@ -332,6 +332,13 @@ if [ "${_shell_hook:-0}" = 1 ] && [ -f "$CFG" ] && ! grep -q 'SCRUBJAY_KEEP' "$C
     echo ": \"\${SCRUBJAY_KEEP:=$_keep}\"" >> "$CFG"
     ok "agents launched over SSH will run inside tmux (SCRUBJAY_KEEP=$_keep)"
     have tmux || warn "tmux is not installed, so until it is, agents still end with the terminal: $(sj_install_hint tmux)"
+    # Kept agents nobody returns to hold memory until they are stopped: the reaper (bin/sj-reap.sh).
+    if have crontab; then
+      bash "$APP/bin/sj-reap.sh" install >/dev/null 2>&1 &&
+        ok "stray kept agents are saved and stopped after 24 h idle (bin/sj-reap.sh, cron every 15 min)"
+    else
+      warn "no crontab here: stray kept agents are not reaped; run 'bin/sj-reap.sh run' from your scheduler"
+    fi
   else
     info "Skipped. Later: add ': \"\${SCRUBJAY_KEEP:=ssh}\"' to $(sj_pretty_path "$CFG")"
   fi
