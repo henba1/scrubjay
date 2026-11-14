@@ -7,6 +7,8 @@
 # the running process, and then stops them.
 #
 #   usage: sj-reap.sh ls                 every agent process here, its idle age and what would happen
+#          sj-reap.sh rows               the same as TSV, for bin/sj.sh: "agent" + the judged row, "empty" + an
+#                                        exited pane (see judge and empties below)
 #          sj-reap.sh run [--dry-run]    act on it (what cron runs every 15 minutes)
 #          sj-reap.sh install|uninstall  the cron line
 #
@@ -347,8 +349,19 @@ ls_cmd() {
 
 cron_line() { printf '*/15 * * * * PATH=%s bash %s run >/dev/null 2>&1 %s' "$PATH" "$APP/bin/sj-reap.sh" "$MARK"; }
 
+# rows_cmd — what ls shows, for a program: bin/sj.sh (`sj ls`) builds its table on it, so there is one
+# reading of "which agent runs in which pane" and not two that drift apart.
+rows_cmd() {
+  local all
+  all="$(judge "$(rows)")"
+  [ -n "$all" ] && printf '%s\n' "$all" | sed "s/^/agent$TAB/"
+  empties | sed "s/^/empty$TAB/"
+  return 0
+}
+
 case "${1:-}" in
   ls) ls_cmd ;;
+  rows) rows_cmd ;;
   run) shift; run "$@" ;;
   install)
     sj_has "$CRONTAB" || { echo "sj-reap: no crontab here; run 'sj-reap.sh run' from your scheduler instead" >&2; exit 1; }
@@ -357,5 +370,5 @@ case "${1:-}" in
     sj_has "$CRONTAB" || exit 0
     "$CRONTAB" -l 2>/dev/null | grep -vF "$MARK" | "$CRONTAB" - && echo "sj-reap: cron line removed" ;;
   -h|--help|'') awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0" | sed -n '4,40p' ;;
-  *) echo "sj-reap: unknown command '$1' (ls, run, install, uninstall)" >&2; exit 2 ;;
+  *) echo "sj-reap: unknown command '$1' (ls, rows, run, install, uninstall)" >&2; exit 2 ;;
 esac

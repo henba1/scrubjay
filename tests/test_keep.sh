@@ -171,6 +171,8 @@ here sj-claude-my-project-old
 case "$(dec --as claude -- claude -c)" in *offer*) _no "not a name that merely starts the same" "offered" ;; *) _ok "not a name that merely starts the same" ;; esac
 here sj-claude-my-project sj-claude-my-project-3
 assert_contains "the newest of several" "$(dec --as claude -- claude -c)" "offer sj-claude-my-project-3"
+here sj-claude-my-project
+case "$(dec --as claude --no-offer -- claude -c)" in *offer*) _no "--no-offer: not asked (sj resume looked by id)" "offered" ;; *) _ok "--no-offer: not asked (sj resume looked by id)" ;; esac
 
 here sj-claude-my-project; : > "$SANDBOX/agent.calls"; rm -f "$SANDBOX/tmux.new" "$SANDBOX/tmux.attach"
 out="$(echo | ex bash "$KEEP" --as claude -- agent -c 2>&1)"

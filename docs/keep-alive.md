@@ -33,6 +33,62 @@ macOS. Every package manager already carries it, and most servers and HPC login 
 installed. So scrubjay treats it like `rsync` or `uv`: an optional dependency it detects, reports
 and tells you how to install, never something it installs as root for you.
 
+## Finding and resuming sessions: `sj`
+
+**`sj` is the way to find a session and get back into it**, wherever it runs. It is a shell function
+from the [shell integration](handoff.md#from-a-terminal-claude-resume-sid) (`bin/sj.sh`; without the
+integration, run `~/.scrubjay/scrubjay/bin/sj.sh` by path).
+
+```sh
+sj ls                  # every agent on every machine: host, sid, state, idle, tmux session, folder, topic
+sj attach <name|sid8>  # back into a running one: tmux here, or ssh -t <host> tmux attach there
+sj resume <sid8>       # continue one, by whichever path fits, and it says which
+```
+
+```text
+HOST       SID      STATE    IDLE    TMUX                           FOLDER               TOPIC
+laptop     9eaf6b3c working  0m      sj-claude-widget-api*          widget-api           Retry backoff fix
+laptop     7499b331 idle     4h35m   sj-claude-widget-api-2         widget-api           Rate limiter tests
+nas        8051500c idle     4h24m   as of 18:00                    infra                Cert renewal
+laptop     f7b8250f reaped   1h29m   -                              docs-site            Docs rewrite
+* attached   as of: a relayed snapshot from that host's last publish, its process not checked
+
+stopped by sj-reap (its screen was saved first):
+  2026-11-14 20:55 f7b8250f sj-claude-docs-site          idle 1d6h                sj resume f7b8250f
+```
+
+States: `working` (mid-turn), `waiting` (at a permission prompt), `idle` (its turn is over), `ended`
+(closed cleanly), `exited` (the process went without saying so, or its pane is held open after a
+crash), `reaped` (stopped by [the reaper](#stray-agents-are-reaped)). Rows from this machine come
+from the harness's process registry and tmux, as `sj-reap.sh` reads them. Rows from other machines
+come from the leases they relay into the archive with each publish, the ones `/sjview` shows, so they
+say **as of** when that host last published: sj can't ask a process on another machine whether it
+is still there. A machine with no filesystem view of the archive (`rsync-wg`) shows only itself.
+Ended and exited sessions are listed for a day (`SCRUBJAY_SJ_RECENT`, seconds).
+
+`sj resume <sid8>` takes the first of these that applies:
+
+1. **Running here in tmux:** it attaches. A fresh resume would load the conversation into a second
+   process, and the two would diverge.
+2. **Running on another machine** (its last relayed lease says so): it asks whether to attach there
+   over ssh or hand it off anyway, warning that the copy there won't see the new turns.
+3. **Stopped, transcript here:** `cd <its folder> && claude --resume <sid>`.
+4. **Not on this machine:** the [cross-machine hand-off](handoff.md), `claude resume <sid>`.
+
+It won't start a second copy of a live session without `--force`, and that includes one running here
+outside tmux, in a plain terminal you can't attach to. An ambiguous prefix lists the candidates.
+
+**Other machines are reached by their SSH alias.** When the scrubjay host name is also a `Host`
+alias in `~/.ssh/config`, that works as it is. Otherwise name it, e.g.
+`SCRUBJAY_SSH_HOSTS="nas=nas-lan laptop=laptop.wg"` in `~/.config/scrubjay/config`. With neither, sj
+prints the command to run on that machine instead of guessing. Attaching there asks that machine's
+own `sj where <sid>` which tmux session holds it, so it needs a current scrubjay there too.
+
+What it wraps, if you'd rather type them: `tmux attach -t <name>`, `claude -c` / `claude --resume
+<sid>`, `claude resume <sid>` and `/sjresume` (hand-off), and `sj-reap.sh ls` / `sj-keep.sh ls`
+(what runs here). An `sj` command, alias or function of your own wins: the integration doesn't define
+one then, and `bin/sj.sh` still works by path.
+
 ## Using it
 
 Start an agent exactly as before:
@@ -45,8 +101,8 @@ claude                       # now inside tmux session sj-claude-widget-api
 | To… | Do |
 |---|---|
 | leave it running on purpose | `Ctrl-b` then `d` (detach), or close the terminal |
-| see what's running here | `~/.scrubjay/scrubjay/bin/sj-keep.sh ls` (or `tmux ls`) |
-| go back in | `tmux attach -t sj-claude-widget-api` |
+| see what's running, here and elsewhere | `sj ls` |
+| go back in | `sj attach sj-claude-widget-api` (or its sid8; plain `tmux attach -t …` works too) |
 | switch between kept sessions while attached | `Ctrl-b` then `s`, pick one |
 | scroll back through output | `Ctrl-b` then `[`, arrows or PgUp, `q` to leave (or turn the mouse on, below) |
 | end it | quit the agent as usual; the session closes with it |

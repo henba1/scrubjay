@@ -5,7 +5,7 @@
 # Keep an agent running when the terminal goes away: run it inside a named tmux session, so closing
 # the SSH connection detaches it instead of hanging it up mid-turn.
 #
-#   usage: sj-keep.sh [--as <harness>] [--force] [--explain] -- <cmd> [args…]
+#   usage: sj-keep.sh [--as <harness>] [--force] [--no-offer] [--explain] -- <cmd> [args…]
 #          sj-keep.sh ls                   the sj-* sessions on this machine, and how to reattach
 #
 # bin/sj-shell.sh routes the interactive `claude`, `opencode` and `codex` commands through here;
@@ -28,7 +28,9 @@
 # that is almost always the agent you are coming back to, still running. A fresh resume would load
 # the same conversation into a second process: it misses whatever the first one did after you left,
 # and both keep writing to one transcript. So it asks first, "attach to it instead? [Y/n]". Enter
-# attaches; n (or no answer, e.g. a closed stdin) starts the new session as before.
+# attaches; n (or no answer, e.g. a closed stdin) starts the new session as before. --no-offer skips
+# the question: bin/sj.sh passes it, because `sj resume` has already looked for that session by its
+# id, which is a better guess than "something detached in this folder".
 set -uo pipefail
 
 SELF="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
@@ -71,18 +73,19 @@ if [ "${1:-}" = ls ]; then
   exit 0
 fi
 
-as="" force=0 explain=0
+as="" force=0 explain=0 offer=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --as)      as="${2:-}"; shift 2 ;;
     --force)   force=1; shift ;;
+    --no-offer) offer=0; shift ;;
     --explain) explain=1; shift ;;
     --)        shift; break ;;
     -h|--help) awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$SELF"; exit 0 ;;
     *)         echo "sj-keep: unknown flag '$1' (the command goes after --)" >&2; exit 2 ;;
   esac
 done
-[ $# -gt 0 ] || { echo "usage: sj-keep.sh [--as <harness>] [--force] [--explain] -- <cmd> [args…]" >&2; exit 2; }
+[ $# -gt 0 ] || { echo "usage: sj-keep.sh [--as <harness>] [--force] [--no-offer] [--explain] -- <cmd> [args…]" >&2; exit 2; }
 
 # interactive <harness> <args…> — 0 when this is a launch of the harness's TUI, the thing worth keeping
 interactive() {
@@ -179,7 +182,7 @@ if [ "${SJ_KEEP_ASSUME_TTY:-0}" = 1 ] || { [ -t 0 ] && [ -t 1 ]; }; then on_tty=
 verdict="$(decide "$@")"
 # A resume with the agent still running here, detached: offer that session (see the header).
 left=""
-if [ "$verdict" = wrap ] && resume_launch "$@"; then left="$(detached_here "$(session_base "$@")")"; fi
+if [ "$offer" = 1 ] && [ "$verdict" = wrap ] && resume_launch "$@"; then left="$(detached_here "$(session_base "$@")")"; fi
 if [ "$explain" = 1 ]; then
   [ -n "$left" ] && echo "offer $(printf '%s\n' "$left" | head -n 1)"
   if [ "$verdict" = wrap ]; then echo "wrap $(session_name "$@")"; else echo "$verdict"; fi

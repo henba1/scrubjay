@@ -109,6 +109,25 @@ ls ~/.scrubjay/scrubjay-memory/*/notes/                                    # wha
 Notes land in `<memory>/<project>/notes/` and publish immediately. They are **not** loaded into
 future sessions — read them back with `/sjrecall`, `/sjbrowse note`, or `sj_list(type="note")`.
 
+## Find and resume a session: `sj`
+
+The one command for getting back into a session, wherever it runs or ran. Installed with the
+[shell integration](handoff.md#from-a-terminal-claude-resume-sid); by path it is
+`~/.scrubjay/scrubjay/bin/sj.sh`.
+
+```sh
+sj ls                          # every agent on every machine: state, idle, tmux session, folder, topic
+sj attach <tmux-name|sid8>     # tmux attach here, or ssh -t <host> tmux attach on the machine running it
+sj resume <sid8>               # attach if it still runs, else claude --resume in its folder, else hand it off
+sj resume --force <sid8>       # start a second copy although one is live (they diverge)
+sj where <sid8>                # the tmux session holding it on this machine
+```
+
+It wraps `tmux attach`, `claude -c` / `--resume`, `claude resume <sid>`, `/sjresume` and
+`sj-reap.sh ls`. Other hosts are reached by SSH alias: the host name when it is a `Host` in
+`~/.ssh/config`, or `SCRUBJAY_SSH_HOSTS="host=alias …"`. Details: [Keeping agents
+alive](keep-alive.md#finding-and-resuming-sessions-sj).
+
 ## Continue another machine's chat here
 
 Stage it, then resume with Claude Code's own picker — see [handoff.md](handoff.md).
@@ -132,8 +151,8 @@ claude resume <sid8>                               # also: claude --resume <sid8
 ```sh
 echo ': "${SCRUBJAY_KEEP:=ssh}"' >> ~/.config/scrubjay/config   # needs tmux on this machine
 claude                                      # runs inside tmux session sj-claude-<folder>
-~/.scrubjay/scrubjay/bin/sj-keep.sh ls      # what's running here
-tmux attach -t sj-claude-<folder>           # back in; Ctrl-b d to detach again
+sj ls                                       # what's running, here and on your other machines
+sj attach sj-claude-<folder>                # back in (or its sid8); Ctrl-b d to detach again
 ```
 
 Setup, what is and isn't wrapped, and a short tmux primer: [Keeping agents alive](keep-alive.md).
@@ -161,6 +180,8 @@ editing needed:
 | `SCRUBJAY_NORECONCILE=1` | don't sweep for sessions that ended without a clean exit |
 | `SCRUBJAY_REAP=on` | stop stray kept agents after saving their screen and publishing them: detached and idle 24 h (warned at 12 h), a duplicate copy of one conversation quiet 30 min, idle 12 h under memory pressure. `warn` only logs, `off` never runs. Thresholds `SCRUBJAY_REAP_WARN`/`_AFTER`/`_DUP_AFTER` (seconds). See [Keeping agents alive](keep-alive.md#stray-agents-are-reaped) |
 | `SCRUBJAY_KEEP=ssh` | run interactive agents inside tmux when launched over SSH, so closing the terminal doesn't kill them (`always`: whenever outside tmux; default `off`). See [Keeping agents alive](keep-alive.md) |
+| `SCRUBJAY_SSH_HOSTS="<host>=<alias> …"` | the SSH alias `sj attach` / `sj resume` use to reach a host whose scrubjay name is not itself an alias in `~/.ssh/config` |
+| `SCRUBJAY_SJ_RECENT=<s>` | how far back `sj ls` lists ended and exited sessions (default 86400, a day) |
 | `SCRUBJAY_VIEW_PORT=<n>` | the port `/sjview` listens on (default 7787; the next free one if taken) |
 | `SCRUBJAY_VIEW_NEXTCLOUD=<url>` | your Nextcloud's address: `/sjview` links folders and files it also shows into its Files app (needs the map below) |
 | `SCRUBJAY_VIEW_NEXTCLOUD_MAP=<local>=<remote>` | which local folder Nextcloud shows as which folder, e.g. `/mnt/nas=/NAS`; several split by `;` |

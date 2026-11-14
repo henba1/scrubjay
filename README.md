@@ -71,6 +71,9 @@ it comes back with every turn, the subagents it spawned, its task list, and its 
 Not in a session yet? From a plain terminal, `claude resume da79fffa` (or `claude --resume da79fffa`)
 fetches the session from whichever machine recorded it and opens it — once the shell integration is
 in your rc (`bin/sj-shell-install.sh`; onboarding offers it).
+Not sure where it is, or whether it still runs? `sj ls` lists every agent on every machine, and
+`sj resume da79fffa` picks the way back for you: attach to it where it runs, resume it in its folder,
+or hand it off ([Keeping agents alive](docs/keep-alive.md#finding-and-resuming-sessions-sj)).
 
 **Find the thing you already solved.** Three weeks ago you fixed a nasty auth timeout. You don't
 remember which machine, which repo, or which agent. Ask for it by topic and scrubjay searches every
