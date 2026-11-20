@@ -4,10 +4,13 @@
 
 # sj: one front door for finding a session and getting back into it, wherever it runs.
 #
-#   usage: sj ls                                 every agent on every machine, and its state
+#   usage: sj [pick] [--all] [--live]            a picker: this project's sessions, live and past, on
+#                                                every machine; Enter takes you back into the chosen one
+#          sj ls                                 every agent on every machine, and its state
 #          sj attach <tmux-name|sid|sid8>        back into a running one: tmux here, over ssh elsewhere
 #          sj resume [--force] <sid|sid8> [claude args…]
 #                                                continue one, by whichever path fits (it says which)
+#          sj view [<sid|sid8>|<project>]        the session map in a browser, on that session or project
 #          sj where <sid|sid8>                   the tmux session holding it here (for scripts and ssh)
 #          sj help
 #
@@ -198,6 +201,35 @@ cmd_ls() {
     shown=$((shown + 1)); [ "$shown" -ge 5 ] && break
   done < <(reaped)
   printf '\nattach: sj attach <tmux-name|sid8>   resume: sj resume <sid8>\n'
+}
+
+# ── sj rows: what the picker reads ────────────────────────────────────────────────────────────────
+# L <src> <host> <sid> <state> <ts> <tmux> <attached> <cwd> <pid>   collect's rows, reaped marked
+# C <ts> <host> <sid> <cwd> <topic> <harness> <summary>             the catalogue, newest first
+cmd_rows() {
+  local gone src host sid state ts tmux att cwd pid
+  gone="$(reaped | cut -f2)"
+  while IFS="$TAB" read -r src host sid state ts tmux att cwd pid; do
+    [ -n "$src" ] || continue
+    [ "$src$state" = hereended ] && grep -qxF "$sid" <<<"$gone" && state=reaped
+    printf 'L\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$src" "$host" "$sid" "$state" "$ts" "$tmux" "$att" "$cwd" "$pid"
+  done < <(collect)
+  sj_log_catalogue 2>/dev/null | sed 's/^/C\t/'
+}
+
+cmd_pick() {
+  command -v python3 >/dev/null 2>&1 || { say "the picker needs python3; sj ls lists the sessions"; return 1; }
+  exec python3 "$APP/bin/sj-pick.py" "$@"
+}
+
+# sj view [<sid|sid8>|<project>] — bin/sj-view.sh, opened on a session when given (part of) its id
+cmd_view() {
+  local want="${1:-}" sid
+  [ -n "$want" ] && [ "${want#-}" = "$want" ] && shift || want=""
+  if [ -n "$want" ] && is_sid "$want" && sid="$(pick "$want" "$(collect)")" && [ -n "$sid" ]; then
+    exec bash "$APP/bin/sj-view.sh" start --sid "$sid" "$@"
+  fi
+  exec bash "$APP/bin/sj-view.sh" start ${want:+"$want"} "$@"
 }
 
 # ── resolving what the user typed ────────────────────────────────────────────────────────────────
@@ -422,11 +454,15 @@ usage() { awk 'NR > 4 && /^#/ {sub(/^# ?/, ""); print; next} NR > 4 {exit}' "${B
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
+  pick|p)   cmd_pick "$@" ;;
   ls|list)  cmd_ls ;;
+  rows)     cmd_rows ;;
+  view|v)   cmd_view "$@" ;;
   attach|a) cmd_attach "$@" ;;
   resume|r) cmd_resume "$@" ;;
   where)    cmd_where "$@" ;;
   help|-h|--help) usage ;;
-  '') usage; exit 2 ;;
-  *) echo "sj: unknown command '$cmd' (ls, attach, resume, where, help)" >&2; exit 2 ;;
+  '') if [ -t 0 ] && [ -t 1 ]; then cmd_pick; fi; usage; exit 2 ;;
+  -*) cmd_pick "$cmd" "$@" ;;
+  *) echo "sj: unknown command '$cmd' (pick, ls, attach, resume, view, where, help)" >&2; exit 2 ;;
 esac

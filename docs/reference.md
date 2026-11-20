@@ -116,11 +116,13 @@ The one command for getting back into a session, wherever it runs or ran. Instal
 `~/.scrubjay/scrubjay/bin/sj.sh`.
 
 ```sh
+sj [--all] [--live]            # the picker: this project's sessions, live and past; Enter goes back in
 sj ls                          # every agent on every machine: state, idle, tmux session, folder, topic
 sj attach <tmux-name|sid8>     # tmux attach here, or ssh -t <host> tmux attach on the machine running it
 sj resume <sid8>               # attach if it still runs, else claude --resume in its folder, else hand it off
 sj resume --force <sid8>       # start a second copy although one is live (they diverge)
 sj where <sid8>                # the tmux session holding it on this machine
+sj view [<sid8>|<project>]     # the session map in a browser, on that session or project
 ```
 
 It wraps `tmux attach`, `claude -c` / `--resume`, `claude resume <sid>`, `/sjresume` and

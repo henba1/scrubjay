@@ -220,6 +220,23 @@ assert_contains "not here: the cross-machine hand-off" "$out" "not on this machi
 assert_eq "staged and resumed on the full id, here" "$work|--resume 11111111-2222-4333-8444-555555555555" "$(calls claude)"
 rm -f "$SCRUBJAY_DATA/logs/otherhost.log"
 
+section "sj rows: what the picker reads"
+reset
+agent "$A" idle sj-claude-w 1 >/dev/null
+lease "$SCRUBJAY_LOCAL_CHATS/otherhost/live" "$D" idle 3600
+printf '%s reaped %s pid 1 (sj-claude-old, idle 1d1h) — resume: cd %s && claude --resume %s — screen: /x\n' \
+  "2026-11-14 09:00" "$E" "$work" "$E" > "$SCRUBJAY_RUN_DIR/reap.log"
+lease "$SCRUBJAY_RUN_DIR/live" "$E" ended 300 "$work"
+printf '%s\n' "2026-11-01 10:00 | testhost | $work | \"retry backoff fix\" | session=$B | harness=claude" > "$SCRUBJAY_DATA/logs/testhost.log"
+out="$(bash "$SJ" rows)"
+assert_contains "a live one here, its tmux session and whether attached" "$out" "$(printf 'L\there\ttesthost\t%s\tidle\t' "$A")"
+assert_contains "with its pane's session" "$(grep "$A" <<<"$out")" "$(printf '\tsj-claude-w\t1\t%s\t' "$work")"
+assert_contains "another host's lease" "$out" "$(printf 'L\trelay\totherhost\t%s\tidle\t' "$D")"
+assert_contains "what the reaper stopped says so" "$out" "$(printf '\t%s\treaped\t' "$E")"
+assert_contains "the catalogue, the past ones" "$out" "$(printf 'C\t2026-11-01 10:00\ttesthost\t%s\t%s\tretry backoff fix\tclaude' "$B" "$work")"
+rm -f "$SCRUBJAY_RUN_DIR/reap.log"
+reset
+
 section "help and the shell function"
 assert_contains "help" "$(bash "$SJ" help)" "sj resume [--force]"
 check_fails "no arguments: usage, non-zero" bash "$SJ"

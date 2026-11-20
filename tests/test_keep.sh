@@ -38,7 +38,7 @@ case "$1" in
   attach-session) printf '%s\n' "$3" >> "$SANDBOX/tmux.attach" ;;
   new-session)
     shift; name="" dir=""
-    while [ $# -gt 0 ]; do case "$1" in -s) name="$2"; shift 2 ;; -c) dir="$2"; shift 2 ;; *) break ;; esac; done
+    while [ $# -gt 0 ]; do case "$1" in -s) name="$2"; shift 2 ;; -c) dir="$2"; shift 2 ;; -d) echo detached >> "$SANDBOX/tmux.detached"; shift ;; *) break ;; esac; done
     printf '%s\n' "$name" >> "$SANDBOX/tmux.new"
     printf '%s\n' "$name" >> "$db"      # detached: it is still running afterwards
     # $3 is the env file (SELF --inner <file> -- cmd …)
@@ -209,6 +209,18 @@ rm -f "$SANDBOX/stubbin/opencode"
 # starting with "_" (taken for completion helpers): a wrapper calling one is broken there.
 helpers="$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)() *{.*/\1/p; s/^function \([A-Za-z_][A-Za-z0-9_]*\).*/\1/p' "$APP/bin/sj-shell.sh" | grep '^_' | tr '\n' ' ')"
 assert_eq "no shell function name starts with _" "" "$helpers"
+
+section "--detach: a new session from inside tmux, for the picker's popup"
+: > "$SANDBOX/agent.calls"; rm -f "$SANDBOX/tmux.detached"
+out="$(cd "$work" && TMUX=/tmp/real,1,0 bash "$KEEP" --detach --as claude -- agent --resume X </dev/null 2>/dev/null)"; rc=$?
+assert_eq "exits 0" 0 "$rc"
+assert_contains "prints the new session's name" "$out" "sj-claude-my-project"
+assert_eq "started detached" 1 "$(grep -c . "$SANDBOX/tmux.detached" 2>/dev/null || echo 0)"
+assert_contains "the agent ran, in this folder, with the caller's environment" "$(cat "$SANDBOX/agent.calls")" "args=--resume X FOO="
+assert_contains "in the folder it was asked from" "$(cat "$SANDBOX/agent.calls")" "pwd=$work"
+out="$(cd "$work" && SCRUBJAY_KEEP=off bash "$KEEP" --detach --as claude -- agent </dev/null 2>/dev/null)"
+assert_contains "SCRUBJAY_KEEP is not asked" "$out" "sj-claude-my-project-"
+check_fails "no tmux: fails, runs nothing" env SJ_KEEP_TMUX=sj-no-such-tmux bash "$KEEP" --detach -- agent
 
 section "sj-doctor and the install hint"
 d() { bash "$APP/bin/sj-doctor.sh" harnesses 2>&1; }

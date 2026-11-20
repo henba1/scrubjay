@@ -548,6 +548,9 @@ assert_eq "start: one JSON object, the address in it" true "$(jq -r '.running an
 assert_eq "no SSH here: no tunnel hint" null "$(jq -r .ssh <<<"$j")"
 assert_eq "over SSH: the tunnel to open" "ssh -L $(jq -r .port <<<"$j"):127.0.0.1:$(jq -r .port <<<"$j") testhost" \
   "$(SSH_CONNECTION="10.0.0.1 1 10.0.0.2 22" SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" status --json | jq -r .ssh)"
+j="$(SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" --json --sid "$P")"
+assert_eq "--sid: the address opens that session" "#sid=$P" "#$(jq -r '.url | split("#")[1]' <<<"$j")"
+check_fails "--sid takes an id, nothing else" env SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" --json --sid 'x"y'
 assert_eq "stop" '{"running":false}' "$(SCRUBJAY_RUN_DIR="$R3" bash "$APP/bin/sj-view.sh" stop --json)"
 
 section "a project, even misspelt, opens the map on its lane"

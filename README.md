@@ -71,7 +71,9 @@ it comes back with every turn, the subagents it spawned, its task list, and its 
 Not in a session yet? From a plain terminal, `claude resume da79fffa` (or `claude --resume da79fffa`)
 fetches the session from whichever machine recorded it and opens it — once the shell integration is
 in your rc (`bin/sj-shell-install.sh`; onboarding offers it).
-Not sure where it is, or whether it still runs? `sj ls` lists every agent on every machine, and
+Several sessions in one project and no idea which was which? `sj` opens a picker of the project's
+sessions, live and past, with each one's first and last prompt; Enter takes you back into the chosen
+one. Not sure where it is, or whether it still runs? `sj ls` lists every agent on every machine, and
 `sj resume da79fffa` picks the way back for you: attach to it where it runs, resume it in its folder,
 or hand it off ([Keeping agents alive](docs/keep-alive.md#finding-and-resuming-sessions-sj)).
 
