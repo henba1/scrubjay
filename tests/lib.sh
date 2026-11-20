@@ -48,6 +48,9 @@ sj_sandbox() {
   export SCRUBJAY_AI_TOPIC=0           # never call a real model from a test
   unset CLAUDE_CODE_SESSION_ID SCRUBJAY_SESSION_ID   # run inside Claude Code, the outer session leaks in
   unset SCRUBJAY_NTFY_URL SCRUBJAY_NTFY_TOPIC SCRUBJAY_NTFY_TOKEN SCRUBJAY_PUSH   # never push from a test
+  # never the developer's tmux: a test that switched a client would move their real terminal
+  unset TMUX TMUX_PANE
+  export SJ_KEEP_TMUX=sj-no-such-tmux SJ_STATUS_TMUX=sj-no-such-tmux
   export SCRUBJAY_MEMORY="$SANDBOX/memory"
   export SCRUBJAY_MEMORY_REMOTE=""     # never clone/push a memory repo from a test
   export CLAUDE_CONFIG_DIR="$SANDBOX/home/.claude"

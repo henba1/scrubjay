@@ -6,7 +6,7 @@
 # small local server (view/sj_view.py) in the background and opens it; it stops on `stop`, on the
 # page's Stop button, or by itself after SCRUBJAY_VIEW_IDLE minutes without a request.
 #
-#   usage: sj-view.sh [start] [PROJECT] [--sid SID] [--port N] [--idle MIN] [--no-open] [--json]
+#   usage: sj-view.sh [start] [PROJECT] [--sid SID] [--port N] [--idle MIN] [--no-open] [--json] [--new-token]
 #          sj-view.sh stop | status [--json]
 #
 # PROJECT opens the map on that project alone. It need not be spelled right: it matches a
@@ -18,7 +18,9 @@
 # {"running":false}, and start never opens a browser.
 #
 # Listens on 127.0.0.1 only, port SCRUBJAY_VIEW_PORT (default 7787, the next free one if taken).
-# On a machine you reach over SSH, forward it: ssh -L 7787:127.0.0.1:7787 <host>.
+# On a machine you reach over SSH, forward it: ssh -L 7787:127.0.0.1:7787 <host> (or once for good,
+# LocalForward in ~/.ssh/config). The address stays the same from run to run - its token is kept in
+# <run>/view.token - so a bookmark keeps working; --new-token makes a new one, and the old one dies.
 set -uo pipefail
 
 APP="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,13 +32,14 @@ LOGF="$(sj_progress_dir)/view.log"
 
 cmd=start
 case "${1:-}" in start|stop|status) cmd="$1"; shift ;; esac
-port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0 want="" project="" others="" sid=""
+port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0 newtok=0 want="" project="" others="" sid=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) port="${2:-}"; shift 2 ;;
     --idle) idle="${2:-}"; shift 2 ;;
     --sid) sid="${2:-}"; shift 2 ;;
     --no-open) open=0; shift ;;
+    --new-token) newtok=1; shift ;;
     --json) json=1; open=0; shift ;;
     -h|--help) sed -n '9,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "sj-view: unknown argument: $1" >&2; exit 2 ;;
@@ -136,6 +139,11 @@ if [ -n "$want" ] && [ "$cmd" = start ]; then
   m="$(match_project)"; project="$(sed -n 1p <<<"$m")"; others="$(sed -n 2p <<<"$m")"
 fi
 
+TOKF="$(sj_progress_dir)/view.token"
+if [ "$newtok" = 1 ]; then
+  if running; then kill "$(jq -r '.pid' "$STATE")" 2>/dev/null; for _ in $(seq 50); do running || break; sleep 0.1; done; fi
+  rm -f "$TOKF"
+fi
 if running; then report; open_url "$(url)"; exit 0; fi
 
 command -v python3 >/dev/null 2>&1 || { echo "sj-view: needs python3" >&2; exit 1; }
@@ -157,7 +165,7 @@ for p in "$port" 0; do   # the usual port, else any free one
   SCRUBJAY_DATA="$data" SCRUBJAY_LOCAL_CHATS="$chats" SCRUBJAY_MEMORY="$(sj_memory)" \
   SCRUBJAY_HOST="$(sj_host)" SCRUBJAY_VIEW_NEXTCLOUD="${SCRUBJAY_VIEW_NEXTCLOUD:-}" \
   SCRUBJAY_VIEW_NEXTCLOUD_MAP="${SCRUBJAY_VIEW_NEXTCLOUD_MAP:-}" "${detach[@]}" python3 "$APP/view/sj_view.py" \
-    --port "$p" --idle "$idle" --state "$STATE" >"$LOGF" 2>&1 </dev/null &
+    --port "$p" --idle "$idle" --state "$STATE" --token-file "$TOKF" >"$LOGF" 2>&1 </dev/null &
   pid=$!
   for _ in $(seq 100); do
     [ -f "$STATE" ] && break

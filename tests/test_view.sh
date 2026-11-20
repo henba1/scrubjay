@@ -292,6 +292,29 @@ page="$(curl -s "$URL")"
 assert_contains "the page pans and zooms (drag, wheel, keys, the zoom bar)" "$page" 'id="zoombar"'
 assert_contains "and draws only the cards near the view" "$page" "function cull()"
 
+section "the address stays good across runs; --new-token retires it"
+assert_eq "the token is kept, private" "$SCRUBJAY_RUN_DIR/view.token" "$(find "$SCRUBJAY_RUN_DIR/view.token" -perm 600 2>/dev/null)"
+bash "$APP/bin/sj-view.sh" stop >/dev/null
+bash "$APP/bin/sj-view.sh" --no-open --port "$PORT" >/dev/null 2>&1
+assert_eq "a restart serves the same address" "$URL" "$(jq -r .url "$STATE")"
+bash "$APP/bin/sj-view.sh" --no-open --port "$PORT" --new-token >/dev/null 2>&1
+assert_eq "--new-token: still running, at a new address" true "$(jq -r --arg u "$URL" '.url != $u and (.url | startswith("http://127.0.0.1:"))' "$STATE")"
+assert_eq "  …and the old one is refused" 403 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-SJ-Token: $TOK" "http://127.0.0.1:$(jq -r .port "$STATE")/api/graph")"
+PORT="$(jq -r .port "$STATE")"; URL="$(jq -r .url "$STATE")"; TOK="${URL#*t=}"
+
+section "go there: the picker's Enter, from the page"
+goto() { curl -s -w ' %{http_code}' -H "X-SJ-Token: $TOK" -H 'Content-Type: application/json' -d "$1" "http://127.0.0.1:$PORT/api/goto"; }
+assert_eq "no token: 403" 403 "$(curl -s -o /dev/null -w '%{http_code}' -d "{\"sid\":\"$P\"}" "http://127.0.0.1:$PORT/api/goto")"
+assert_contains "a session nobody catalogued: 400" "$(goto '{"sid":"nope"}')" '"no such session"} 400'
+assert_contains "not a body: 400" "$(goto 'x')" ' 400'
+out="$(goto "{\"sid\":\"$P\"}")"
+assert_contains "a real one goes to the picker, which says what stops it (no tmux here): 409" "$out" ' 409'
+assert_contains "  …in words" "$out" '"error": "'
+page="$(curl -s "$URL")"
+assert_contains "the panel has the button" "$page" 'id="goc"'
+assert_contains "the page reads #status=" "$page" 'h.get("status")'
+assert_contains "and with nothing asked, opens on what is live" "$page" 'want ??= "live"'
+
 section "the map: every session once, forks as edges"
 g="$(get /api/graph)"
 assert_eq "one node per session, earlier rows folded in" 6 "$(jq '.nodes | length' <<<"$g")"

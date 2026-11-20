@@ -138,6 +138,10 @@ aside .summary { font-size: 14px; margin: 8px 0 0; padding: 8px 10px; background
 .dot.s-died { background: var(--closed); border-radius: 2px; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ok) 25%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .dot.s-working { animation: none; } }
+/* the session a link or `sj view <sid>` opened on: a few beats of a wider ring, then the usual one */
+@keyframes arrive { 0%, 100% { box-shadow: 0 0 0 2px var(--h); } 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--h) 35%, transparent); } }
+.card.arrive { animation: arrive .9s ease-in-out 3; }
+@media (prefers-reduced-motion: reduce) { .card.arrive { animation: none; } }
 .card.s-working { border-color: var(--ok); } .card.s-waiting { border-color: var(--wait); }
 /* a context pack: the sessions picked so far, and what starts a new session on them */
 #pack { position: absolute; left: 16px; bottom: 16px; z-index: 6; width: min(460px, calc(100% - 32px)); padding: 8px 10px;
@@ -517,6 +521,7 @@ let LAYOUT = { nodes: [], pos: new Map(), apos: new Map() }, WORLD = { w: 0, h: 
 let laneLabels = [], dayEls = [];
 const cardEl = new Map(), artEl = new Map();
 let lit = new Set(); // the cards and pills the hovered or selected node lights up
+let ARRIVE = ""; // the session the address opened on, flashed once when its card is made
 
 function draw() {
   const canvas = $("canvas"), svg = $("edges");
@@ -679,12 +684,13 @@ async function pollLive() {
     if (now.length !== shown.size || now.some((n) => !shown.has(n.sid))) draw();
   }
 }
-const hasStatus = (sid, want) => want === "active" ? isActive(sid) : LIVE_NOW[sid]?.state === want;
+const isLive = (sid) => isActive(sid) || LIVE_NOW[sid]?.state === "recent";
+const hasStatus = (sid, want) => want === "live" ? isLive(sid) : want === "active" ? isActive(sid) : LIVE_NOW[sid]?.state === want;
 // The status menu, each state with how many sessions are in it now.
 function countLive() {
   const sel = $("status"), keep = sel.value, count = (s) => G.nodes.filter((n) => hasStatus(n.sid, s)).length;
   sel.length = 1;
-  for (const [v, word] of [["active", "active (open here)"], ...Object.entries(LIVE_WORD)]) sel.add(new Option(`${word} (${count(v)})`, v));
+  for (const [v, word] of [["live", "live, here or elsewhere"], ["active", "active (open here)"], ...Object.entries(LIVE_WORD)]) sel.add(new Option(`${word} (${count(v)})`, v));
   sel.value = keep;
 }
 
@@ -777,6 +783,7 @@ function cull() {
       if (!el.isConnected) {
         el.classList.toggle("hl", lit.has(key));
         el.classList.toggle("sel", !!selected && (selected.sid === key || selected.aid === key));
+        el.classList.toggle("arrive", key === ARRIVE);
         if (cache === cardEl) markKin(el, key);
         canvas.appendChild(el);
       }
@@ -980,7 +987,7 @@ async function open(sid) {
         `<p><button id="readc">Read transcript</button> <button id="packc">${PACK.has(n.sid) ? "− Remove from" : "+ Add to"} context pack</button></p>`
       : `<p class="note">Not in the archive on this machine${G.archive ? "" : " (this machine has no archive mounted)"}.` +
         ` Recall it on ${esc(n.host)}.</p>`) +
-    `<h3>Continue it</h3>` + (r.cmd
+    `<h3>Continue it</h3>` + goHere(n) + (r.cmd
       ? `<pre class="cmd" id="rcmd">${esc(r.cmd)}</pre><button id="copy">Copy</button>` +
         (r.where === "here" ? "" : `<p class="note">${esc(r.note)}${r.then ? `, e.g. <code>${esc(r.then)}</code>` : ""}.</p>`)
       : `<p class="note">No resume command for ${esc(n.harness)} sessions.</p>`) +
@@ -989,11 +996,32 @@ async function open(sid) {
       (w.prompts ? ` <span class="note">· ${esc(w.prompts)} prompts</span>` : "")]));
   wire($("dbody"), () => open(sid), n.host);
   if ($("readc")) $("readc").onclick = () => read(n);
+  if ($("goc")) $("goc").onclick = () => goThere(n);
   if ($("packc")) $("packc").onclick = () => togglePack(n.sid);
   if ($("copy")) $("copy").onclick = async () => {
     try { await navigator.clipboard.writeText(r.cmd); $("copy").textContent = "Copied"; }
     catch { getSelection().selectAllChildren($("rcmd")); $("copy").textContent = "Selected — press Ctrl+C"; }
   };
+}
+
+// "Go there": this machine's tmux client (the terminal you last typed in) switches to the session's
+// tmux session, or, for one not running, to a new one that resumes it. bin/sj-pick.py --go decides,
+// exactly as Enter in the picker would, and never starts a second live copy.
+function goHere(n) {
+  if (n.harness !== "claude") return "";
+  const l = LIVE_NOW[n.sid]?.state, here = n.host === G.host;
+  const word = isActive(n.sid) ? "Switch my terminal to it" : l === "recent" && !here ? `Attach to it on ${n.host}` : "Resume it in my terminal";
+  return `<p><button id="goc">${esc(word)}</button> <span class="note" id="gonote">the terminal you last used in tmux on ` +
+    `${esc(G.host || "this machine")}${isActive(n.sid) ? "" : ", in a new tmux session"}</span></p>`;
+}
+async function goThere(n) {
+  const b = $("goc"), note = $("gonote");
+  b.disabled = true; note.textContent = "…";
+  const r = await api("/api/goto", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sid: n.sid }) }).catch(() => ({ error: "the viewer did not answer" }));
+  b.disabled = false;
+  note.textContent = r.ok ? `done: ${r.what} — look at your terminal` : (r.error || r.what || "it did not work");
+  note.className = r.ok ? "note" : "warn";
 }
 
 // Work with no ending, across every repo. Asking the forge takes a moment, so only on request.
@@ -1137,6 +1165,7 @@ document.addEventListener("keydown", (e) => {
   else closePanel();
 });
 for (const id of ["project", "host", "harness", "since", "arts", "empty-too", "status"]) $(id).addEventListener("input", draw);
+$("status").addEventListener("input", () => { try { localStorage.setItem("sj-status", $("status").value || "any"); } catch {} });
 let typing = 0; // the search redraws once typing pauses, not on every key
 $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(draw, 140); });
 
@@ -1710,12 +1739,30 @@ $("stop").onclick = async () => {
   document.body.innerHTML = '<p id="empty">The viewer has stopped. Run <code>/sjview</code> to start it again.</p>';
 };
 // `#sid=<id>` opens a session's panel, `#read=<id>` its transcript, `#art=<id>` an artefact's
-// milestones, `#project=<name>` that project's lane alone, `#view=timeline` that view: links you can keep.
+// milestones, `#project=<name>` that project's lane alone, `#status=<live|active|working|…|any>` that
+// filter, `#view=timeline` that view: links you can keep. With none of them it opens on what is live.
 setInterval(pollLive, 10000);
 load().then(async () => {
   const h = new URLSearchParams(location.hash.slice(1)), sid = h.get("sid") || h.get("read"), aid = h.get("art");
   const proj = h.get("project"), line = G.nodes.find((n) => n.project === proj)?.line || proj;
-  if (proj && [...$("project").options].some((o) => o.value === line)) { $("project").value = line; draw(); }
+  if (proj && [...$("project").options].some((o) => o.value === line)) $("project").value = line;
+  // What is running now, unless the address asks for something (or you chose another status before).
+  let want = h.get("status");
+  if (want === null && !sid && !aid && !proj) { try { want = localStorage.getItem("sj-status"); } catch {} want ??= "live"; }
+  if (want === "any") want = "";
+  if (want && [...$("status").options].some((o) => o.value === want)) $("status").value = want;
+  if (!h.get("status") && $("status").value === "live" && !visible().length) {
+    $("status").value = "";   // nothing runs: the map, not an empty page
+    $("count").dataset.note = "nothing is running now";
+  }
+  // A session asked for by name is shown, whatever the filters would hide.
+  if (sid && bySid.has(sid) && !visible().some((n) => n.sid === sid)) {
+    $("status").value = ""; $("since").value = "0"; $("q").value = "";
+    if (bySid.get(sid).line !== $("project").value) $("project").value = "";
+  }
+  if (sid) { ARRIVE = sid; setTimeout(() => { ARRIVE = ""; cardEl.get(sid)?.classList.remove("arrive"); }, 3000); }
+  draw();
+  if ($("count").dataset.note) $("count").textContent += " · " + $("count").dataset.note;
   let mode = h.get("view");
   try { mode ||= localStorage.getItem("sj-view"); } catch {}
   if (mode === "timeline") setMode(mode);

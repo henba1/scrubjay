@@ -22,6 +22,7 @@ still running, what each session changed and how your projects fit together, the
 |---|---|
 | `/sjview` | Starts the viewer and prints its address |
 | `/sjview <project>` | Opens on one project |
+| `sj view <sid8>`, `sj view <project>` | The same from a terminal, opened on that session or project |
 | `/sjview status` | Says whether it runs, and where |
 | `/sjview stop` | Stops it |
 
@@ -35,7 +36,16 @@ or after 30 minutes without a request. On a machine you reach over SSH, forward 
 ssh -L 7787:127.0.0.1:7787 <host>
 ```
 
-`bin/sj-view.sh` also takes `--port N`, `--idle MIN` (`0` keeps it running) and `--no-open`.
+The address stays the same from one start to the next, so a bookmark keeps working. For a forward
+that is always there, put it in `~/.ssh/config` once:
+
+```text
+Host <host>
+    LocalForward 7787 127.0.0.1:7787
+```
+
+`bin/sj-view.sh` also takes `--port N`, `--idle MIN` (`0` keeps it running), `--no-open`, and
+`--new-token`, which gives it a new address and retires the old one.
 `SCRUBJAY_VIEW_PORT` and `SCRUBJAY_VIEW_IDLE` set the defaults ([reference](reference.md)).
 
 ## Two views of the same sessions
@@ -89,6 +99,10 @@ a card's title, or at the end of a timeline bar.
 
 Only this machine's processes can be asked, so a session on another machine is at best recent.
 
+With no session or project in its address, the map opens on what is **live, here or elsewhere**: open
+here, or recent on another machine. When nothing is, it shows everything and says so. Choose another
+status and this browser remembers it.
+
 The status menu filters by any state, or by all sessions open here, and counts each. It looks past the
 date and **show empty** filters, so a live session is never hidden by its age. Marks and counts refresh
 every 10 seconds.
@@ -129,6 +143,10 @@ Click a session for everything scrubjay holds on it:
 - **Read transcript**, condensed or in full
 - the command that continues it: the harness's own resume for a session from this machine, or
   `sj-resume.sh` first for one from another machine ([hand-off](handoff.md))
+- for a Claude session, a button that takes you there in your terminal: **Switch my terminal to it**
+  when it runs in tmux here, else **Resume it in my terminal**. The tmux client you last typed in
+  switches to the session's tmux session, or to a new one that resumes it. It works the way Enter does
+  in [the picker](keep-alive.md#the-picker), so it never starts a second copy of a live session
 
 ## Connecting projects
 
@@ -228,7 +246,9 @@ empty**.
 | Add to a context pack | Shift+click | Shift+click, or Shift+drag along a lane |
 
 Addresses you can keep end in `#sid=<id>` (a session's panel), `#read=<id>` (its transcript), `#art=<id>`
-(an artefact's milestones), `#project=<name>` (one project) or `#view=timeline`.
+(an artefact's milestones), `#project=<name>` (one project), `#status=<live|active|working|waiting|idle|recent|died|any>`
+or `#view=timeline`. A session asked for by `#sid=` is shown even when the filters would hide it, and its
+card flashes when the map opens on it.
 
 The menu beside **Stop viewer** sets the colours: your system's light or dark, or a preset (Light, Dark,
 Nord, Solarized light and dark, Gruvbox, High contrast, Colour-blind safe). This browser remembers it.
@@ -236,7 +256,8 @@ Nord, Solarized light and dark, Gruvbox, High contrast, Colour-blind safe). This
 ## What it reads and writes
 
 The viewer reads the archive and never changes it. It listens on `127.0.0.1` alone and answers only
-requests carrying the token in the address it prints.
+requests carrying the token in the address it prints. The token is kept in `~/.scrubjay/run/view.token`
+(readable by you alone). Its one action is the panel's go-there button, which only moves your own tmux.
 
 | It writes | Where | Reaches other machines |
 |---|---|---|

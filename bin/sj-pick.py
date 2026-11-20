@@ -6,6 +6,8 @@
     usage: sj-pick.py [--all] [--live] [--cwd DIR] [--popup] [--client NAME]
            sj-pick.py --list [--all] [--live] [--cwd DIR]     the rows, TSV, for scripts and tests
            sj-pick.py --plan SID [--popup] [--client NAME]    what Enter would do with SID
+           sj-pick.py --go SID [--client NAME]                do it, from outside any terminal: the
+                                                              viewer's "go there" (JSON on stdout)
 
 It opens on this project's sessions (the git repository of the folder you are in, worktrees
 included; another machine's sessions count by the repository's name), live ones first, then the
@@ -317,7 +319,8 @@ def plan(s: S, popup: bool, in_tmux: bool) -> Plan:
         what = f"hand it off from the archive{f' ({s.host})' if s.host else ''} and resume it here"
     if popup:
         cwd = s.cwd if s.cwd and os.path.isdir(s.cwd) else os.getcwd()
-        return Plan(what + ", in a new tmux session", "detach", [cwd, *argv])
+        return Plan(what + (", in a new tmux session" if cwd == s.cwd else f", in a new tmux session in {pretty(cwd)}"),
+                    "detach", [cwd, *argv])
     return Plan(what, "exec", argv)
 
 
@@ -655,6 +658,7 @@ def cli(argv: list[str]) -> int:
     ap.add_argument("--client", default="", help="the tmux client to switch (a popup: the latest active)")
     ap.add_argument("--list", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--plan", metavar="SID", help=argparse.SUPPRESS)
+    ap.add_argument("--go", metavar="SID", help=argparse.SUPPRESS)
     a = ap.parse_args(argv)
     HOST = os.environ.get("SCRUBJAY_HOST") or subprocess.run(
         ["bash", "-c", '. "$1/bin/lib.sh" && sj_load_config && sj_host', "_", str(APP)],
@@ -664,6 +668,25 @@ def cli(argv: list[str]) -> int:
             os.chdir(a.cwd)
         except OSError:
             pass
+    if a.go:
+        # From the viewer: no terminal of its own, so as the popup would - into tmux, never exec
+        hit = [s for s in load() if s.sid == a.go] or [s for s in load() if s.sid.startswith(a.go)]
+        out = {"ok": False, "what": "", "error": ""}
+        if len(hit) != 1:
+            out["error"] = f"{len(hit)} sessions match {a.go}"
+        else:
+            p = plan(hit[0], True, True)
+            out["what"] = p.what
+            client = a.client or popup_client()
+            if p.kind == "msg":
+                out["error"] = p.what
+            elif not client:
+                out["error"] = f"no terminal is attached to tmux on {HOST or 'this machine'}: run sj resume {a.go[:8]} in one"
+            else:
+                out["error"] = run_plan(p, client)
+                out["ok"] = not out["error"]
+        print(json.dumps(out))
+        return 0 if out["ok"] else 1
     if a.list or a.plan:
         sessions = load()
         if a.plan:
