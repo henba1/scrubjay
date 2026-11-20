@@ -92,6 +92,37 @@ assert_eq "  …from the popup, into the folder it was opened in" "detach	$W	bas
 assert_contains "another harness: says so" "$(plan "$G")" "not a Claude session (opencode)"
 check_fails "a prefix that matches nothing" plan zzzz
 
+section "--go: the viewer's \"go there\", into tmux and never a terminal of its own"
+mkdir -p "$SANDBOX/stubbin"
+cat > "$SANDBOX/stubbin/faketmux" <<'EOF2'
+#!/usr/bin/env bash
+echo "$*" >> "$SANDBOX/tmux.calls"
+case "$1" in
+  list-clients) cat "$SANDBOX/tmux.clients" 2>/dev/null ;;
+  has-session) exit 1 ;;
+  new-session) prev=""; for a in "$@"; do [ "$prev" = --inner ] && rm -f "$a"; prev="$a"; done ;;   # the env file
+esac
+EOF2
+chmod +x "$SANDBOX/stubbin/faketmux"
+go() { (cd "$W" && SJ_KEEP_TMUX="$SANDBOX/stubbin/faketmux" python3 "$PICK" --go "$@"); }
+printf '100\t/dev/pts/1\n300\t/dev/pts/9\n200\t/dev/pts/5\n' > "$SANDBOX/tmux.clients"
+rm -f "$SANDBOX/tmux.calls"
+out="$(go "$A")"
+assert_eq "live in tmux: ok" true "$(jq -r .ok <<<"$out")"
+assert_contains "  …the terminal last used switches to it" "$(cat "$SANDBOX/tmux.calls")" "switch-client -c /dev/pts/9 -t =sj-claude-widget"
+rm -f "$SANDBOX/tmux.calls"
+out="$(go "${C:0:8}")"
+assert_eq "stopped: ok (a prefix will do)" true "$(jq -r .ok <<<"$out")"
+assert_contains "  …a new detached session in its folder, resuming it" "$(cat "$SANDBOX/tmux.calls")" "new-session -d -s sj-claude-widget -c $W"
+assert_contains "  …through sj resume" "$(grep new-session "$SANDBOX/tmux.calls")" "bin/sj.sh resume $C"
+assert_contains "  …then the switch to it" "$(cat "$SANDBOX/tmux.calls")" "switch-client -c /dev/pts/9 -t =sj-claude-widget"
+out="$(go "$B")"; rc=$?
+assert_eq "live outside tmux: refused, non-zero" "false 1" "$(jq -r .ok <<<"$out") $rc"
+assert_contains "  …and says why" "$(jq -r .error <<<"$out")" "outside tmux"
+: > "$SANDBOX/tmux.clients"
+assert_contains "no terminal in tmux: says what to run" "$(go "$C" | jq -r .error)" "no terminal is attached to tmux on testhost: run sj resume cccc0003"
+assert_contains "an unknown one" "$(go zzzz | jq -r .error)" "0 sessions match"
+
 section "the panel: what tells sessions of one folder apart"
 said() { python3 -c 'import importlib.util, json, sys
 s = importlib.util.spec_from_file_location("p", sys.argv[1]); m = importlib.util.module_from_spec(s); sys.modules["p"] = m; s.loader.exec_module(m)

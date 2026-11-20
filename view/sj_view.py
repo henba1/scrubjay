@@ -10,12 +10,13 @@ Started and stopped by bin/sj-view.sh (/sjview); not a daemon. It exits on its o
 Built on sjmcp's own readers (mcp/sjmcp_server.py imports nothing beyond the standard library until
 it builds the MCP server), so the catalogue and the archive are parsed one way only. It reads the
 archive and never changes it; its only writes are a line in the moves ledger (bin/sj-moves.sh) or
-the project links (bin/sj-projects.sh). Same
+the project links (bin/sj-projects.sh). Its one action is POST /api/goto, a session's "go there":
+bin/sj-pick.py --go switches this machine's tmux client to it, or resumes it in a new tmux session. Same
 environment as sjmcp: SCRUBJAY_DATA, SCRUBJAY_LOCAL_CHATS, SCRUBJAY_MEMORY; SCRUBJAY_HOST names this
 machine.
 
-Safety: binds 127.0.0.1 only; every request needs the per-run token (in the URL the wrapper
-prints, then a header), and a Host header naming this loopback port, so another page in the
+Safety: binds 127.0.0.1 only; every request needs the token (in the URL the wrapper prints, then a
+header; kept 0600 in --token-file across runs so the address stays good), and a Host header naming this loopback port, so another page in the
 browser cannot read the archive through it (DNS rebinding included).
 """
 from __future__ import annotations
@@ -758,6 +759,16 @@ def loose(st: "State") -> dict:
         return st.loose_now
 
 
+def goto(sid: str) -> dict:
+    """Into the session from this machine's terminal: bin/sj-pick.py --go, the picker's Enter."""
+    try:
+        out = subprocess.run([sys.executable, str(APP / "bin" / "sj-pick.py"), "--go", sid],
+                             capture_output=True, text=True, timeout=60).stdout
+        return json.loads(out.strip().splitlines()[-1])
+    except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        return {"ok": False, "error": "the picker did not answer"}
+
+
 def _resume_cmd(harness: str, sid: str) -> str:
     """The adapter's own resume command (bin/adapters/<harness>.sh: sjh_resume_cmd)."""
     try:
@@ -1039,6 +1050,17 @@ def handler_for(st: State):
                     return self._json({"error": "not a pack"}, 400)
                 p = build_pack(st, body.get("sids"), body.get("harness"))
                 return self._json(p, 400 if "error" in p else 200)
+            if method == "POST" and u.path == "/api/goto":
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    body = json.loads(self.rfile.read(n)) if 0 < n <= BODY_MAX else None
+                except ValueError:
+                    body = None
+                sid = body.get("sid") if isinstance(body, dict) else None
+                if not isinstance(sid, str) or sid not in _rows(st.r):
+                    return self._json({"ok": False, "error": "no such session"}, 400)
+                g = goto(sid)
+                return self._json(g, 200 if g.get("ok") else 409)
             if method == "POST" and u.path == "/api/stop":
                 self._json({"stopped": True})
                 threading.Thread(target=st.server.shutdown, daemon=True).start()
@@ -1054,6 +1076,28 @@ def handler_for(st: State):
     return H
 
 
+def token(f: Path | None) -> str:
+    """The token: the kept one, else a new one (kept, 0600, when there is a file to keep it in)."""
+    if f:
+        try:
+            t = f.read_text().strip()
+            if re.fullmatch(r"[A-Za-z0-9_-]{24,}", t):
+                return t
+        except OSError:
+            pass
+    t = secrets.token_urlsafe(18)
+    if f:
+        try:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            tmp = f.with_suffix(".tmp")
+            tmp.write_text(t)
+            os.chmod(tmp, 0o600)
+            tmp.replace(f)
+        except OSError:
+            pass
+    return t
+
+
 def _watch_idle(st: State):
     while st.idle > 0:
         time.sleep(min(30.0, st.idle / 4))
@@ -1067,6 +1111,7 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=0, help="0 = any free port")
     ap.add_argument("--idle", type=float, default=30, help="minutes without a request before it exits; 0 = never")
     ap.add_argument("--state", required=True, help="file to write {pid, port, url} to while running")
+    ap.add_argument("--token-file", help="keep the token here across runs, so an address stays good")
     a = ap.parse_args()
 
     r = sj.roots()
@@ -1077,7 +1122,8 @@ def main() -> int:
         return 1
     port = srv.server_address[1]
     state = Path(a.state)
-    st = State(secrets.token_urlsafe(18), port, a.idle * 60, r, state.parent / "view-artefacts.json")
+    st = State(token(Path(a.token_file) if a.token_file else None), port, a.idle * 60, r,
+               state.parent / "view-artefacts.json")
     st.server = srv
     st.arts.start({sj._handle(sid): rs[-1]["cwd"] for sid, rs in _rows(r).items()})
     st.acts.start()
