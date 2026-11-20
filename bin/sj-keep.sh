@@ -6,6 +6,10 @@
 # the SSH connection detaches it instead of hanging it up mid-turn.
 #
 #   usage: sj-keep.sh [--as <harness>] [--force] [--no-offer] [--explain] -- <cmd> [args…]
+#          sj-keep.sh --detach [--as <harness>] -- <cmd> [args…]
+#                                          start it in a new detached sj-* session, even from inside
+#                                          tmux, and print the session's name (the picker's popup
+#                                          then switches to it); SCRUBJAY_KEEP is not asked
 #          sj-keep.sh ls                   the sj-* sessions on this machine, and how to reattach
 #
 # bin/sj-shell.sh routes the interactive `claude`, `opencode` and `codex` commands through here;
@@ -73,13 +77,14 @@ if [ "${1:-}" = ls ]; then
   exit 0
 fi
 
-as="" force=0 explain=0 offer=1
+as="" force=0 explain=0 offer=1 detach=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --as)      as="${2:-}"; shift 2 ;;
     --force)   force=1; shift ;;
     --no-offer) offer=0; shift ;;
     --explain) explain=1; shift ;;
+    --detach)  detach=1; shift ;;
     --)        shift; break ;;
     -h|--help) awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$SELF"; exit 0 ;;
     *)         echo "sj-keep: unknown flag '$1' (the command goes after --)" >&2; exit 2 ;;
@@ -175,6 +180,18 @@ detached_here() {
       }' |
     sort -t "$(printf '\t')" -k1,1nr | cut -f2
 }
+
+if [ "$detach" = 1 ]; then
+  sj_has "$TMUX_BIN" || { echo "sj-keep: tmux is not installed" >&2; exit 1; }
+  name="$(session_name "$@")"
+  envf="$( (umask 077; mktemp "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/sj-keep.XXXXXX") )" || exit 1
+  export -p > "$envf"
+  if ! "$TMUX_BIN" new-session -d -s "$name" -c "$PWD" "$SELF" --inner "$envf" -- "$@"; then
+    rm -f "$envf"; echo "sj-keep: tmux could not start a session" >&2; exit 1
+  fi
+  printf '%s\n' "$name"
+  exit 0
+fi
 
 # Asked out here: inside $(decide) stdout is a pipe, never the terminal.
 on_tty=0

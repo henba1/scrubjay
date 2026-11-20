@@ -6,12 +6,13 @@
 # small local server (view/sj_view.py) in the background and opens it; it stops on `stop`, on the
 # page's Stop button, or by itself after SCRUBJAY_VIEW_IDLE minutes without a request.
 #
-#   usage: sj-view.sh [start] [PROJECT] [--port N] [--idle MIN] [--no-open] [--json]
+#   usage: sj-view.sh [start] [PROJECT] [--sid SID] [--port N] [--idle MIN] [--no-open] [--json]
 #          sj-view.sh stop | status [--json]
 #
 # PROJECT opens the map on that project alone. It need not be spelled right: it matches a
 # project folder's name ignoring case and punctuation, then as part of one, then by likeness;
-# the newest project wins a tie.
+# the newest project wins a tie. --sid opens that session's panel (a full id; `sj view <sid8>`
+# resolves a short one).
 # --json is for front-ends (an editor that opens the address itself): stdout is one JSON object,
 # {"running":true,"url":…,"port":…,"idle":…,"ssh":"ssh -L …"|null,"project":…|null} or
 # {"running":false}, and start never opens a browser.
@@ -29,19 +30,21 @@ LOGF="$(sj_progress_dir)/view.log"
 
 cmd=start
 case "${1:-}" in start|stop|status) cmd="$1"; shift ;; esac
-port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0 want="" project="" others=""
+port="${SCRUBJAY_VIEW_PORT:-7787}" idle="${SCRUBJAY_VIEW_IDLE:-30}" open=1 json=0 want="" project="" others="" sid=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --port) port="${2:-}"; shift 2 ;;
     --idle) idle="${2:-}"; shift 2 ;;
+    --sid) sid="${2:-}"; shift 2 ;;
     --no-open) open=0; shift ;;
     --json) json=1; open=0; shift ;;
-    -h|--help) sed -n '9,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '9,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "sj-view: unknown argument: $1" >&2; exit 2 ;;
     *) [ -z "$want" ] || { echo "sj-view: one project at a time ($want, $1)" >&2; exit 2; }
        want="$1"; shift ;;
   esac
 done
+case "$sid" in *[!A-Za-z0-9_-]*) echo "sj-view: --sid takes a session id" >&2; exit 2 ;; esac
 case "$port" in ''|*[!0-9]*) echo "sj-view: --port needs a number" >&2; exit 2 ;; esac
 case "$idle" in ''|*[!0-9]*) echo "sj-view: --idle needs whole minutes (0 = never)" >&2; exit 2 ;; esac
 
@@ -52,8 +55,11 @@ running() {
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then return 0; fi
   rm -f "$STATE"; return 1
 }
-# The address, opened on the matched project when one was asked for.
-url() { jq -r --arg p "$project" '.url + (if $p == "" then "" else "#project=" + ($p | @uri) end)' "$STATE"; }
+# The address, opened on the matched project and the session when asked for.
+url() {
+  jq -r --arg p "$project" --arg s "$sid" '.url + ([(if $p == "" then empty else "project=" + ($p | @uri) end),
+    (if $s == "" then empty else "sid=" + $s end)] | if length == 0 then "" else "#" + join("&") end)' "$STATE"
+}
 
 # The catalogued project (the last folder of a session's path, as the map's lanes name it) that
 # best fits what was typed: the same name ignoring case and punctuation, then one that contains it

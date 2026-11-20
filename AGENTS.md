@@ -70,9 +70,12 @@ git-vs-rsync; sensitive-vs-not picks NAS-vs-GitHub" model). Full docs build with
 - `bin/sj.sh` — **the front door for finding and resuming sessions** (`sj`, a function from
   `bin/sj-shell.sh`): `sj ls` lists every agent on every machine (here: `sj-reap.sh rows`, the registry
   joined with tmux; elsewhere: the relayed `<host>/live/*.lease`, shown "as of"; plus what sj-reap
-  stopped); `sj attach` goes to the tmux session here or over `ssh -t <alias>`; `sj resume` attaches to
-  a live copy, else `claude --resume` in its folder, else the `sj-claude-resume.sh` hand-off, and never
-  starts a second live copy without `--force`. It wraps the older commands rather than replacing them.
+  stopped); `sj` alone opens `bin/sj-pick.py`, a curses picker of the project's sessions (live and
+  catalogued, from `sj rows`) whose Enter does what `sj resume` would — in tmux it is a popup on a
+  status-bar click or prefix S (tests: `tests/test_pick.sh`); `sj attach` goes to the tmux session
+  here or over `ssh -t <alias>`; `sj resume` attaches to a live copy, else `claude --resume` in its
+  folder, else the `sj-claude-resume.sh` hand-off, and never starts a second live copy without
+  `--force`. It wraps the older commands rather than replacing them.
   Tests: `tests/test_sj.sh`.
 - `bin/sj-live.sh` — session leases: which sessions a harness process holds open. Marked from
   lifecycle events (`hooks/live-session.sh`, `hooks/log-session.sh`, the opencode plugin), relayed to

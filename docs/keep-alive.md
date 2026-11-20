@@ -40,10 +40,42 @@ from the [shell integration](handoff.md#from-a-terminal-claude-resume-sid) (`bin
 integration, run `~/.scrubjay/scrubjay/bin/sj.sh` by path).
 
 ```sh
+sj                     # the picker: this project's sessions, live and past, on every machine
 sj ls                  # every agent on every machine: host, sid, state, idle, tmux session, folder, topic
 sj attach <name|sid8>  # back into a running one: tmux here, or ssh -t <host> tmux attach there
 sj resume <sid8>       # continue one, by whichever path fits, and it says which
+sj view [<sid8>]       # the session map in a browser, opened on that session
 ```
+
+### The picker
+
+`sj` on its own (or `sj pick`) opens a full-screen list of the sessions of the project you are in:
+the git repository, worktrees included, and the same repository on your other machines. Live ones come
+first, then the rest newest first. Sessions that never got a title are left out (`e` shows them).
+For several sessions in one folder, the panel beside the list shows what tells them apart: the title,
+the first and the last prompt, and how the last reply ended. It also says what Enter will do.
+
+```text
+ widget  ·  5 sessions, 2 live                       Enter go · Tab all · / filter · v view · ? keys
+ ● a1b2c3d4  working   2m  sj-claude-widget*      Retry backoff for the uploader
+ ○ 9f8e7d6c  idle      1h  @laptop                Flaky upload test on CI
+ · 77aa0c1e            3h                         Upload size limit, config and docs
+ · 4c5d6e7f            2d                         Release 1.4 notes
+```
+
+| key | does |
+|---|---|
+| Enter | go back into it, the way `sj resume` would: switch to its tmux session, or resume it in its folder, or hand it off from the archive. It never starts a second copy of a live session |
+| Tab | this project ⇄ every project (`sj --all` opens on every project) |
+| `/` | filter by words in the title, id, host or branch |
+| `l` | live sessions only (`sj --live`) |
+| `v` | start the [session map](session-viewer.md) on this session, and copy its address |
+| `y` | copy the session id |
+
+In tmux, **a click on the left of the [status bar](#the-status-bar)** or **prefix `S`** opens the
+same picker in a popup, on the clicked pane's project (tmux 3.2 and later). There, Enter on a session
+that isn't running starts it in a new kept `sj-*` session and switches to it, so the pane you came
+from stays as it was.
 
 ```text
 HOST       SID      STATE    IDLE    TMUX                           FOLDER               TOPIC
@@ -200,9 +232,8 @@ ships one that says what the agent in the pane is doing, and what else runs in i
 - **right:** the session's title, time, date and host. On a narrow terminal the bar drops things to
   fit, related sessions first, then the date.
 - **a click on a related session** switches to its tmux pane (tmux 3.4 and later). **A click
-  elsewhere on the left** opens a menu of those sessions, which works on any tmux: choosing one
-  switches to it (one in a Neovim can't be switched to and is shown greyed out). "All tmux sessions"
-  is tmux's own picker. Clicks need `set -g mouse on`.
+  elsewhere on the left**, or prefix `S`, opens [the picker](#the-picker) in a popup (tmux 3.2 and
+  later; before that, a menu of the project's live sessions). Clicks need `set -g mouse on`.
 
 It is black and dim, and nothing on it stays put: the text drifts a cell every two minutes and its
 grey breathes slowly, so an OLED screen doesn't burn it in. `SCRUBJAY_STATUS_DRIFT=off` keeps it
