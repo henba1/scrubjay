@@ -1329,6 +1329,10 @@ still running, what each session changed and how your projects fit together, the
 <td>Opens on one project</td>
 </tr>
 <tr>
+<td><code>sj view &lt;sid8&gt;</code>, <code>sj view &lt;project&gt;</code></td>
+<td>The same from a terminal, opened on that session or project</td>
+</tr>
+<tr>
 <td><code>/sjview status</code></td>
 <td>Says whether it runs, and where</td>
 </tr>
@@ -1344,7 +1348,13 @@ several fit, the newest wins and the others are listed. With no likely match, it
 or after 30 minutes without a request. On a machine you reach over SSH, forward the port it prints:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">7787</span>:127.0.0.1:7787<span class="w"> </span>&lt;host&gt;
 </code></pre></div>
-<p><code>bin/sj-view.sh</code> also takes <code>--port N</code>, <code>--idle MIN</code> (<code>0</code> keeps it running) and <code>--no-open</code>.
+<p>The address stays the same from one start to the next, so a bookmark keeps working. For a forward
+that is always there, put it in <code>~/.ssh/config</code> once:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Host &lt;host&gt;
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    LocalForward 7787 127.0.0.1:7787
+</code></pre></div>
+<p><code>bin/sj-view.sh</code> also takes <code>--port N</code>, <code>--idle MIN</code> (<code>0</code> keeps it running), <code>--no-open</code>, and
+<code>--new-token</code>, which gives it a new address and retires the old one.
 <code>SCRUBJAY_VIEW_PORT</code> and <code>SCRUBJAY_VIEW_IDLE</code> set the defaults (<a href="../reference/">reference</a>).</p>
 <h2 id="two-views-of-the-same-sessions">Two views of the same sessions<a class="headerlink" href="#two-views-of-the-same-sessions" title="Permanent link">&para;</a></h2>
 <p><strong>Map</strong> and <strong>Timeline</strong> in the header switch views. Filters, the selected session and the context pack
@@ -1449,6 +1459,9 @@ a card's title, or at the end of a timeline bar.</p>
 </tbody>
 </table>
 <p>Only this machine's processes can be asked, so a session on another machine is at best recent.</p>
+<p>With no session or project in its address, the map opens on what is <strong>live, here or elsewhere</strong>: open
+here, or recent on another machine. When nothing is, it shows everything and says so. Choose another
+status and this browser remembers it.</p>
 <p>The status menu filters by any state, or by all sessions open here, and counts each. It looks past the
 date and <strong>show empty</strong> filters, so a live session is never hidden by its age. Marks and counts refresh
 every 10 seconds.</p>
@@ -1505,6 +1518,10 @@ is read in the background on start and cached, so a later start reads only new t
 <li><strong>Read transcript</strong>, condensed or in full</li>
 <li>the command that continues it: the harness's own resume for a session from this machine, or
   <code>sj-resume.sh</code> first for one from another machine (<a href="../handoff/">hand-off</a>)</li>
+<li>for a Claude session, a button that takes you there in your terminal: <strong>Switch my terminal to it</strong>
+  when it runs in tmux here, else <strong>Resume it in my terminal</strong>. The tmux client you last typed in
+  switches to the session's tmux session, or to a new one that resumes it. It works the way Enter does
+  in <a href="../keep-alive/#the-picker">the picker</a>, so it never starts a second copy of a live session</li>
 </ul>
 <h2 id="connecting-projects">Connecting projects<a class="headerlink" href="#connecting-projects" title="Permanent link">&para;</a></h2>
 <p>A lane is a folder's name, so a rename, a merge or a subfolder reads as separate projects until you say
@@ -1653,12 +1670,15 @@ empty</strong>.</p>
 </tbody>
 </table>
 <p>Addresses you can keep end in <code>#sid=&lt;id&gt;</code> (a session's panel), <code>#read=&lt;id&gt;</code> (its transcript), <code>#art=&lt;id&gt;</code>
-(an artefact's milestones), <code>#project=&lt;name&gt;</code> (one project) or <code>#view=timeline</code>.</p>
+(an artefact's milestones), <code>#project=&lt;name&gt;</code> (one project), <code>#status=&lt;live|active|working|waiting|idle|recent|died|any&gt;</code>
+or <code>#view=timeline</code>. A session asked for by <code>#sid=</code> is shown even when the filters would hide it, and its
+card flashes when the map opens on it.</p>
 <p>The menu beside <strong>Stop viewer</strong> sets the colours: your system's light or dark, or a preset (Light, Dark,
 Nord, Solarized light and dark, Gruvbox, High contrast, Colour-blind safe). This browser remembers it.</p>
 <h2 id="what-it-reads-and-writes">What it reads and writes<a class="headerlink" href="#what-it-reads-and-writes" title="Permanent link">&para;</a></h2>
 <p>The viewer reads the archive and never changes it. It listens on <code>127.0.0.1</code> alone and answers only
-requests carrying the token in the address it prints.</p>
+requests carrying the token in the address it prints. The token is kept in <code>~/.scrubjay/run/view.token</code>
+(readable by you alone). Its one action is the panel's go-there button, which only moves your own tmux.</p>
 <table>
 <thead>
 <tr>
@@ -1693,8 +1713,8 @@ requests carrying the token in the address it prints.</p>
 <p>A machine with no archive (<code>rsync-wg</code>) shows the map but cannot open transcripts or show bursts of work.</p>
 <h2 id="nextcloud-links">Nextcloud links<a class="headerlink" href="#nextcloud-links" title="Permanent link">&para;</a></h2>
 <p>If the same folders are in a Nextcloud, set these in <code>~/.config/scrubjay/config</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">SCRUBJAY_VIEW_NEXTCLOUD</span><span class="o">=</span>https://cloud.example
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nv">SCRUBJAY_VIEW_NEXTCLOUD_MAP</span><span class="o">=</span>/mnt/nas<span class="o">=</span>/NAS
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">SCRUBJAY_VIEW_NEXTCLOUD</span><span class="o">=</span>https://cloud.example
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">SCRUBJAY_VIEW_NEXTCLOUD_MAP</span><span class="o">=</span>/mnt/nas<span class="o">=</span>/NAS
 </code></pre></div>
 <p>Every path under that folder then gets an <strong>☁ open</strong> link: a session's folder, its transcript, a local
 repo or folder, each file written. A folder opens in the Files app; a file opens its folder with the
