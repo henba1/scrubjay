@@ -122,6 +122,8 @@ assert_contains "  …and says why" "$(jq -r .error <<<"$out")" "outside tmux"
 : > "$SANDBOX/tmux.clients"
 assert_contains "no terminal in tmux: says what to run" "$(go "$C" | jq -r .error)" "no terminal is attached to tmux on testhost: run sj resume cccc0003"
 assert_contains "an unknown one" "$(go zzzz | jq -r .error)" "0 sessions match"
+out="$(cd "$W" && SJ_KEEP_TMUX="$SANDBOX/no-such-tmux" python3 "$PICK" --go "$C")"
+assert_contains "no tmux at all: still JSON, and says so" "$(jq -r .error <<<"$out")" "tmux is not usable on testhost"
 
 section "the panel: what tells sessions of one folder apart"
 said() { python3 -c 'import importlib.util, json, sys
