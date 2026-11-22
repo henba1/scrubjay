@@ -670,21 +670,25 @@ def cli(argv: list[str]) -> int:
             pass
     if a.go:
         # From the viewer: no terminal of its own, so as the popup would - into tmux, never exec
-        hit = [s for s in load() if s.sid == a.go] or [s for s in load() if s.sid.startswith(a.go)]
+        sessions = load()
+        hit = [s for s in sessions if s.sid == a.go] or [s for s in sessions if s.sid.startswith(a.go)]
         out = {"ok": False, "what": "", "error": ""}
         if len(hit) != 1:
             out["error"] = f"{len(hit)} sessions match {a.go}"
         else:
             p = plan(hit[0], True, True)
             out["what"] = p.what
-            client = a.client or popup_client()
-            if p.kind == "msg":
-                out["error"] = p.what
-            elif not client:
-                out["error"] = f"no terminal is attached to tmux on {HOST or 'this machine'}: run sj resume {a.go[:8]} in one"
-            else:
-                out["error"] = run_plan(p, client)
-                out["ok"] = not out["error"]
+            try:   # no tmux installed: say so in words, not a traceback the viewer cannot read
+                client = "" if p.kind == "msg" else a.client or popup_client()
+                if p.kind == "msg":
+                    out["error"] = p.what
+                elif not client:
+                    out["error"] = f"no terminal is attached to tmux on {HOST or 'this machine'}: run sj resume {a.go[:8]} in one"
+                else:
+                    out["error"] = run_plan(p, client)
+                    out["ok"] = not out["error"]
+            except OSError as e:
+                out["error"] = f"tmux is not usable on {HOST or 'this machine'} ({e.strerror or e}): run sj resume {a.go[:8]} in a terminal"
         print(json.dumps(out))
         return 0 if out["ok"] else 1
     if a.list or a.plan:

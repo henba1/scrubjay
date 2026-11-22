@@ -44,7 +44,7 @@ sj                     # the picker: this project's sessions, live and past, on 
 sj ls                  # every agent on every machine: host, sid, state, idle, tmux session, folder, topic
 sj attach <name|sid8>  # back into a running one: tmux here, or ssh -t <host> tmux attach there
 sj resume <sid8>       # continue one, by whichever path fits, and it says which
-sj view [<sid8>]       # the session map in a browser, opened on that session
+sj view [<sid8>]       # the session map in a browser, opened on that session (else this project)
 ```
 
 ### The picker

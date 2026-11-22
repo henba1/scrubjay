@@ -535,7 +535,8 @@ function draw() {
   const aedges = G.edges.filter((e) => e.kind === "artefact" && shown.has(e.from) && mode !== "none"
     && (mode === "all" || GIT_KINDS.has(byArt.get(e.to)?.kind)));
   const idx = G.indexing ? ` · reading artefacts ${G.indexing.done}/${G.indexing.total}` : "";
-  $("count").textContent = `${nodes.length} of ${G.nodes.length} sessions${idx}`;
+  const note = $("count").dataset.note ? " · " + $("count").dataset.note : "";
+  $("count").textContent = `${nodes.length} of ${G.nodes.length} sessions${note}${idx}`;
   $("empty").hidden = nodes.length > 0;
   $("empty").textContent = G.nodes.length ? "No session matches these filters." :
     "The catalogue is empty on this machine (no logs/*.log in the data repo).";
@@ -1165,7 +1166,7 @@ document.addEventListener("keydown", (e) => {
   else closePanel();
 });
 for (const id of ["project", "host", "harness", "since", "arts", "empty-too", "status"]) $(id).addEventListener("input", draw);
-$("status").addEventListener("input", () => { try { localStorage.setItem("sj-status", $("status").value || "any"); } catch {} });
+$("status").addEventListener("input", () => { delete $("count").dataset.note; draw(); try { localStorage.setItem("sj-status", $("status").value || "any"); } catch {} });
 let typing = 0; // the search redraws once typing pauses, not on every key
 $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(draw, 140); });
 
@@ -1757,12 +1758,15 @@ load().then(async () => {
   }
   // A session asked for by name is shown, whatever the filters would hide.
   if (sid && bySid.has(sid) && !visible().some((n) => n.sid === sid)) {
+    const n = bySid.get(sid);
     $("status").value = ""; $("since").value = "0"; $("q").value = "";
-    if (bySid.get(sid).line !== $("project").value) $("project").value = "";
+    if (n.line !== $("project").value) $("project").value = "";
+    if (n.host !== $("host").value) $("host").value = "";
+    if (n.harness !== $("harness").value) $("harness").value = "";
+    if (n.size === "0" && !n.topic) $("empty-too").checked = true;
   }
   if (sid) { ARRIVE = sid; setTimeout(() => { ARRIVE = ""; cardEl.get(sid)?.classList.remove("arrive"); }, 3000); }
   draw();
-  if ($("count").dataset.note) $("count").textContent += " · " + $("count").dataset.note;
   let mode = h.get("view");
   try { mode ||= localStorage.getItem("sj-view"); } catch {}
   if (mode === "timeline") setMode(mode);

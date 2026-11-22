@@ -22,7 +22,8 @@ still running, what each session changed and how your projects fit together, the
 |---|---|
 | `/sjview` | Starts the viewer and prints its address |
 | `/sjview <project>` | Opens on one project |
-| `sj view <sid8>`, `sj view <project>` | The same from a terminal, opened on that session or project |
+| `sj view` | The same from a terminal, opened on the project of the folder you are in |
+| `sj view <sid8>`, `sj view <project>` | Opened on that session or project |
 | `/sjview status` | Says whether it runs, and where |
 | `/sjview stop` | Stops it |
 

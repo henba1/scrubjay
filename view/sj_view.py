@@ -1090,8 +1090,10 @@ def token(f: Path | None) -> str:
         try:
             f.parent.mkdir(parents=True, exist_ok=True)
             tmp = f.with_suffix(".tmp")
-            tmp.write_text(t)
-            os.chmod(tmp, 0o600)
+            tmp.unlink(missing_ok=True)
+            # created 0600, never readable by others even for a moment: the token outlives the run
+            with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as fh:
+                fh.write(t)
             tmp.replace(f)
         except OSError:
             pass

@@ -591,6 +591,12 @@ out="$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --no-open)"
 assert_contains "no likeness: all of them, and says so" "$out" 'no project like "zzqqxx"'
 assert_eq "no likeness: a plain address" null "$(SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" zzqqxx --json | jq .project)"
 assert_contains "the page reads #project=" "$(cat "$APP/view/index.html")" 'h.get("project")'
+here="$SANDBOX/here"; mkdir -p "$here/widget-api/src" "$here/nowhere"
+git -C "$here/widget-api" init -q
+sjv() { (cd "$1" && SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj.sh" view --json | jq -r .project); }
+assert_eq "sj view alone: the project of the folder it runs in" widget-api "$(sjv "$here/widget-api/src")"
+assert_eq "  …not a git repository: the folder's name" Gadget_Firmware "$(mkdir -p "$here/Gadget_Firmware" && sjv "$here/Gadget_Firmware")"
+assert_eq "  …a folder with no sessions: every project" null "$(sjv "$here/nowhere")"
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
 section "colour presets: each one in the menu has its colours, and sets all of them"
