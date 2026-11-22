@@ -222,19 +222,31 @@ cmd_pick() {
   exec python3 "$APP/bin/sj-pick.py" "$@"
 }
 
-# The project of the folder sj runs in, as the map's lanes name one (a folder's last part; for a git
-# repository or a worktree of it, the repository's), when the catalogue has sessions there.
+# The project of the folder sj runs in, as the map's lanes name one: the last part of a session's
+# folder. The first that has sessions of: this folder, the ones above it up to its git repository's
+# top (else up to, not including, $HOME), then the repository's own name, which a worktree shares.
 here_project() {
-  local common name
-  common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  local names d top="" common="" name
+  names="$(sj_log_catalogue 2>/dev/null | awk -F '\t' '{ sub(/\/+$/, "", $4); sub(/.*\//, "", $4); print $4 }' | sort -u)"
+  if top="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    common="$(git rev-parse --git-common-dir 2>/dev/null)"   # relative to here on older git: made absolute
+    common="$(cd "$common" 2>/dev/null && pwd -P)"
+  fi
+  d="$(pwd -P)"
+  while [ -n "$d" ] && [ "$d" != / ]; do
+    [ -z "$top" ] && [ "$d" = "$(cd "$HOME" 2>/dev/null && pwd -P)" ] && break
+    name="$(basename "$d")"
+    grep -qxF -- "$name" <<<"$names" && { printf '%s\n' "$name"; return 0; }
+    [ -n "$top" ] && [ "$d" = "$(cd "$top" && pwd -P)" ] && break
+    d="$(dirname "$d")"
+  done
   case "$common" in
-    "")     name="$(basename "$PWD")" ;;
+    "")     return 0 ;;
     */.git) name="$(basename "$(dirname "$common")")" ;;
     *)      name="$(basename "${common%.git}")" ;;
   esac
-  # awk reads it all: grep -q would stop at the first match, and pipefail count the writer's broken pipe
-  sj_log_catalogue 2>/dev/null | awk -F '\t' -v n="$name" '{ sub(/\/+$/, "", $4); sub(/.*\//, "", $4) }
-    $4 == n { hit = 1 } END { exit !hit }' && printf '%s\n' "$name"
+  grep -qxF -- "$name" <<<"$names" && printf '%s\n' "$name"
+  return 0
 }
 
 # sj view [<sid|sid8>|<project>] — bin/sj-view.sh, opened on a session when given (part of) its id;
