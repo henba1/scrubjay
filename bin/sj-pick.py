@@ -678,7 +678,7 @@ def cli(argv: list[str]) -> int:
         else:
             p = plan(hit[0], True, True)
             out["what"] = p.what
-            try:   # no tmux installed: say so in words, not a traceback the viewer cannot read
+            try:   # tmux missing, a folder gone: say so in words, not a traceback the viewer cannot read
                 client = "" if p.kind == "msg" else a.client or popup_client()
                 if p.kind == "msg":
                     out["error"] = p.what
@@ -687,8 +687,9 @@ def cli(argv: list[str]) -> int:
                 else:
                     out["error"] = run_plan(p, client)
                     out["ok"] = not out["error"]
-            except OSError as e:
-                out["error"] = f"tmux is not usable on {HOST or 'this machine'} ({e.strerror or e}): run sj resume {a.go[:8]} in a terminal"
+            except OSError as e:   # which: tmux, bash, or the session's folder
+                what = f"{e.strerror}: {e.filename}" if e.strerror and e.filename else str(e)
+                out["error"] = f"could not go there on {HOST or 'this machine'} ({what}): run sj resume {a.go[:8]} in a terminal"
         print(json.dumps(out))
         return 0 if out["ok"] else 1
     if a.list or a.plan:

@@ -597,6 +597,11 @@ sjv() { (cd "$1" && SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj.sh" view --json | j
 assert_eq "sj view alone: the project of the folder it runs in" widget-api "$(sjv "$here/widget-api/src")"
 assert_eq "  …not a git repository: the folder's name" Gadget_Firmware "$(mkdir -p "$here/Gadget_Firmware" && sjv "$here/Gadget_Firmware")"
 assert_eq "  …a folder with no sessions: every project" null "$(sjv "$here/nowhere")"
+git -C "$here/widget-api" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m init
+git -C "$here/widget-api" worktree add -q -b fix-x "$here/fix-x" 2>/dev/null
+assert_eq "  …a worktree with no sessions of its own: its repository's" widget-api "$(sjv "$here/fix-x")"
+mkdir -p "$here/mono/Gadget_Firmware/src"; git -C "$here/mono" init -q
+assert_eq "  …a folder in a repository that has its own sessions: that folder's" Gadget_Firmware "$(sjv "$here/mono/Gadget_Firmware/src")"
 SCRUBJAY_RUN_DIR="$R4" bash "$APP/bin/sj-view.sh" stop >/dev/null
 
 section "colour presets: each one in the menu has its colours, and sets all of them"

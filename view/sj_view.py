@@ -29,6 +29,7 @@ import secrets
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections import Counter
@@ -1089,12 +1090,22 @@ def token(f: Path | None) -> str:
     if f:
         try:
             f.parent.mkdir(parents=True, exist_ok=True)
-            tmp = f.with_suffix(".tmp")
-            tmp.unlink(missing_ok=True)
-            # created 0600, never readable by others even for a moment: the token outlives the run
-            with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as fh:
-                fh.write(t)
-            tmp.replace(f)
+            # mkstemp: created 0600, never readable by others even for a moment (the token outlives
+            # the run). Linked into place only if no file is there: two viewers starting at once
+            # agree on the first one's token rather than each serving its own.
+            fd, tmp = tempfile.mkstemp(dir=f.parent, prefix=f.name + ".")
+            try:
+                with os.fdopen(fd, "w") as fh:
+                    fh.write(t)
+                try:
+                    os.link(tmp, f)
+                except FileExistsError:
+                    kept = f.read_text().strip()
+                    if re.fullmatch(r"[A-Za-z0-9_-]{24,}", kept):
+                        return kept
+                    os.replace(tmp, f)   # a file that holds no token: ours instead
+            finally:
+                Path(tmp).unlink(missing_ok=True)
         except OSError:
             pass
     return t

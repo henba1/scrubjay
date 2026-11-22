@@ -680,6 +680,8 @@ async function pollLive() {
   for (const [sid, el] of cardEl) paintLive(el, sid);
   countLive();
   if (!TL.act) tlPaint();
+  // "nothing is running now" holds until something is
+  if ($("count").dataset.note && G.nodes.some((n) => isLive(n.sid))) { delete $("count").dataset.note; draw(); return; }
   if ($("status").value) {
     const shown = new Set(LAYOUT.nodes.map((n) => n.sid)), now = visible();
     if (now.length !== shown.size || now.some((n) => !shown.has(n.sid))) draw();
@@ -1165,7 +1167,7 @@ document.addEventListener("keydown", (e) => {
   if ($("reader").classList.contains("open")) $("reader").classList.remove("open");
   else closePanel();
 });
-for (const id of ["project", "host", "harness", "since", "arts", "empty-too", "status"]) $(id).addEventListener("input", draw);
+for (const id of ["project", "host", "harness", "since", "arts", "empty-too"]) $(id).addEventListener("input", draw);  // status: below, with the note
 $("status").addEventListener("input", () => { delete $("count").dataset.note; draw(); try { localStorage.setItem("sj-status", $("status").value || "any"); } catch {} });
 let typing = 0; // the search redraws once typing pauses, not on every key
 $("q").addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(draw, 140); });
