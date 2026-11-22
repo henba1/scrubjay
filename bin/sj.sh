@@ -222,13 +222,30 @@ cmd_pick() {
   exec python3 "$APP/bin/sj-pick.py" "$@"
 }
 
-# sj view [<sid|sid8>|<project>] — bin/sj-view.sh, opened on a session when given (part of) its id
+# The project of the folder sj runs in, as the map's lanes name one (a folder's last part; for a git
+# repository or a worktree of it, the repository's), when the catalogue has sessions there.
+here_project() {
+  local common name
+  common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  case "$common" in
+    "")     name="$(basename "$PWD")" ;;
+    */.git) name="$(basename "$(dirname "$common")")" ;;
+    *)      name="$(basename "${common%.git}")" ;;
+  esac
+  # awk reads it all: grep -q would stop at the first match, and pipefail count the writer's broken pipe
+  sj_log_catalogue 2>/dev/null | awk -F '\t' -v n="$name" '{ sub(/\/+$/, "", $4); sub(/.*\//, "", $4) }
+    $4 == n { hit = 1 } END { exit !hit }' && printf '%s\n' "$name"
+}
+
+# sj view [<sid|sid8>|<project>] — bin/sj-view.sh, opened on a session when given (part of) its id;
+# alone, on the project of the folder it runs in, as `sj` opens the picker there
 cmd_view() {
   local want="${1:-}" sid
   [ -n "$want" ] && [ "${want#-}" = "$want" ] && shift || want=""
   if [ -n "$want" ] && is_sid "$want" && sid="$(pick "$want" "$(collect)")" && [ -n "$sid" ]; then
     exec bash "$APP/bin/sj-view.sh" start --sid "$sid" "$@"
   fi
+  [ -n "$want" ] || want="$(here_project)"
   exec bash "$APP/bin/sj-view.sh" start ${want:+"$want"} "$@"
 }
 
