@@ -99,6 +99,19 @@ if need_cmd tmux "tmux parses tmux/scrubjay.conf"; then
   # tmux expands ${...} in a double-quoted string itself and knows no ${X:-default}: it must parse
   err="$(tmux -L "sjstatus$$" -f /dev/null start-server \; source-file -n "$APP/tmux/scrubjay.conf" 2>&1)"
   assert_eq "tmux parses it without a complaint" "" "$err"
+  # its version checks, run on other versions: by number, so 3.10 is newer than 3.2
+  tmux -L "sjstatus$$" -f /dev/null new-session -d -s t
+  for want in 302 304; do
+    expr="$(sed -n "s/^%if \"\\(.*,$want}\\)\".*/\\1/p" "$APP/tmux/scrubjay.conf" | sed 's/:version}/:@v}/g')"
+    got=""
+    for v in 2.9a 3.1c 3.2 3.3a 3.4 3.5a 3.10 next-3.6 4.0; do
+      tmux -L "sjstatus$$" set -g @v "$v"; got="$got $v:$(tmux -L "sjstatus$$" display -p "$expr")"
+    done
+    case "$want" in
+      302) assert_eq "the popup from 3.2" " 2.9a:0 3.1c:0 3.2:1 3.3a:1 3.4:1 3.5a:1 3.10:1 next-3.6:1 4.0:1" "$got" ;;
+      304) assert_eq "the click ranges from 3.4" " 2.9a:0 3.1c:0 3.2:0 3.3a:0 3.4:1 3.5a:1 3.10:1 next-3.6:1 4.0:1" "$got" ;;
+    esac
+  done
   tmux -L "sjstatus$$" kill-server 2>/dev/null
 fi
 # what onboard writes into ~/.tmux.conf: a path tmux can expand ($HOME), never ${X:-default}
