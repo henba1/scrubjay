@@ -15,13 +15,14 @@
 
 ## Start and stop
 
-| Command                               | What it does                                                |
-| ------------------------------------- | ----------------------------------------------------------- |
-| `/sjview`                             | Starts the viewer and prints its address                    |
-| `/sjview <project>`                   | Opens on one project                                        |
-| `sj view <sid8>`, `sj view <project>` | The same from a terminal, opened on that session or project |
-| `/sjview status`                      | Says whether it runs, and where                             |
-| `/sjview stop`                        | Stops it                                                    |
+| Command                               | What it does                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| `/sjview`                             | Starts the viewer and prints its address                                 |
+| `/sjview <project>`                   | Opens on one project                                                     |
+| `sj view`                             | The same from a terminal, opened on the project of the folder you are in |
+| `sj view <sid8>`, `sj view <project>` | Opened on that session or project                                        |
+| `/sjview status`                      | Says whether it runs, and where                                          |
+| `/sjview stop`                        | Stops it                                                                 |
 
 The project name need not be exact: `widget`, `WIDGET_API` or `widgt-api` all find `widget-api`. When several fit, the newest wins and the others are listed. With no likely match, it shows every project.
 

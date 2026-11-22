@@ -92,7 +92,7 @@ sj attach <tmux-name|sid8>     # tmux attach here, or ssh -t <host> tmux attach 
 sj resume <sid8>               # attach if it still runs, else claude --resume in its folder, else hand it off
 sj resume --force <sid8>       # start a second copy although one is live (they diverge)
 sj where <sid8>                # the tmux session holding it on this machine
-sj view [<sid8>|<project>]     # the session map in a browser, on that session or project
+sj view [<sid8>|<project>]     # the session map in a browser, on that session or project (else this folder's)
 ```
 
 It wraps `tmux attach`, `claude -c` / `--resume`, `claude resume <sid>`, `/sjresume` and `sj-reap.sh ls`. Other hosts are reached by SSH alias: the host name when it is a `Host` in `~/.ssh/config`, or `SCRUBJAY_SSH_HOSTS="host=alias …"`. Details: [Keeping agents alive](https://henba1.github.io/scrubjay/keep-alive/#finding-and-resuming-sessions-sj).
